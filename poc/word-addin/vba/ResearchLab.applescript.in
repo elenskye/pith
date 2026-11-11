@@ -1,0 +1,11 @@
+-- Research Lab 引文 PoC：Word 宏通过 AppleScriptTask 调用本机 Node。
+-- 由 vba/install-word-bridge.sh 填入路径并编译到 ~/Library/Application Scripts/com.microsoft.Word/
+on rlBridge(payload)
+	set nodePath to "@NODE@"
+	set bridgePath to "@BRIDGE@"
+	try
+		return do shell script quoted form of nodePath & " " & quoted form of bridgePath & " " & quoted form of payload without altering line endings
+	on error errMsg
+		return "ERR" & tab & errMsg
+	end try
+end rlBridge

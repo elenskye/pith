@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["src-tauri", "crates/zotero-import", "crates/docx-engine"]
+
+[workspace.package]
+edition = "2024"
+publish = false
+
+[profile.dev.package."*"]
+debug = false

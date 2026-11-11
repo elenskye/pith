@@ -1,0 +1,18 @@
+# Peck runtime handoff & task artifacts
+.peck/
+
+# Rust
+/target/
+
+# 本机私有输出（真实库副本的解析结果等），不进 Git
+/local/
+
+.DS_Store
+node_modules/
+dist/
+
+# Tauri 生成的权限 schema
+/src-tauri/gen/
+
+# Agent 的临时 worktree
+.claude/worktrees/

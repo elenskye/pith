@@ -1,0 +1,774 @@
+{
+ "name": "某某大学本科毕业论文撰写规范（示例，2026 年版）",
+ "requirements": [
+  {
+   "id": "A1",
+   "group": "页面与通用",
+   "text": "A4 纸",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "1.1",
+     "quote": "论文一律用 A4 纸打印"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "page",
+     "prop": "paper",
+     "value": "A4"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "A2",
+   "group": "页面与通用",
+   "text": "页边距：上 30 mm、下 25 mm、左右各 25 mm，装订线 10 mm，页眉距边界 16 mm，页脚距边界 15 mm",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "1.1",
+     "quote": "页边距：上 30 mm，下 25 mm，左、右各 25 mm"
+    },
+    {
+     "doc": "R1",
+     "section": "1.1",
+     "quote": "页眉距边界 16 mm，页脚距边界 15 mm"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "page",
+     "prop": "margin_top",
+     "value": "30mm"
+    },
+    {
+     "target": "page",
+     "prop": "margin_bottom",
+     "value": "25mm"
+    },
+    {
+     "target": "page",
+     "prop": "margin_left",
+     "value": "25mm"
+    },
+    {
+     "target": "page",
+     "prop": "margin_right",
+     "value": "25mm"
+    },
+    {
+     "target": "page",
+     "prop": "gutter",
+     "value": "10mm"
+    },
+    {
+     "target": "page",
+     "prop": "header_distance",
+     "value": "16mm"
+    },
+    {
+     "target": "page",
+     "prop": "footer_distance",
+     "value": "15mm"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "A3",
+   "group": "页面与通用",
+   "text": "30 页及以上双面打印；正文从奇数页开始",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "1.3",
+     "quote": "30 页及以上的论文双面打印。正文从奇数页开始"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "layout",
+     "prop": "duplex_from_pages",
+     "value": "30"
+    },
+    {
+     "target": "layout",
+     "prop": "body_on_odd_page",
+     "value": "true"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "B1",
+   "group": "标题与正文",
+   "text": "正文：宋体小四，西文与数字 Times New Roman；行距固定值 20 磅；首行缩进 2 字符，两端对齐",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "1.2",
+     "quote": "正文用宋体小四号，西文与数字用 Times New Roman"
+    },
+    {
+     "doc": "R1",
+     "section": "1.2",
+     "quote": "行距为固定值 20 磅；段落首行缩进 2 个字符，两端对齐"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "body",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "body",
+     "prop": "font_latin",
+     "value": "Times New Roman"
+    },
+    {
+     "target": "body",
+     "prop": "size",
+     "value": "小四"
+    },
+    {
+     "target": "body",
+     "prop": "line_spacing_exact",
+     "value": "20pt"
+    },
+    {
+     "target": "body",
+     "prop": "first_line_indent",
+     "value": "2"
+    },
+    {
+     "target": "body",
+     "prop": "align",
+     "value": "both"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "B2",
+   "group": "标题与正文",
+   "text": "一级标题：黑体三号，居中，另起一页，段前段后各空一行",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "2.1",
+     "quote": "一级标题用黑体三号，居中，另起一页，段前、段后各空一行"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "「空一行」按固定行距 20 磅折算。",
+   "settings": [
+    {
+     "target": "heading1",
+     "prop": "font_east_asia",
+     "value": "黑体"
+    },
+    {
+     "target": "heading1",
+     "prop": "size",
+     "value": "三号"
+    },
+    {
+     "target": "heading1",
+     "prop": "align",
+     "value": "center"
+    },
+    {
+     "target": "heading1",
+     "prop": "page_break_before",
+     "value": "true"
+    },
+    {
+     "target": "heading1",
+     "prop": "space_before",
+     "value": "20pt"
+    },
+    {
+     "target": "heading1",
+     "prop": "space_after",
+     "value": "20pt"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "B3",
+   "group": "标题与正文",
+   "text": "二级标题：黑体小三，居左，段前空一行（紧跟一级标题时不空）",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "2.2",
+     "quote": "二级标题用黑体小三号，居左，段前空一行，紧跟一级标题时段前不空行"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "「空一行」按 20 磅折算。",
+   "settings": [
+    {
+     "target": "heading2",
+     "prop": "font_east_asia",
+     "value": "黑体"
+    },
+    {
+     "target": "heading2",
+     "prop": "size",
+     "value": "小三"
+    },
+    {
+     "target": "heading2",
+     "prop": "align",
+     "value": "left"
+    },
+    {
+     "target": "heading2",
+     "prop": "space_before",
+     "value": "20pt"
+    },
+    {
+     "target": "heading2",
+     "prop": "tight_after_parent",
+     "value": "true"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "B4",
+   "group": "标题与正文",
+   "text": "三级标题：黑体四号，居左",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "2.3",
+     "quote": "三级标题用黑体四号，居左"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "heading3",
+     "prop": "font_east_asia",
+     "value": "黑体"
+    },
+    {
+     "target": "heading3",
+     "prop": "size",
+     "value": "四号"
+    },
+    {
+     "target": "heading3",
+     "prop": "align",
+     "value": "left"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "B6",
+   "group": "标题与正文",
+   "text": "标题是否加粗：没有规定，保留原文档",
+   "sources": [],
+   "certainty": "unspecified",
+   "handling": "keep",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "C1",
+   "group": "前置部分",
+   "text": "中文摘要 300–500 字",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "3.1",
+     "quote": "中文摘要 300～500 字"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "check",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "abstract_zh_chars",
+    "min": "300",
+    "max": "500"
+   }
+  },
+  {
+   "id": "C2",
+   "group": "前置部分",
+   "text": "关键词 3–5 个，用分号隔开，末尾不加标点",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "3.2",
+     "quote": "关键词 3～5 个，用分号隔开，最后一个关键词后不加标点"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "check",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "keywords_count",
+    "min": "3",
+    "max": "5"
+   }
+  },
+  {
+   "id": "D1",
+   "group": "图表公式脚注",
+   "text": "图题在图下、表题在表上；宋体五号，居中",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.1",
+     "quote": "图题在图的下方，表题在表的上方，均用宋体五号，居中"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "caption",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "caption",
+     "prop": "size",
+     "value": "五号"
+    },
+    {
+     "target": "caption",
+     "prop": "align",
+     "value": "center"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D2",
+   "group": "图表公式脚注",
+   "text": "图、表按章编号（图 2.1、表 3.2）",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.1",
+     "quote": "图、表按章编号，如图 2.1、表 3.2"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "check",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "caption_by_chapter",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D3",
+   "group": "图表公式脚注",
+   "text": "表格用三线表",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.2",
+     "quote": "表格采用三线表，表内文字用宋体五号"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "table",
+     "prop": "three_line",
+     "value": "true"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D4",
+   "group": "图表公式脚注",
+   "text": "表内文字：宋体五号",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.2",
+     "quote": "表格采用三线表，表内文字用宋体五号"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "table_text",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "table_text",
+     "prop": "size",
+     "value": "五号"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D5",
+   "group": "图表公式脚注",
+   "text": "脚注：宋体小五",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.3",
+     "quote": "脚注用宋体小五号，每页单独编号"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "footnote",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "footnote",
+     "prop": "size",
+     "value": "小五"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D6",
+   "group": "图表公式脚注",
+   "text": "脚注每页单独编号",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.3",
+     "quote": "脚注用宋体小五号，每页单独编号"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "footnote_number",
+     "prop": "restart",
+     "value": "each_page"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "D7",
+   "group": "图表公式脚注",
+   "text": "公式编号写在公式所在行的最右边",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "4.4",
+     "quote": "公式的编号写在公式所在行的最右边"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "structure",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "E1",
+   "group": "页眉页脚",
+   "text": "页眉文字：宋体小五，居中",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "5.1",
+     "quote": "页眉用宋体小五号，居中"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "居中要改页眉段落本身，属于页眉内容，见 E2。",
+   "settings": [
+    {
+     "target": "header_footer",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "header_footer",
+     "prop": "size",
+     "value": "小五"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "E2",
+   "group": "页眉页脚",
+   "text": "页眉内容为「某某大学本科毕业论文」，居中，下加横线",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "5.1",
+     "quote": "内容为「某某大学本科毕业论文」，下加横线"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "header",
+     "prop": "single_center",
+     "value": "某某大学本科毕业论文"
+    },
+    {
+     "target": "header",
+     "prop": "rule",
+     "value": "true"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "E3",
+   "group": "页眉页脚",
+   "text": "页码在页脚居中；摘要、目录用罗马数字，正文起用阿拉伯数字",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "5.2",
+     "quote": "页码位于页脚居中；摘要、目录用罗马数字"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "page_number",
+     "prop": "align",
+     "value": "center"
+    },
+    {
+     "target": "page_number",
+     "prop": "front_format",
+     "value": "upper_roman"
+    },
+    {
+     "target": "page_number",
+     "prop": "body_format",
+     "value": "decimal"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "F1",
+   "group": "参考文献",
+   "text": "参考文献按 GB/T 7714—2015 顺序编码制著录",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "6.1",
+     "quote": "参考文献按 GB/T 7714—2015 的顺序编码制著录"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "check",
+   "note": "著录格式由引文样式负责（Pith 里选 GB/T 7714 顺序编码制）。",
+   "settings": [],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "F2",
+   "group": "参考文献",
+   "text": "参考文献不少于 15 篇",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "6.1",
+     "quote": "顺序编码制著录，不少于 15 篇"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "check",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "references_count",
+    "min": "15",
+    "max": ""
+   }
+  },
+  {
+   "id": "F3",
+   "group": "参考文献",
+   "text": "参考文献表：宋体五号，行距固定值 20 磅",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "6.2",
+     "quote": "参考文献表用宋体五号，行距为固定值 20 磅"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "auto",
+   "note": "",
+   "settings": [
+    {
+     "target": "bibliography",
+     "prop": "font_east_asia",
+     "value": "宋体"
+    },
+    {
+     "target": "bibliography",
+     "prop": "size",
+     "value": "五号"
+    },
+    {
+     "target": "bibliography",
+     "prop": "line_spacing_exact",
+     "value": "20pt"
+    }
+   ],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  },
+  {
+   "id": "G1",
+   "group": "附录致谢声明",
+   "text": "封面按学校统一格式，不得改动",
+   "sources": [
+    {
+     "doc": "R1",
+     "section": "7.1",
+     "quote": "封面按学校统一格式填写，不得改动"
+    }
+   ],
+   "certainty": "explicit",
+   "handling": "keep",
+   "note": "",
+   "settings": [],
+   "check": {
+    "kind": "none",
+    "min": "",
+    "max": ""
+   }
+  }
+ ]
+}

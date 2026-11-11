@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Lab · 第一轮需求问卷</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3df;
+    --accent: #2f5d50; --accent-soft: #e6efeb; --warn: #9a5b00; --warn-soft: #fff4e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161616; --card: #1f1f1f; --ink: #ececea; --muted: #9b9b96; --line: #2e2e2c;
+      --accent: #7fb8a3; --accent-soft: #223129; --warn: #e0a84a; --warn-soft: #302612; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.65 -apple-system, "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", "Noto Sans CJK SC", sans-serif; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 120px; }
+  header h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { color: var(--muted); margin: 0 0 8px; }
+  .notice { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 10px 14px; font-size: 14px; margin: 16px 0 28px; }
+  .notice b { font-weight: 600; }
+  .progress { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  section.part { margin: 36px 0 12px; }
+  section.part h2 { font-size: 17px; margin: 0 0 4px; color: var(--accent); }
+  section.part p.lead { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 12px 0; }
+  .q .num { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+  .q h3 { margin: 2px 0 4px; font-size: 16px; font-weight: 600; }
+  .q .hint { color: var(--muted); font-size: 13.5px; margin: 0 0 10px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .opt:hover { background: var(--accent-soft); }
+  .opt input { margin-top: 5px; flex: none; }
+  .opt .lab { flex: 1; }
+  .opt .desc { display: block; color: var(--muted); font-size: 13px; }
+  .opt .rec { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 0 6px; margin-left: 6px; vertical-align: middle; }
+  textarea, input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font: inherit; background: var(--bg); color: var(--ink); }
+  textarea { min-height: 72px; resize: vertical; }
+  .other { margin: 6px 0 0 30px; }
+  table.score { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.score th, table.score td { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: center; }
+  table.score td:first-child, table.score th:first-child { text-align: left; }
+  table.score th { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+  .footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; z-index: 6; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 9px; padding: 10px 18px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  #out { display: none; margin-top: 24px; }
+  #out textarea { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .ok { color: var(--accent); font-size: 13px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Research Lab · 第一轮需求问卷</h1>
+  <p>目的：确定你的真实需求、项目大方向，以及 v0.1 的详细开发计划。共 4 部分，约 10–15 分钟。</p>
+  <p>标有 <span class="rec">建议</span> 的是我基于 Brief 和本机环境的推荐，不必照选。草稿会自动保存在本浏览器。</p>
+</header>
+<div class="notice"><b>填完后</b>点底部「生成回答（Markdown）」，复制文本粘贴回对话即可。自由文本题随意写，越具体越好。</div>
+<div class="progress"><span id="pcount">0 / 0</span><div class="bar"><i id="pbar"></i></div></div>
+<div id="form"></div>
+<div id="out"><h3>回答（Markdown）<span id="copied" class="ok"></span></h3><textarea id="md" readonly></textarea></div>
+</div>
+<div class="footer">
+  <button class="primary" id="gen">生成回答（Markdown）</button>
+  <button class="ghost" id="copy">复制到剪贴板</button>
+  <button class="ghost" id="reset">清空草稿</button>
+</div>
+<script>
+const Q = [
+ {part:'A · 你与使用场景', lead:'先搞清楚谁在用、为什么用。'},
+ {id:'a1', type:'multi', title:'未来 3 个月你会把 Research Lab 用在哪些事上？', hint:'多选。括号里是 Brief 中的对应模块。',
+  opts:[['写毕业论文 / 学术论文（Library + Word Studio + Academic）'],['日常事实调查，如政策、城市数据、跨境转账路径（Fact Research）'],['读书与长期学习，把摘抄变成概念卡 / 图表（Concept + WonderLab）'],['工作中的调研报告'],['管理已有的 Zotero 文献库，先不做研究功能']], other:true},
+ {id:'a2', type:'single', title:'如果只能先解决一个痛点，你选哪个？', hint:'这决定 v0.1 之后的第一个方向。',
+  opts:[['Zotero 文献管理不顺手，想要自己的 Library','例如界面、搜索、标签、PDF 定位'],['Word 中英文字体 / 行距 / 标题 / 页眉页码 / 参考文献格式反复调整'],['Deep Research 漏来源、报告冗长、事实与推测混在一起'],['读书摘抄无法沉淀为可复习、有出处的知识'],['这些痛点差不多，按 Brief 顺序来就好']], other:true},
+ {id:'a3', type:'single', title:'你手头有没有一个真实的、马上要用的项目来驱动开发？', hint:'有具体项目能让验收标准落地。',
+  opts:[['有，一篇正在写 / 要重排的毕业论文或论文'],['有，一个具体的调查问题'],['有，一本正在读的书'],['暂时没有，先把 Library 做扎实']], other:true, text:'如果有，一句话描述（题目、字数、截止时间等）'},
+ {id:'a4', type:'single', title:'你的文献主要是什么语言？',
+  opts:[['中文为主'],['英文为主'],['中英混合，比例接近']], other:true},
+ {id:'a5', type:'single', title:'预期使用频率？',
+  opts:[['几乎每天'],['每周几次'],['项目驱动，忙的时候密集用，平时不开']]},
+
+ {part:'B · 项目大方向', lead:'这些选择会影响整个技术栈和目录结构，改起来代价大。'},
+ {id:'b1', type:'single', title:'v0.1 的产品形态？', hint:'本机已有 Rust 1.99、Node 24、pnpm，但未装 Tauri CLI。',
+  opts:[['macOS 桌面 App（Tauri 2 + React + TS，Brief 首选）','完整体验，但 UI 工作量最大，Phase 0 验证会被拖慢',true],['本地 Web UI（后端 + 浏览器打开 localhost），以后再包成桌面 App','UI 轻、迭代快；需要手动启动'],['先 CLI + 核心库，v0.1 不做图形界面','最快跑通垂直链路，但"可长期使用"要打折'],['由 Agent 在 Phase 0 后根据验证结果决定']], other:true},
+ {id:'b2', type:'score', title:'给 Brief 中 7 个模块打优先级', hint:'1 = 最低，5 = 最高。用于排 v0.2 之后的顺序，也用于判断哪些东西 v0.1 的数据模型要预留。',
+  items:['Library（文献与资料库）','Word Studio · 引用引擎（Word 插件动态引用）','Word Studio · 排版 Agent（自然语言 → 格式规则）','Fact Research（事实调查）','Concept Research（概念 / 阅读研究）','Academic Research（专业研究 + 统计）','WonderLab（可视化与复习）','Adaptive Agent（记忆 / Skills / 自改进）']},
+ {id:'b3', type:'single', title:'Phase 0 的三项高风险验证，要不要在 v0.1 之前做？', hint:'三项：① Zotero 迁移 ② Word 动态引用（本机有 Word，可真实验证）③ Word 排版保真。',
+  opts:[['三项都先做，验证结果决定架构（Brief 原方案）','最稳，但 v0.1 可用版本会晚 1–2 周'],['只做 ① Zotero 迁移，② ③ 放到 v0.2 前再做','v0.1 只依赖 ①；Word 相关风险延后',true],['跳过 Phase 0，直接做 v0.1 Library','最快看到东西，但可能返工'],['由 Agent 决定']], other:true},
+ {id:'b4', type:'single', title:'Research Lab 与 Zotero 的关系？', hint:'本机 ~/Zotero 有真实库。',
+  opts:[['逐步替代：迁移后主要用 Research Lab，Zotero 只做备份 / 采集器'],['并存：Research Lab 只读导入 Zotero，Zotero 继续当主库（可增量重导）',true],['并存并双向同步（后期）'],['还没想好，先只读导入再说']], other:true},
+ {id:'b5', type:'single', title:'云端 LLM 的使用政策？', hint:'v0.1 Library 本身可以不依赖任何 LLM。',
+  opts:[['允许云端 API，但要有月度预算硬上限',true],['只允许本地模型（Ollama / MLX 等）'],['v0.1 完全不接 LLM，之后再谈'],['看情况，先接一个 provider adapter 留口']], other:true},
+ {id:'b6', type:'single', title:'如果允许云端 API，月度预算大约？',
+  opts:[['0（先不花钱）'],['< $10'],['$10 – $50'],['> $50']], other:true},
+ {id:'b7', type:'text', title:'哪些事情 Brief 没写、但你心里已经有想法？', hint:'比如：一定要像某个 App；一定不要做成某种样子；数据将来要和 Pomelo / Personal Website 怎么互通。'},
+
+ {part:'C · v0.1 Library 详细计划', lead:'第一条垂直链路：导入一篇文献 → 保留元数据与源文件 → 搜索 → 打开源文件 / 定位页码 → 备份与恢复。下面决定它的具体范围。'},
+ {id:'c1', type:'multi', title:'v0.1 必须包含哪些功能？', hint:'多选。没选的会进 v0.1.x 或后续版本。',
+  opts:[['Zotero 库导入（只读）'],['BibTeX / CSL JSON / RIS 文件导入'],['DOI / ISBN 输入后自动补元数据（需联网）'],['PDF 附件管理（复制到自己的存储，保留哈希）'],['全文搜索（标题 / 作者 / 标签 / 摘要，SQLite FTS5）'],['PDF 正文全文搜索（需解析 PDF）'],['标签与分类（集合 / 文件夹）'],['内置 PDF 阅读器'],['PDF 高亮 / 摘录并保存精确锚点（页码 + 坐标）'],['去重提示'],['批量编辑元数据'],['备份 / 恢复（整库导出为一个目录或压缩包）'],['Zotero 增量导入时的冲突预览'],['中文界面']]},
+ {id:'c2', type:'single', title:'PDF 阅读方式？',
+  opts:[['v0.1 先调用系统默认 App（Preview / Zotero / Skim）打开并尽量定位页码','零 UI 成本；"定位页码"依赖外部 App 是否支持',true],['内置阅读器（pdf.js），支持高亮摘录','这是 Library 的核心体验，但是 v0.1 最大的 UI 工作量'],['先外部，v0.1.x 再内置']], other:true},
+ {id:'c3', type:'single', title:'Zotero 导入走哪条路？', hint:'Agent 会在 Phase 0 实测，这里是你的倾向。',
+  opts:[['直接读 zotero.sqlite 的只读副本','最完整（集合、标签、附件路径、笔记）；需兼容 Zotero 7 schema',true],['读 Zotero 导出的 CSL JSON / Zotero RDF','依赖官方导出，稳定但丢部分信息'],['走 Zotero 本地 API（localhost:23119）','需要 Zotero 运行中'],['由 Agent 评估后决定']]},
+ {id:'c4', type:'single', title:'测试数据怎么来？', hint:'Agent 绝不直接读 ~/Zotero。',
+  opts:[['我可以提供真实 Zotero 库的一份副本（放到项目外的指定目录）','验收最真实',true],['我导出一部分（如 20–50 条）给你'],['只用 Agent 合成的样例库']], other:true},
+ {id:'c5', type:'single', title:'你的 Zotero 库大约多大？',
+  opts:[['< 100 条'],['100 – 500 条'],['500 – 2000 条'],['> 2000 条']], text:'PDF 附件大约多少个 / 多大（GB）？'},
+ {id:'c6', type:'single', title:'数据存放位置？',
+  opts:[['~/ResearchLab/ 一个目录装下 SQLite + 附件 + 备份',true],['首次启动让用户自选目录'],['放在 iCloud / 同步盘目录里（注意 SQLite 与同步盘冲突）']], other:true},
+ {id:'c7', type:'single', title:'核心数据层用什么语言写？', hint:'影响 Phase 0 原型和长期维护。本机 Rust、Node、Python 都齐。',
+  opts:[['Rust（Tauri 后端同语言；性能与可靠性好，开发慢）'],['TypeScript（与前端同语言；生态里 citeproc-js、Office.js 都是 JS）',true],['Python（PDF 解析、数据分析生态强；桌面打包麻烦）'],['由 Agent 决定']]},
+ {id:'c8', type:'single', title:'UI 风格参考？',
+  opts:[['Zotero 7 的三栏布局，熟悉优先'],['克制、信息密度高（Linear / Things 风格）'],['v0.1 不在乎样式，功能先行',true]], other:true},
+ {id:'c9', type:'single', title:'v0.1 的验收标准？',
+  opts:[['用真实库副本迁移后，我日常用 1 周没有丢数据 / 没有想回 Zotero',true],['合成样例通过自动化测试即可'],['两者都要']]},
+ {id:'c10', type:'single', title:'v0.1 的时间预期？',
+  opts:[['1–2 周内可用'],['1 个月左右'],['不限，做扎实为主']]},
+ {id:'c11', type:'text', title:'v0.1 一定不要做的事？', hint:'防止 Agent 自作主张铺功能。'},
+
+ {part:'D · 协作方式', lead:'决定 Agent 的自主程度和汇报节奏。'},
+ {id:'d1', type:'single', title:'Agent 的自主度？',
+  opts:[['大胆做，可逆操作不用问，每轮结束汇报（Kickoff 原方案）',true],['关键选型（技术栈、数据模型、依赖）前先问我'],['每个阶段开始前给我计划，批准后再动手']]},
+ {id:'d2', type:'single', title:'现在要不要 git init 并开始本地提交？', hint:'目前目录不是 git 仓库。不会 push。',
+  opts:[['现在就 init，每轮至少一次提交',true],['等 v0.1 有代码再 init'],['我自己来']]},
+ {id:'d3', type:'single', title:'每轮开发的汇报粒度？',
+  opts:[['只看 HANDOFF.md 的摘要，细节我自己翻',true],['对话里给完整汇报（做了什么 / 测试 / 风险 / 下一步）'],['两者都要']]},
+ {id:'d4', type:'single', title:'原始 Brief 已删除，压缩版保存在 docs/brief-digest.md。这样处理可以吗？',
+  opts:[['可以',true],['把原始 Brief 全文也恢复到 docs/ 里'],['压缩版也不用留']]},
+ {id:'d5', type:'text', title:'还有什么想说的？', hint:'任何疑问、担忧、对我这轮工作的意见。'}
+];
+
+const form = document.getElementById('form');
+const KEY = 'rl-q1-draft';
+let draft = {}; try { draft = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) {}
+let n = 0;
+Q.forEach(q => {
+  if (q.part) { const s = document.createElement('section'); s.className='part'; s.innerHTML = `<h2>${q.part}</h2><p class="lead">${q.lead||''}</p>`; form.appendChild(s); return; }
+  n++; q.n = n;
+  const d = document.createElement('div'); d.className='q'; d.id='q-'+q.id;
+  let h = `<div class="num">Q${n}</div><h3>${q.title}</h3>${q.hint?`<p class="hint">${q.hint}</p>`:''}`;
+  if (q.type==='single' || q.type==='multi') {
+    const t = q.type==='single'?'radio':'checkbox';
+    q.opts.forEach((o,i)=>{ h += `<label class="opt"><input type="${t}" name="${q.id}" value="${i}"><span class="lab">${o[0]}${o[2]?'<span class="rec">建议</span>':''}${o[1]?`<span class="desc">${o[1]}</span>`:''}</span></label>`; });
+    if (q.other) h += `<label class="opt"><input type="${t}" name="${q.id}" value="other"><span class="lab">其他</span></label><div class="other"><input type="text" id="${q.id}-other" placeholder="补充说明"></div>`;
+    if (q.text) h += `<div class="other"><input type="text" id="${q.id}-text" placeholder="${q.text}"></div>`;
+  } else if (q.type==='text') {
+    h += `<textarea id="${q.id}-text" placeholder="自由填写"></textarea>`;
+  } else if (q.type==='score') {
+    h += `<table class="score"><tr><th>模块</th>${[1,2,3,4,5].map(v=>`<th>${v}</th>`).join('')}</tr>`;
+    q.items.forEach((it,i)=>{ h += `<tr><td>${it}</td>${[1,2,3,4,5].map(v=>`<td><input type="radio" name="${q.id}-${i}" value="${v}"></td>`).join('')}</tr>`; });
+    h += `</table>`;
+  }
+  d.innerHTML = h; form.appendChild(d);
+});
+document.getElementById('pcount').textContent = `0 / ${n}`;
+
+function answered(q){
+  if (q.type==='text') return !!(val(q.id+'-text')||'').trim();
+  if (q.type==='score') return q.items.some((_,i)=>document.querySelector(`input[name="${q.id}-${i}"]:checked`));
+  return !!document.querySelector(`input[name="${q.id}"]:checked`);
+}
+function val(id){ const el=document.getElementById(id); return el?el.value:''; }
+function progress(){ let a=0; Q.forEach(q=>{ if(q.id && answered(q)) a++; }); document.getElementById('pcount').textContent=`${a} / ${n}`; document.getElementById('pbar').style.width=(100*a/n)+'%'; }
+function save(){ const s={}; form.querySelectorAll('input,textarea').forEach(el=>{ if(el.type==='radio'||el.type==='checkbox'){ if(el.checked) s[el.name+'='+el.value]=1; } else if(el.value) s['#'+el.id]=el.value; }); try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){} progress(); }
+function load(){ form.querySelectorAll('input,textarea').forEach(el=>{ if(el.type==='radio'||el.type==='checkbox'){ if(draft[el.name+'='+el.value]) el.checked=true; } else if(draft['#'+el.id]) el.value=draft['#'+el.id]; }); progress(); }
+form.addEventListener('input', save); form.addEventListener('change', save); load();
+
+function gen(){
+  let md = `# Research Lab · 第一轮问卷回答\n\n> 生成时间：${new Date().toISOString().slice(0,16).replace('T',' ')}\n\n`;
+  let part='';
+  Q.forEach(q=>{
+    if (q.part){ part=q.part; md += `## ${part}\n\n`; return; }
+    md += `**Q${q.n}. ${q.title}**\n`;
+    if (q.type==='single'||q.type==='multi'){
+      const sel=[...document.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el=>el.value==='other'?`其他：${val(q.id+'-other')||'（未填）'}`:q.opts[+el.value][0]);
+      md += sel.length? sel.map(s=>`- ${s}`).join('\n')+'\n' : '- （未答）\n';
+      const t=val(q.id+'-text'); if(t) md += `- 补充：${t}\n`;
+    } else if (q.type==='text'){
+      const t=(val(q.id+'-text')||'').trim(); md += (t? t.split('\n').map(l=>'> '+l).join('\n') : '> （未答）')+'\n';
+    } else if (q.type==='score'){
+      q.items.forEach((it,i)=>{ const c=document.querySelector(`input[name="${q.id}-${i}"]:checked`); md += `- ${it}：${c?c.value:'（未答）'}\n`; });
+    }
+    md += '\n';
+  });
+  document.getElementById('md').value = md; document.getElementById('out').style.display='block';
+  document.getElementById('out').scrollIntoView({behavior:'smooth'});
+  return md;
+}
+document.getElementById('gen').onclick = gen;
+document.getElementById('copy').onclick = async ()=>{ const md=gen(); const ok=document.getElementById('copied'); try{ await navigator.clipboard.writeText(md); ok.textContent='已复制'; }catch(e){ document.getElementById('md').select(); ok.textContent='请手动全选复制'; } setTimeout(()=>ok.textContent='',2500); };
+document.getElementById('reset').onclick = ()=>{ if(!document.getElementById('reset').dataset.c){ document.getElementById('reset').dataset.c='1'; document.getElementById('reset').textContent='再点一次确认清空'; setTimeout(()=>{delete document.getElementById('reset').dataset.c; document.getElementById('reset').textContent='清空草稿';},3000); return; } try{localStorage.removeItem(KEY);}catch(e){} form.querySelectorAll('input,textarea').forEach(el=>{ if(el.type==='radio'||el.type==='checkbox') el.checked=false; else el.value=''; }); progress(); document.getElementById('reset').textContent='清空草稿'; delete document.getElementById('reset').dataset.c; };
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+[
+  { "id": "gbt7714-2015-numeric", "label": "GB/T 7714-2015 顺序编码制", "en": "GB/T 7714-2015 (numeric)", "file": "china-national-standard-gb-t-7714-2015-numeric.csl", "uri": "http://www.zotero.org/styles/china-national-standard-gb-t-7714-2015-numeric", "kind": "numeric", "locator": "after-brackets" },
+  { "id": "gbt7714-2015-author-date", "label": "GB/T 7714-2015 著者-出版年制", "en": "GB/T 7714-2015 (author-date)", "file": "china-national-standard-gb-t-7714-2015-author-date.csl", "uri": "http://www.zotero.org/styles/china-national-standard-gb-t-7714-2015-author-date", "kind": "author-date" },
+  { "id": "apa", "label": "APA 第 7 版", "en": "APA 7th edition", "file": "apa.csl", "uri": "http://www.zotero.org/styles/apa", "kind": "author-date" },
+  { "id": "chicago-author-date", "label": "Chicago 著者-日期", "en": "Chicago (author-date)", "file": "chicago-author-date.csl", "uri": "http://www.zotero.org/styles/chicago-author-date", "kind": "author-date" },
+  { "id": "gbt7714-2025-numeric", "label": "GB/T 7714-2025 顺序编码制", "en": "GB/T 7714-2025 (numeric)", "file": "china-national-standard-gb-t-7714-2025-numeric.csl", "uri": "http://www.zotero.org/styles/china-national-standard-gb-t-7714-2025-numeric", "kind": "numeric", "locator": "after-brackets" }
+]
