@@ -28,6 +28,7 @@ pnpm check
 | 恢复与导出 | `transfer/tests.rs`、`lib.rs` | 见下 |
 | Word 集成（v0.2） | `word/*.rs` | 本机服务：没令牌 / 令牌错 401、带 Origin 403、分块 411、超大 413、`Expect: 100-continue`、service.json 0600、停止时只删自己那份；宏协议：新文档第一处引文、旧名换新、复制粘贴重复、缺数据、切换样式、比 App 新的数据、搜索窗（新插入 / 编辑预填 / 删除 / 取消）、编辑保留 ID 与创建时间、Style 菜单清单、Word 里的 Zotero 转换；搜索窗：搜索、预填（库里 / 文档快照 / 找不到 / 回收站）、一次只有一个会话；样式：内置清单与 CSL 文件一致、导入 / 替换 / 依赖样式 / 删除；Zotero 条目 key 对应；CSL 映射（含印刷品文章不出网址、「额外」字段换算）；模板含全部按钮的回调与图片；装进临时「家目录」再卸载（真跑 osacompile）、写不进时由用户选中的文件夹写入 |
 | 排版 Agent（v0.2 W3） | `agent/*.rs`、`agent/tests.rs` | 整条流程用模拟模型和合成文档（提炼 → 合成规范 → 计划 → 排版 → 报告，原文件不变、不覆盖）；预算按最坏情况拦、上月不算；截断 / 拒答 / 格式不对照样记账且不存结果；中途停止按估计记账；流（SSE）解析用录好的文本；出处摘录核对、数值换算表、冲突取确定度高的；计划里不存在的样式 / 编不过的正则 / 越界的分节被丢掉；存档编号防路径穿越；测试不碰钥匙串、不联网 |
+| 事实调查（v0.3） | `crates/research-engine`（各模块单元测试、`tests/flow.rs`）、`src-tauri/src/research/*.rs`、`research/tests.rs` | 见下「事实调查」 |
 | W5 版面（文档引擎） | `crates/docx-engine/tests/w5_layout.rs` | 已经另起一页的段落不再加段前分页（分节符后隔空段落、上一段以分页符结尾、一个标题分两段写）；新一节第一段、前面是正文的照样分页；受保护分节不动；表格里参考文献样式的段落换成表格文字；自带悬挂缩进的样式和列表段落写明 0 字符，参考文献保持原对齐；**改坏**（去掉段前不分页、去掉 0 字符）核对都查得出 |
 | 结构类排版（文档引擎，W4） | `crates/docx-engine/tests/structure.rs` | 「像论文」的合成文档上六类结构（分区与分节、页眉、页码、奇数页起、三线表、脚注编号、标题紧跟）；单面 / 双面；已有分节符后隔着空段落不多切一节；重复执行不重复加；表格可跳过、受保护分节不动；没给正文起点时如实标出；过期的分界点被拒绝；**把排好的文档逐项改坏，校验器都查得出**（含多一个部件、多一条关系、子元素顺序挪乱） |
 | 结构摘要与检查（文档引擎） | `crates/docx-engine/tests/outline.rs`、`src/checks.rs` | 分节的数法与排版器一致；计划预览的命中数 = 排版器实际改的段落数；页面设置缺省的项不动；摘要字数（Word 的算法）、关键词、参考文献条数与外文占比、题注是否按章编号 |
@@ -47,6 +48,25 @@ pnpm check
 ```bash
 cargo test -p pith freeze_fixture -- --ignored
 ```
+
+## 事实调查（v0.3，`decisions/0020`、`0022`）
+
+- **引擎**（`crates/research-engine`，模拟接口）：认数（千分位、万 / 亿、% / ‰ / 百分点、负数、区间，日期和编号不当数）、文字折叠（只容忍空白和全半角）、计算（单位不一致、除数为 0、未核实的都拒绝）、结论核对（含占位符后面又写一遍单位）、可信度、重查对比（含同一格两次写法不同、不同指标 / 年龄段不误对）、渲染；`tests/flow.rs` 整条流程、取消后接着做、超预算、单个来源失败、全都读不了。夹具是虚构的「示例市」，故意带一条摘录写错的事实、一个 404、一个扫描件 PDF、一段注入文字和一段 `hidden` 文字。
+- **改坏**：摘录改一个字、数字改一位、单位错、结论里多一个对不上的数、低可信来源排到前面，流程里拦一次，`audit` 对存下来的结果再查一次（另查：没核实的标成已核实、计算结果被改、可信度被抬高、正文被换）。
+- **App 一侧**（`src-tauri/src/research/`）：取正文（类型判断、编码、HTML / CSV / XLSX / PDF / DOCX、扫描件）、快照、本机下载（本地 `TcpListener` 假服务器：字节一致、跳转、各种失败、内网拦截、限速与取消）、三类接口（录制的回复、请求形状、`pause_turn` 原样发回、拒答、错误不回显密钥、重试、预算、流断开按估计记账）、存取（fresh / v5 升级）、Word 导出、加入文献库；`research/tests.rs` 端到端：真实的接口实现连本地假 Anthropic / DeepSeek / Tavily / 网站，每一笔费用对上账本。
+- **浏览器**：`?mock` 里调查页全流程能点通；`?mock&research=real` 假装真接口（确认框里显示缺密钥等）。mock 数据由引擎生成，改了引擎的输出结构就重新生成：
+
+```bash
+cargo run -q -p research-engine --example mock_data > src/dev/mockResearch.json
+```
+
+- **真实验收**（默认忽略，会联网花钱，事先问用户上限）：和 App 的命令走同一套接口与设置，结果存进指定的数据目录，打包版用 `PITH_DATA_DIR` 指过去就能在 App 里看。密钥文件每行一把（Anthropic、DeepSeek、Tavily 按形状认；别放 OpenAI 等其他 `sk-` 开头的密钥，会被当成 DeepSeek 的）。
+
+```bash
+PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=plan cargo test -p pith real_research_run -- --ignored --nocapture
+```
+
+  打印计划、uid 和下一步的预计费用；接着 `PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>` 做完（审计、导出三种、结论用到的来源加入文献库）；重查是 `PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按 execute 做新的这一次。
 
 ## 真实数据（默认忽略，只读，只打印汇总数字）
 

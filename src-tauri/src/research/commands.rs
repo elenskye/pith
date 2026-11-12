@@ -1083,4 +1083,115 @@ mod tests {
         assert!(export_path(&dir, "2022–2024 年示例市/样本市的青年就业？", 2, "md").to_string_lossy().ends_with("（第 2 次调查 2）.md"));
         assert!(export_path(&dir, "???", 1, "html").to_string_lossy().ends_with("事实调查（第 1 次调查）.html"));
     }
+
+    /// F4 真实验收（默认忽略：会联网、会花钱）。和 App 里的命令走同一套接口与设置，结果存进 `PITH_ACCEPT_DIR` 这个数据目录，
+    /// 打包版用 `PITH_DATA_DIR` 指过去就能在 App 里看。分两步，中间可以先看计划和花了多少：
+    ///
+    /// 1. 拆问题：`PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=plan
+    ///    [PITH_QUESTION=<问题>] cargo test -p pith real_research_run -- --ignored --nocapture`，打印计划和这次调查的 uid；
+    /// 2. 做完：同上，`PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>`：检索 → 下载 → 摘证据 → 核对 → 结论，
+    ///    审计、导出三种格式、把用到的来源加入文献库，打印小结（`PITH_STAGE=export` 只重新审计、导出，不联网）；
+    /// 3. 重查：`PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按第 2 步做新的这一次。
+    #[test]
+    #[ignore]
+    fn real_research_run() {
+        use crate::paths::DataPaths;
+        assert!(!mock_mode(), "要设 PITH_REAL_MODEL=1");
+        let env = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+        let root = PathBuf::from(env("PITH_ACCEPT_DIR").expect("要设 PITH_ACCEPT_DIR（数据目录）"));
+        let state = AppState::init(DataPaths::new(root.clone()));
+        let (agent, research) = (AgentState::default(), ResearchState::default());
+        if let Some(b) = env("PITH_BUDGET") {
+            let b: f64 = b.parse().expect("PITH_BUDGET 要是数");
+            assert!((usage::MIN_BUDGET_USD..=usage::MAX_BUDGET_USD).contains(&b));
+            state.with_db(|c| crate::metadata::put_setting(c, format_agent::BUDGET_KEY, Some(&b.to_string()))).unwrap();
+        }
+        let s = settings(&state);
+        let ledger = Ledger::new(&root);
+        let spent = |at: &str| ledger.all().unwrap().iter().filter(|c| !c.mock && c.at.as_str() >= at).map(|c| c.cost_usd).sum::<f64>();
+        let started = text::now_iso();
+        println!("月上限 ${:.2}，本月已花 ${:.4}", format_agent::budget(&state), ledger.month_total(&started[..7]).unwrap());
+        let stage = env("PITH_STAGE").unwrap_or_else(|| "plan".into());
+        match stage.as_str() {
+            "plan" => {
+                let question = env("PITH_QUESTION").unwrap_or_else(|| REAL_QUESTION.into());
+                let k = kit(&state, &agent, &research, &s, 1).unwrap();
+                let uid = new_uid().unwrap();
+                let question_id = state.with_db(|c| store::question_create(c, &question, &text::now_iso())).unwrap();
+                let mut recorder = DbRecorder { state: &state, question_id };
+                let now = text::now_iso;
+                let progress = |p: Progress| println!("  … {}", serde_json::to_string(&p).unwrap_or_default());
+                let mut ports = Ports { planner: k.planner.as_ref(), worker: k.worker.as_ref(), search: k.search.as_ref(), fetch: &k.fetch, recorder: &mut recorder, now: &now, progress: &progress, cancel: &research.cancel };
+                let run = flow::plan(&question, &uid, 1, None, s.config(false), s.plan_searches(), &mut ports).unwrap();
+                println!("\n计划（uid {uid}）：\n{}", serde_json::to_string_pretty(&run.plan).unwrap());
+                let (lines, queries, max_sources) = execute_estimate(&run, &s);
+                println!("\n接着做：{queries} 个搜索词、最多 {max_sources} 个来源");
+                for l in &lines {
+                    println!("  {}：预计约 ${:.3}，最多 ${:.3}", l.label, l.typical_usd, l.max_usd);
+                }
+                println!("拆问题花了 ${:.4}", spent(&started));
+            }
+            "rerun" => {
+                let uid = env("PITH_RUN").expect("要设 PITH_RUN");
+                let (question_id, previous) = state.with_db(|c| Ok((store::question_of(c, &uid)?, store::run_load(c, &uid)?))).unwrap();
+                let new = new_uid().unwrap();
+                let mut run = flow::rerun_from(&previous, &new, s.config(false), text::now_iso());
+                run.seq = state.with_db(|c| store::next_seq(c, question_id)).unwrap();
+                state.with_db(|c| store::run_save(c, question_id, &run)).unwrap();
+                println!("重查：新的一次 uid {new}（第 {} 次），用 PITH_STAGE=execute PITH_RUN={new} 做完", run.seq);
+            }
+            "execute" | "export" => {
+                let uid = env("PITH_RUN").expect("要设 PITH_RUN");
+                let (question_id, mut run) = state.with_db(|c| Ok((store::question_of(c, &uid)?, store::run_load(c, &uid)?))).unwrap();
+                run.config = Config { limits: run.config.limits.clone(), ..s.config(false) };
+                let k = kit(&state, &agent, &research, &s, 1).unwrap();
+                let mut recorder = DbRecorder { state: &state, question_id };
+                let now = text::now_iso;
+                let progress = |p: Progress| println!("  … {}", serde_json::to_string(&p).unwrap_or_default());
+                let mut ports = Ports { planner: k.planner.as_ref(), worker: k.worker.as_ref(), search: k.search.as_ref(), fetch: &k.fetch, recorder: &mut recorder, now: &now, progress: &progress, cancel: &research.cancel };
+                // export：只对存下来的结果重新审计、导出（不联网）
+                let result = if stage == "export" { Ok(()) } else { flow::execute(&mut run, &mut ports) };
+                println!("\n状态 {:?}，停在 {:?}，错误 {:?}，结果 {result:?}", run.status, run.stage, run.error);
+                println!("这一步花了 ${:.4}", spent(&started));
+                if run.status != Status::Done {
+                    return;
+                }
+                let v = view(&state, &research, &uid).unwrap();
+                println!("审计发现的问题：{}", v.findings.len());
+                for f in &v.findings {
+                    println!("  {f:?}");
+                }
+                let fetched = run.sources.iter().filter(|x| x.sha256.is_some()).count();
+                let verified = run.facts.iter().filter(|f| f.verified()).count();
+                println!("来源 {}（下载到 {fetched}），事实 {}（核实 {verified}），结论 {}", run.sources.len(), run.facts.len(), run.conclusions.len());
+                if let Some(dir) = env("PITH_EXPORT_DIR") {
+                    let previous = run.previous.as_deref().and_then(|p| state.with_db(|c| store::run_load(c, p)).ok());
+                    for (format, ext) in [(Format::Markdown, "md"), (Format::Html, "html"), (Format::Docx, "docx")] {
+                        let path = export_path(Path::new(&dir), &run.question, run.seq, ext);
+                        std::fs::write(&path, export_bytes(&run, previous.as_ref(), format).unwrap()).unwrap();
+                        println!("导出 {}", path.display());
+                    }
+                }
+                // 结论引用到的事实的来源加入文献库
+                let mut keys: Vec<String> = run.conclusions.iter().flat_map(|c| c.facts.iter()).filter_map(|id| run.fact(id)).map(|f| f.source.clone()).collect();
+                keys.sort();
+                keys.dedup();
+                keys.retain(|k| run.source(k).is_some_and(|x| x.sha256.is_some()));
+                if !keys.is_empty() {
+                    let snapshots = Snapshots::new(&state.paths.root);
+                    let original = |x: &Source| snapshots.original_of(x);
+                    let added = crate::mutate(&state, |c| {
+                        crate::import::backup_before(c, &state.paths.backups)?;
+                        library::add(c, &state.paths.attachments, &run, &keys, &original)
+                    })
+                    .unwrap();
+                    println!("加入文献库 {} 条：{}", added.len(), added.iter().map(|a| format!("{}→{}{}", a.key, a.item_id, if a.attachment_id.is_some() { "（带附件）" } else { "" })).collect::<Vec<_>>().join("、"));
+                }
+            }
+            other => panic!("不认识的 PITH_STAGE：{other}"),
+        }
+    }
+
+    /// v0.3 的验收问题（`decisions/0020`「用户定的」第 1 条）
+    const REAL_QUESTION: &str = "2022–2026 年北京、天津年轻人（应届毕业生和非应届青年）的就业情况怎么样？和其他一线城市（上海、广州、深圳）、热门二线城市（如杭州、成都、南京、武汉）比呢？想弄清四件事：官方数字能不能直接比；官方与其他来源对不上时哪个更接近真实；应届生、非应届青年等特定人群的情况；给自己找工作、选城市做参考。";
 }

@@ -93,7 +93,12 @@ function Shell() {
               view={view}
               scope={scope}
               onScope={choose}
-              onView={setView}
+              onView={(v) => {
+                // 已经在排版 / 调查页时再点侧栏的这一项：回到它的列表（从设置回来时仍停在原处）
+                if (v === view && v === "format") setFormatAt({ rulesetId: null, runId: null });
+                if (v === view && v === "research") setResearchAt({ uid: null });
+                setView(v);
+              }}
               tags={tags}
               onTags={(t) => {
                 setTags(t);

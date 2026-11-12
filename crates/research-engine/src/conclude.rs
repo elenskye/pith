@@ -88,6 +88,26 @@ fn push_text(segments: &mut Vec<Segment>, more: &str) {
     }
 }
 
+/// 占位符换上去的值已经带着单位；模型在占位符后面又写了一遍单位（「{C1}个百分点」）时，去掉后面这一遍，
+/// 免得读成「26.8 个百分点个百分点」（F4 真实调查里出现过）
+pub fn drop_repeated_units(segments: &mut [Segment]) {
+    for i in 1..segments.len() {
+        let unit = match &segments[i - 1] {
+            Segment::Fact { text, .. } | Segment::Calc { text, .. } => text.trim_start_matches(|c: char| c.is_ascii_digit() || matches!(c, '.' | ',' | '-' | '+' | '−')).trim().to_string(),
+            _ => continue,
+        };
+        if unit.is_empty() {
+            continue;
+        }
+        if let Segment::Text { text } = &mut segments[i] {
+            let rest = text.trim_start();
+            if let Some(after) = rest.strip_prefix(unit.as_str()) {
+                *text = after.to_string();
+            }
+        }
+    }
+}
+
 /// 文字里出现的数（不管单位），描述用
 fn numbers_in(text: &str, into: &mut Vec<Dec>) {
     for f in numbers::scan(text) {
@@ -240,6 +260,7 @@ pub fn finish(id: &str, draft: &Draft, ctx: &Context) -> Conclusion {
             }
         }
     }
+    drop_repeated_units(&mut segments);
     for s in &segments {
         if let Segment::Unmatched { text, why } = s
             && text.starts_with('{')
@@ -337,6 +358,17 @@ mod tests {
         assert!(k.segments.contains(&Segment::Calc { id: "C1".into(), text: "-1.1 个百分点".into() }));
         // 全是低可信来源：代码标出来
         assert_eq!(k.uncertainty, [Uncertainty::LowTrustOnly]);
+    }
+
+    #[test]
+    fn a_unit_written_again_after_a_placeholder_is_dropped() {
+        // F4 真实调查里模型写过「高 {C1}个百分点」：值已经带着单位，后面那遍去掉
+        let k = check("比上年低 {C1}个百分点，失业率为 {F1} %以上，新增 {F5}万人。", &[], &[], &[]);
+        assert_eq!(k.text(), "比上年低 -1.1 个百分点，失业率为 12.3%以上，新增 1.2万人。");
+        assert!(k.issues.is_empty(), "{:?}", k.issues);
+        // 单位没重复的照原样
+        let k = check("失业率为 {F1}，新增 {F5}（全市）。", &[], &[], &[]);
+        assert_eq!(k.text(), "失业率为 12.3%，新增 1.2万人（全市）。");
     }
 
     #[test]

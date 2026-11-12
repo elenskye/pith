@@ -239,7 +239,9 @@ fn edited_or_foreign_exports_are_refused() {
     assert!(e.contains("比这个 App 新"), "{e}");
     let e = refuse(&original.replacen("\"research-lab-library\"", "\"pomelo-export\"", 1));
     assert!(e.contains("不是 Pith"), "{e}");
-    let e = refuse(&original[..original.len() / 2]);
+    // 从中间截断（退到字符边界：导出里有中文，按字节对半切可能落在一个字中间）
+    let half = (0..=original.len() / 2).rev().find(|&i| original.is_char_boundary(i)).unwrap();
+    let e = refuse(&original[..half]);
     assert!(e.contains("不完整或已损坏"), "{e}");
     // 去掉一张表（连同它的校验值）：缺表
     let mut v: J = serde_json::from_str(&original).unwrap();

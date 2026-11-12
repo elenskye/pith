@@ -13,10 +13,13 @@ personal-research-lab/
 │   │                           ItemDetail（可编辑详情、批量面板、合并）、labels（中文名）
 │   ├── shared/ui.tsx           弹窗（确认 / 输入 / 选集合）、右键菜单、提示条、就地编辑、标签输入（带提示）、useMutate、useStoredState
 │   ├── settings/               SettingsPage（数据目录、数据库版本、备份列表：立即备份 / 恢复）、Transfer（整库导出、从导出恢复、恢复结果）、
-│   │                           WordSettings（安装 / 卸载 Word 模板、服务与排版器状态）、CiteSettings（引文样式与导入 .csl、Word 外转换 Zotero 文档）
+│   │                           WordSettings（安装 / 卸载 Word 模板、服务与排版器状态）、CiteSettings（引文样式与导入 .csl、Word 外转换 Zotero 文档）、
+│   │                           ResearchSettings（事实调查：三把密钥、模型、专用搜索、单价、可信度等级表、月上限）
 │   ├── picker/Picker.tsx       置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码
 │   ├── shared/ipc.ts           带类型的 api 对象，唯一的 invoke 入口
-│   ├── dev/mockIpc.ts          `pnpm dev` → http://localhost:1430/?mock，合成数据，打包时剔除
+│   ├── dev/mockIpc.ts          `pnpm dev` → http://localhost:1430/?mock，合成数据，打包时剔除；mockResearch.ts / .json 是调查页的假后端（数据由引擎生成）
+│   ├── research/               事实调查页（v0.3）：ResearchPage（提问、问题和各次调查）、Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、
+│   │                           Result（短答、点数字看原文、全过程、导出、加入文献库、重查对比）、labels
 │   ├── cite/                   引文排版（v0.2）：renderer（听 cite-render 事件、交回结果）、engine（citeproc-js；GB/T 页码在方括号外、前后缀）、
 │   │                           runs（HTML → 带格式片段）、resources（内置样式打包、导入样式向 Rust 要）、styles.json（内置样式清单，Rust 也读）、
 │   │                           csl/ 与 locales/（官方 CSL 文件，来源见 SOURCES.md）、*.test.ts（node --test）
@@ -25,9 +28,10 @@ personal-research-lab/
 │   └── reader/                 阅读器（单独打包，第一次阅读时加载）：Reader（工具栏、浮动工具条、查找）、
 │                               controller（pdf.js 的 PDFViewer、标注层、选区 → PDF 坐标）、AnnotationList、useRead
 ├── src-tauri/                  Rust 后端（唯一读写 SQLite 的地方）
-│   ├── migrations/             0001_library … 0005_metadata；顺序编号，用过永不改
+│   ├── migrations/             0001_library … 0006_research；顺序编号，用过永不改
 │   ├── word/                   Word 一侧的源文件：Pith.bas（宏，ASCII）、customUI.xml（选项卡）、images/（选项卡图标 PNG）、Pith.applescript、pith-bridge.sh
-│   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）
+│   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）；
+│   │                           research/（虚构「示例市」的网页、统计表原件，录制的 Anthropic / DeepSeek / Tavily 回复）
 │   └── src/
 │       ├── lib.rs              AppState（启动：建目录 → 打开 → 升级 → 当天自动备份 → 清理没人用的附件文件；整库替换）、命令注册
 │       ├── paths.rs            正式 ~/Pith/、开发 ~/Pith Dev/、PITH_DATA_DIR 覆盖
@@ -52,10 +56,16 @@ personal-research-lab/
 │       ├── word/               Word 集成（v0.2，`decisions/0016`、`0017`）：service（本机服务）、bridge（宏协议）、picker（置顶搜索窗）、
 │                               render（排版桥）、csl（文献 → CSL-JSON、Zotero 条目 key → 文献库）、install（模板与脚本的安装）、
 │                               styles（内置 + 导入的 .csl）
-│       └── agent/              排版 Agent（v0.2 W3，`decisions/0018`）：claude（调用 Anthropic Messages API、模拟模型）、usage（用量账本、月度预算）、
+│       ├── agent/              排版 Agent（v0.2 W3，`decisions/0018`）：claude（调用 Anthropic Messages API、模拟模型）、usage（用量账本、月度预算）、
 │                               secret（密钥：正式版钥匙串，其余内存或文件）、extract（提炼要求、出处核对、数值换算、合成规范）、
-│                               planner（论文 → 给模型看的文字、文档计划的核对与预览）、apply（排版、校验、只检查项、报告）、store（成果存档）
+│       │                       planner（论文 → 给模型看的文字、文档计划的核对与预览）、apply（排版、校验、只检查项、报告）、store（成果存档）
+│       └── research/           事实调查（v0.3，`decisions/0020`、`0022`）：commands（`research_*` 命令、设置、组装接口、后台执行）、store（存进 research_* 表）、
+│                               anthropic（流式、网页搜索、pause_turn；ClaudeSearch）、openai（OpenAI 兼容，DeepSeek）、tavily、meter（发送前按最坏情况查月上限、记账）、
+│                               download（本机下载：限速、拒内网、自己跟跳转）、content（HTML / PDF / XLSX / CSV / DOCX 取正文）、snapshot（快照文件）、
+│                               docx（Word 导出）、library（加入文献库）、fixtures / testing（合成原件、本地假服务器）
 ├── crates/zotero-import/       Zotero 只读读取 + 审计 + 合成夹具（src-tauri 以 path 依赖引用）
+├── crates/research-engine/     事实调查的纯逻辑（只依赖 serde）：流程、提示词与解析、核对、认数与精确十进制、计算、可信度、结论核对、
+│                               重查对比、报告与渲染（Markdown / 单文件 HTML）、审计；合成夹具与模拟接口（README 有模块表）
 ├── crates/docx-engine/         Word 文档引擎（src-tauri 引用）：排版器 + 独立校验器 + 文档计划（0-C）、structure / verify_structure（结构类排版与它的独立核对，W4）、
 │                               outline（结构摘要、表格清单、计划预览、要求文档转文字）、
 │                               checks（只检查项的统计）、cite（引文写入与核对、Zotero 引文识别与转换、.csl 检查、Node 里排版）、
@@ -68,7 +78,7 @@ personal-research-lab/
 └── docs/
 ```
 
-根目录是 Cargo 工作区（`src-tauri`、`crates/zotero-import`、`crates/docx-engine`），编译输出在根 `target/`。
+根目录是 Cargo 工作区（`src-tauri`、`crates/zotero-import`、`crates/docx-engine`、`crates/research-engine`），编译输出在根 `target/`。
 
 ## 规则
 
@@ -179,9 +189,33 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - W5（`decisions/0021`）：排完结构后，已经另起一页的段落不再加段前分页（`format::keep_single_page_breaks`）；表格里参考文献样式的段落按表格文字排；自带磅值缩进的样式和段落写明 0 字符，免得被正文的字符缩进盖掉（`format::keep_own_indents`）；规范没定参考文献对齐时保持原对齐。校验器各有一项独立核对（`verify::check_page_breaks`、`check_own_indents`）。
 - 模型拒答时直接报错让用户重试，不换模型；论文默认按「结构和片段」发送，设置里可换成「全文」（`agent_send_mode_set`）。
 
+## v0.3 事实调查（`decisions/0020`、`0022`）
+
+```
+问题 ─research_plan_prepare（估费用，不联网）─▶ 确认框 ─research_plan_run─▶ Opus 5.5（可带 Claude 网页搜索摸底）─▶ 计划（子问题、维度、注意事项）
+用户删改子问题、加网址或文件 ─research_execute_prepare─▶ 确认框 ─research_execute（后台线程，事件 research-progress / research-done）─▶
+   检索（执行模型的专用搜索：DeepSeek → Tavily；Anthropic → Claude 网页搜索）─▶ 本机下载 → 快照 + 正文
+   ─▶ 摘证据（DeepSeek，JSON；记数据生产者）─▶ 核对（代码：摘录逐字、数值在摘录里、单位）─▶ 可信度排序（代码，按等级表）
+   ─▶ 结论（Opus 5.5，用 {F3}/{C1} 占位，代码填数、核对模型自己写的数）─▶ 报告 ─▶ 导出 Markdown / HTML / Word、加入文献库、重查对比
+```
+
+- 分层：`crates/research-engine` 不碰数据库和网络，接口经 `ports` 的 trait 进来（模型、搜索、下载、存档、进度、取消）；App 这一侧（`src-tauri/src/research/`）实现真实接口并存库。`Run` 整份可序列化；每次保存在一个事务里整份换掉这次调查的行。
+- 每步都存，可以取消；停下或出错后「接着做」从 `run.stage` 继续，搜过的不再搜、读过的不再读。启动时把异常退出时还在「进行中」的标成「已停止」。
+- 核对两层：流程里核一次（核不上的不进结论）；`research_run_get` 每次对做完的调查从快照重新审计一遍（`audit`），有问题页面顶上标红。
+- 数字只由代码写进结论；计算用精确十进制（`dec`），结果存字符串。中文数量词（「三成」）只标出、不核对。
+- 带网页搜索的请求不加结构化输出：网页搜索的引用总是开着，而引用和 `output_config.format` 不能同时用（官方文档）；靠提示词 + 宽容解析。不带搜索的计划、结论用 JSON Schema。
+- 费用：每次调用前按最坏情况（输入估计 ×1.1 + 输出写满 + 搜索用满）查月度上限（和排版 Agent 共用，默认 $30）；记账按接口返回的用量，缓存命中也按原价，宁多勿少；模拟接口记一行「模拟」不算钱。
+- 下载：外来网址不下本机和内网；跳转自己跟、每一跳都检查；类型按内容判断；同一站点间隔 1.5 秒；User-Agent 只有 `Pith/版本`。
+- 快照：`数据目录/research/sources/<sha256 前两位>/<sha256>.<扩展名>` + `.txt`，只读、同内容一份，删调查后清理没人用的。
+- 加入文献库：来源 → 网页 / 报告条目，原件作附件（附件 SHA-256 去重），同一网址已有的连上不重建；先做「导入前」备份。
+- Word 导出不改文档引擎：`research/docx.rs` 用 `docx_engine::package::Package` 拼最小的 .docx（标题、表格、列表、外链、书签与文档内跳转）。
+- 密钥：Anthropic 和排版 Agent 共用一把（`agent.key_saved`）；DeepSeek、Tavily 各一个钥匙串条目（`deepseek-api-key`、`tavily-api-key`）。和排版 Agent 一样，只有正式版用钥匙串和真接口。
+- 命令（`research_*`，21 个）：status / settings_set / key_set / key_clear；questions_list / question_get；plan_prepare → plan_run；run_get；plan_update / source_add / source_remove；execute_prepare → execute；cancel；rerun；export / reveal；add_to_library；run_delete / question_delete。
+
 ## 联网（`decisions/0004`、`0012`）
 
 - v0.1 唯一的联网功能是联网补全；只在 Rust 里联网（`metadata::net`），界面不直接发请求。没打开时 Rust 拒绝联网。v0.2 W3 多了排版 Agent 调用 Claude（`agent::claude`，见上；每次发送前确认、有月度上限）。
+- v0.3 事实调查（见上）：连 `api.anthropic.com`、`api.deepseek.com`（地址可改）、`api.tavily.com`，以及检索到的网页（本机下载，只取单页）。每次发送模型和搜索前界面确认、查月度上限。
 - 导入完成、改了 DOI / ISBN 后，命令层把文献放进 `AppState.lookups` 队列，后台线程一次一条地查：读库（拿锁）→ 联网（不拿锁）→ 写库（拿锁）并更新搜索索引。
 
 ## 资源约束

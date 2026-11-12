@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use research_engine::dec::Dec;
 use research_engine::fold::Span;
-use research_engine::model::{Calc, Check, Conclusion, Fact, Run, SearchRecord, Source, Step};
+use research_engine::model::{Calc, Check, Conclusion, Fact, Run, SearchRecord, Segment, Source, Step};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -414,7 +414,10 @@ pub fn run_load(c: &Connection, uid: &str) -> Result<Run, String> {
     .into_iter()
     .map(|(row, key, template, segments, calcs, uncertainty, note, issues)| {
         let facts = rows(c, "SELECT f.key FROM research_conclusion_facts x JOIN research_facts f ON f.id = x.fact_id WHERE x.conclusion_id = ?1 ORDER BY x.position", row, |r| r.get::<_, String>(0))?;
-        Ok(Conclusion { id: key, template, segments: from_json(&segments, "结论")?, facts, calcs: from_json(&calcs, "结论用到的计算")?, uncertainty: from_json(&uncertainty, "不确定类型")?, note, issues: from_json(&issues, "结论的问题")? })
+        // 「单位写两遍」修正之前存下的结论，读出来时同样去掉重复的单位（`decisions/0022`）
+        let mut segments: Vec<Segment> = from_json(&segments, "结论")?;
+        research_engine::conclude::drop_repeated_units(&mut segments);
+        Ok(Conclusion { id: key, template, segments, facts, calcs: from_json(&calcs, "结论用到的计算")?, uncertainty: from_json(&uncertainty, "不确定类型")?, note, issues: from_json(&issues, "结论的问题")? })
     })
     .collect::<Result<Vec<_>, String>>()?;
 

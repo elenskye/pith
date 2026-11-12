@@ -1,7 +1,11 @@
 //! 重查对比（`decisions/0020`「重查」）：同一问题的新旧两次调查，按（指标、地区、人群、时间）对齐已核实的事实，
 //! 标出变了的数字、新增和消失的来源、变了的结论。
 //!
-//! 对齐靠的是模型摘录时写的指标名等文字（折叠空白和全半角后比较）。两次写法不同的会显示成一条消失、一条新增。
+//! 对齐分两遍：
+//! 1. 模型摘录时写的指标名等文字（折叠空白和全半角后）完全一样的；
+//! 2. 剩下的再按「同一格」宽松对一遍（F4 真实重查里，同一条事实两次写成「年度均值」「年平均值」，全被当成一消失一新增）：
+//!    地区（去掉「市」「省」）、时间里的数字、人群里的数字（年龄段）都一样，指标名的二字组相似度够高。
+//!    数值相同就算没变；数值不同的要求更严（指标名更像、数据生产者相同），才算「变了」，免得把两个不同的指标当成一个。
 
 use serde::Serialize;
 
@@ -80,6 +84,42 @@ fn same_value(a: &Fact, b: &Fact) -> bool {
     }
 }
 
+/// 两段文字的二字组相似度（Dice），折叠后、去掉空白和标点
+fn similarity(a: &str, b: &str) -> f64 {
+    let grams = |s: &str| -> Vec<(char, char)> {
+        let cs: Vec<char> = fold(s).to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+        cs.windows(2).map(|w| (w[0], w[1])).collect()
+    };
+    let (x, mut y) = (grams(a), grams(b));
+    if x.is_empty() || y.is_empty() {
+        return if fold(a).to_lowercase() == fold(b).to_lowercase() { 1.0 } else { 0.0 };
+    }
+    let total = x.len() + y.len();
+    let mut common = 0;
+    for g in &x {
+        if let Some(i) = y.iter().position(|h| h == g) {
+            y.swap_remove(i);
+            common += 1;
+        }
+    }
+    2.0 * common as f64 / total as f64
+}
+
+fn digits(s: &str) -> String {
+    fold(s).chars().filter(|c| c.is_ascii_digit()).collect()
+}
+
+fn region(s: &str) -> String {
+    let r = fold(s).to_lowercase();
+    r.trim_end_matches(['市', '省']).to_string()
+}
+
+/// 第二遍：键对不上、但看得出是同一格
+fn same_slot(a: &Fact, b: &Fact, metric_at_least: f64) -> bool {
+    let (pa, pb) = (digits(&a.population), digits(&b.population));
+    region(&a.region) == region(&b.region) && !digits(&a.period).is_empty() && digits(&a.period) == digits(&b.period) && (pa.is_empty() || pb.is_empty() || pa == pb) && similarity(&a.metric, &b.metric) >= metric_at_least
+}
+
 pub fn compare(old: &Run, new: &Run) -> Diff {
     let mut d = Diff { previous_uid: old.uid.clone(), previous_at: old.finished_at.clone().unwrap_or_else(|| old.updated_at.clone()), ..Default::default() };
 
@@ -87,6 +127,7 @@ pub fn compare(old: &Run, new: &Run) -> Diff {
     let new_facts: Vec<&Fact> = new.verified_facts().collect();
     let mut old_used = vec![false; old_facts.len()];
     let producer = |f: &Fact| fold(&f.producer).to_lowercase();
+    let mut unmatched: Vec<&Fact> = Vec::new();
     for n in &new_facts {
         let key = n.key();
         let candidates: Vec<usize> = (0..old_facts.len()).filter(|i| !old_used[*i] && old_facts[*i].key() == key).collect();
@@ -102,7 +143,26 @@ pub fn compare(old: &Run, new: &Run) -> Diff {
                     d.changed.push(FactChange { old: brief(old_facts[i]), new: brief(n) });
                 }
             }
-            None => d.added.push(brief(n)),
+            None => unmatched.push(n),
+        }
+    }
+    // 第二遍：同一格、数值相同 → 没变；更像、同一个生产者、数值不同 → 变了
+    for n in unmatched {
+        let free = |i: &usize| !old_used[*i];
+        let same = (0..old_facts.len()).filter(free).find(|i| same_slot(old_facts[*i], n, 0.6) && same_value(old_facts[*i], n));
+        let changed = || (0..old_facts.len()).filter(free).find(|i| same_slot(old_facts[*i], n, 0.8) && producer(old_facts[*i]) == producer(n));
+        match same {
+            Some(i) => {
+                old_used[i] = true;
+                d.unchanged += 1;
+            }
+            None => match changed() {
+                Some(i) => {
+                    old_used[i] = true;
+                    d.changed.push(FactChange { old: brief(old_facts[i]), new: brief(n) });
+                }
+                None => d.added.push(brief(n)),
+            },
         }
     }
     d.removed = old_facts.iter().zip(&old_used).filter(|(_, used)| !**used).map(|(f, _)| brief(f)).collect();
@@ -190,6 +250,36 @@ mod tests {
         assert_eq!(d.conclusions_same, 1);
         assert!(!d.nothing_changed());
         assert!(compare(&old, &old).nothing_changed());
+    }
+
+    #[test]
+    fn the_same_slot_written_differently_is_still_aligned() {
+        // F4 真实重查里的写法差别：「年度均值」/「年平均值」、「北京市」/「北京」、「2024年」/「2024 年」
+        let mut a = fact("F1", "城镇调查失业率年平均值", "2024年", "北京市统计局", "4.1");
+        a.region = "北京市".into();
+        let mut b = fact("F9", "城镇调查失业率年度均值", "2024 年", "北京经济运行情况新闻发布会", "4.1");
+        b.region = "北京".into();
+        // 指标名像、生产者相同、数值不同：变了
+        let mut c = fact("F2", "16-24岁城镇调查失业率", "2025年8月", "国家统计局", "18.9");
+        c.population = "16-24岁".into();
+        let mut e = fact("F7", "16—24岁劳动力城镇调查失业率", "2025 年 8 月", "国家统计局", "18.8");
+        e.population = "16–24 岁".into();
+        // 不同的指标（登记 / 调查）、不同的年龄段：不对齐
+        let mut g = fact("F3", "城镇登记失业率", "2024年", "北京市人社局", "1.2");
+        g.region = "北京".into();
+        let mut h = fact("F8", "城镇调查失业率", "2024年", "北京市人社局", "1.5");
+        h.region = "北京".into();
+        let mut y1 = fact("F4", "城镇调查失业率", "2025年8月", "国家统计局", "7.0");
+        y1.population = "25-29岁".into();
+        let mut y2 = fact("F6", "城镇调查失业率", "2025年8月", "国家统计局", "7.0");
+        y2.population = "30-59岁".into();
+        let old = Run { facts: vec![a, c, g, y1], ..Default::default() };
+        let new = Run { facts: vec![b, e, h, y2], ..Default::default() };
+        let d = compare(&old, &new);
+        assert_eq!(d.unchanged, 1);
+        assert_eq!(d.changed.iter().map(|x| (x.old.value.as_str(), x.new.value.as_str())).collect::<Vec<_>>(), [("18.9%", "18.8%")]);
+        assert_eq!(d.added.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(), ["F8", "F6"]);
+        assert_eq!(d.removed.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(), ["F3", "F4"]);
     }
 
     #[test]

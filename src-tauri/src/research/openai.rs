@@ -5,6 +5,9 @@
 //! - 用量从 `usage` 读：`prompt_tokens`、`completion_tokens`，缓存命中的（`prompt_cache_hit_tokens`）单独记下；
 //!   费用按全部输入 token 的原价算（缓存命中其实更便宜），宁可多记。
 //! - 不流式：摘证据的输出不长（上限 8000 token），整份读回。
+//! - DeepSeek 默认开着思考模式（effort high）：思考的 token 也算输出、占 `max_tokens`，JSON 输出的文档也没说思考时能用。
+//!   摘证据不需要思考，发给 DeepSeek 的请求一律带 `thinking: {type: "disabled"}`（F4 对照官方文档补上）。
+//!   别的 OpenAI 兼容接口不一定认这个字段，不带。
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -60,7 +63,7 @@ impl OpenAiCompatible {
         if !system.to_lowercase().contains("json") {
             system.push_str("\n\n只输出一个 json 对象。");
         }
-        json!({
+        let mut body = json!({
             "model": self.model,
             "messages": [
                 { "role": "system", "content": system },
@@ -69,7 +72,11 @@ impl OpenAiCompatible {
             "response_format": { "type": "json_object" },
             "max_tokens": req.max_tokens,
             "stream": false,
-        })
+        });
+        if name_of(&self.base, &self.model) == "DeepSeek" {
+            body["thinking"] = json!({ "type": "disabled" });
+        }
+        body
     }
 
     fn endpoint(&self) -> String {
@@ -141,6 +148,7 @@ impl Model for OpenAiCompatible {
             "length" => return Err(PortError { kind: ErrorKind::Failed, message: format!("回答太长，写到上限被截断了，这一段的结果不能用。已经产生的 ${cost:.4} 记进了用量。"), usage }),
             "content_filter" => return Err(PortError { kind: ErrorKind::Failed, message: format!("{who} 的内容审查拦下了这一段，没有结果。费用 ${cost:.4} 已记进用量。"), usage }),
             "insufficient_system_resource" => return Err(PortError { kind: ErrorKind::Failed, message: format!("{who} 的服务资源不足，回答没写完。等一会儿再点「继续」。"), usage }),
+            "aborted" => return Err(PortError { kind: ErrorKind::Failed, message: format!("{who} 中途停止了这次回答，结果不能用。等一会儿再点「继续」。"), usage }),
             _ => {}
         }
         let content = v.pointer("/choices/0/message/content").and_then(Value::as_str).unwrap_or("").to_string();
@@ -189,6 +197,8 @@ mod tests {
         assert_eq!(body["model"], "deepseek-flash");
         assert_eq!(body["response_format"], json!({ "type": "json_object" }));
         assert_eq!(body["stream"], false);
+        // DeepSeek 默认开思考：摘证据关掉
+        assert_eq!(body["thinking"], json!({ "type": "disabled" }));
         assert_eq!(body["messages"][0]["role"], "system");
         assert!(body["messages"][1]["content"].as_str().unwrap().contains("<正文>"));
         let c = &crate::agent::usage::Ledger::new(&dir).all().unwrap()[0];
@@ -208,6 +218,8 @@ mod tests {
         let m = OpenAiCompatible::new(Some("https://llm.example.invalid/v1/chat/completions"), "k".into(), Some("other-model"), meter(&dir));
         assert_eq!(m.endpoint(), "https://llm.example.invalid/v1/chat/completions");
         assert_eq!(m.info().model, "other-model");
+        // 不是 DeepSeek 的接口不带 DeepSeek 专有的字段
+        assert!(m.body(&req).get("thinking").is_none());
     }
 
     #[test]

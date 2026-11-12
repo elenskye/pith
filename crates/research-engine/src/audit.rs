@@ -109,7 +109,10 @@ pub fn audit(run: &Run, text_of: &mut dyn FnMut(&Source) -> Result<String, Strin
             note: k.note.clone(),
         };
         let now = conclude::finish(&k.id, &draft, &ctx);
-        if now.segments != k.segments {
+        // 修正「单位写两遍」之前存下的结论：比较前同样去掉重复的单位
+        let mut stored = k.segments.clone();
+        conclude::drop_repeated_units(&mut stored);
+        if now.segments != stored {
             let extra = now.issues.iter().find(|i| !k.issues.contains(i)).cloned().unwrap_or_else(|| "显示的文字和按模板核对出来的不一样".into());
             out.push(Finding { kind: Kind::Conclusion, target: k.id.clone(), message: format!("结论 {}：{extra}", k.id) });
         } else if now.issues != k.issues || now.facts != k.facts || now.calcs != k.calcs || now.uncertainty != k.uncertainty {
