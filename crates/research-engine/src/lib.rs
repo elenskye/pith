@@ -29,3 +29,5 @@ pub mod ports;
 pub mod prompts;
 pub mod render;
 pub mod report;
+pub mod audit;
+pub mod fixture;

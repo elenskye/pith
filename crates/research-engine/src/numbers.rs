@@ -102,14 +102,7 @@ fn norm(c: char) -> char {
 }
 
 fn starts_with(cs: &[char], at: usize, word: &str) -> bool {
-    let mut i = at;
-    for w in word.chars() {
-        if cs.get(i) != Some(&w) {
-            return false;
-        }
-        i += 1;
-    }
-    true
+    word.chars().enumerate().all(|(i, w)| cs.get(at + i) == Some(&w))
 }
 
 fn skip_spaces(cs: &[char], mut i: usize, max: usize) -> usize {

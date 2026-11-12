@@ -131,7 +131,7 @@ pub fn build(run: &Run, previous: Option<&Run>) -> Report {
             }
         })
         .collect();
-    facts.sort_by(|a, b| (!a.fact.verified(), tier_rank(Some(a.fact.tier)), fact_number(&a.fact.id)).cmp(&(!b.fact.verified(), tier_rank(Some(b.fact.tier)), fact_number(&b.fact.id))));
+    facts.sort_by_key(|a| (!a.fact.verified(), tier_rank(Some(a.fact.tier)), fact_number(&a.fact.id)));
 
     let mut sources: Vec<SourceRow> = run
         .sources
@@ -162,7 +162,7 @@ pub fn build(run: &Run, previous: Option<&Run>) -> Report {
         "no_text" => 2,
         _ => 3,
     };
-    sources.sort_by(|a, b| (tier_rank(a.source.tier), state_rank(a), fact_number(&a.source.id)).cmp(&(tier_rank(b.source.tier), state_rank(b), fact_number(&b.source.id))));
+    sources.sort_by_key(|a| (tier_rank(a.source.tier), state_rank(a), fact_number(&a.source.id)));
 
     let totals = Totals {
         sub_questions: run.plan.sub_questions.iter().filter(|s| s.enabled).count(),

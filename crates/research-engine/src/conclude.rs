@@ -394,7 +394,7 @@ mod tests {
     fn feedback_lists_the_problems_per_conclusion() {
         let good = check("失业率为 {F1}。", &[], &[], &[]);
         let bad = Conclusion { id: "K2".into(), ..check("失业率为 17.6%。", &["F1"], &[], &[]) };
-        assert_eq!(feedback(&[good.clone()]), None);
+        assert_eq!(feedback(std::slice::from_ref(&good)), None);
         assert_eq!(feedback(&[good, bad]).unwrap(), "第 2 条结论：「17.6%」对不上这条结论引用的任何事实或计算");
     }
 }

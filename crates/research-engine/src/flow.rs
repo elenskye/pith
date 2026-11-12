@@ -458,11 +458,10 @@ fn extract_step(run: &mut Run, ports: &mut Ports) -> Result<(), PortError> {
                 }
             }
         }
-        let mut number = next_number(run.facts.iter().map(|f| &f.id));
-        for mut f in facts {
+        let first = next_number(run.facts.iter().map(|f| &f.id));
+        for (number, mut f) in (first..).zip(facts) {
             f.id = format!("F{number}");
             f.source = id.clone();
-            number += 1;
             run.facts.push(f);
         }
         let s = &mut run.sources[i];
@@ -528,8 +527,11 @@ fn question_context(run: &Run) -> String {
     text
 }
 
+/// 计算、结论、没查到的
+type Settled = (Vec<crate::model::Calc>, Vec<crate::model::Conclusion>, Vec<String>);
+
 /// 按模型的回答算出计算、核对并定稿结论
-fn settle(run: &Run, reply: &ModelReply) -> Result<(Vec<crate::model::Calc>, Vec<crate::model::Conclusion>, Vec<String>), String> {
+fn settle(run: &Run, reply: &ModelReply) -> Result<Settled, String> {
     let mut parsed = prompts::parse_conclude(&reply.text)?;
     for c in &mut parsed.calcs {
         calc::run(c, &run.facts);

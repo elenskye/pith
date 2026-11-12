@@ -166,7 +166,7 @@ impl TrustTable {
     /// 和默认表不同的项：（类型, 默认等级, 现在的等级）
     pub fn changes(&self) -> Vec<(ProducerKind, Tier, Tier)> {
         let default = TrustTable::default();
-        ProducerKind::ALL.into_iter().filter_map(|k| (self.tier(k) != default.tier(k)).then(|| (k, default.tier(k), self.tier(k)))).collect()
+        ProducerKind::ALL.into_iter().filter(|k| self.tier(*k) != default.tier(*k)).map(|k| (k, default.tier(k), self.tier(k))).collect()
     }
 
     pub fn is_default(&self) -> bool {

@@ -19,6 +19,8 @@ fn pow10(n: u32) -> Option<i128> {
     10i128.checked_pow(n)
 }
 
+// 加减乘除都可能溢出或除以 0，所以返回 Option，不实现 std::ops 的运算符
+#[allow(clippy::should_implement_trait)]
 impl Dec {
     pub const ZERO: Dec = Dec { m: 0, s: 0 };
 
