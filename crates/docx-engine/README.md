@@ -30,6 +30,8 @@ v0.2 W4 新增（结构类排版，`decisions/0019`）：
 
 规范里写 `structure`（页眉、页码、`body_on_odd_page`、`three_line_tables`、`footnote_numbering`、`tight_headings`），计划里写 `layout`（`front_start` / `body_start` / `back_start` = 段落编号 + 开头文字，`duplex`，`skip_tables`）。例子见 `tests/structure.rs`。`verify::verify_all` 一次做完保真、受保护分节、规范、结构四样核对。
 
+v0.2 W5 新增（在 Word 里看出来的问题，`decisions/0021`；测试 `tests/w5_layout.rs`）：排完结构后，已经另起一页的段落不再加段前分页（不多出空白页、不把一个标题拆到两页）；表格里参考文献样式的段落按表格文字排；自带磅值缩进的样式和段落写明 0 字符，免得被正文的字符缩进盖掉；规范没定参考文献对齐时保持原对齐。`verify_all` 另加两项独立核对（段前分页、自带缩进）。
+
 Phase 0-C 的部分：
 
 | 模块 | 作用 |

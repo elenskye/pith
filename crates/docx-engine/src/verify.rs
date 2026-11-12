@@ -669,5 +669,223 @@ pub fn verify_all(before: &Package, after: &Package, spec: &Spec, plan: &Plan) -
     problems.extend(check_protected(before, after, plan)?);
     let mut checks = check_spec_with_plan(after, spec, plan)?;
     checks.extend(crate::verify_structure::check(before, after, spec, plan)?);
+    checks.extend(check_page_breaks(before, after)?);
+    checks.extend(check_own_indents(before, after)?);
     Ok((problems, checks))
+}
+
+// ---------- 自带的缩进没有被继承来的字符缩进盖掉（W5；与排版器分开实现） ----------
+//
+// Word 里字符单位的缩进（firstLineChars / hangingChars）优先于磅值，ind 的属性又是一个个分别继承的。
+// 样式或段落自己用磅值写了首行 / 悬挂缩进、没写字符缩进，排版后却继承到了原来没有的字符缩进，就被盖掉了。
+
+/// 沿样式链找 ind 的某个属性（最近的优先），最后看文档默认值
+fn ind_attr(styles: &Styles, id: Option<&str>, attr: &str) -> i64 {
+    let parse = |n: Node| wattr(&n, attr).and_then(|v| v.parse::<i64>().ok());
+    let mut cur = id.map(String::from);
+    let mut guard = 0;
+    while let Some(i) = cur {
+        guard += 1;
+        let Some(s) = styles.by_id.get(&i) else { break };
+        if guard > 20 {
+            break;
+        }
+        if let Some(v) = child(s.node, "pPr").and_then(|pp| child(pp, "ind")).and_then(parse) {
+            return v;
+        }
+        cur = s.based_on.clone();
+    }
+    styles.defaults_ppr.and_then(|d| child(d, "ind")).and_then(parse).unwrap_or(0)
+}
+
+/// 自己用磅值写了首行 / 悬挂缩进、没写字符缩进
+fn own_twips_indent(ind: Option<Node>) -> bool {
+    ind.is_some_and(|i| (wattr(&i, "firstLine").is_some() || wattr(&i, "hanging").is_some()) && wattr(&i, "firstLineChars").is_none() && wattr(&i, "hangingChars").is_none())
+}
+
+pub fn check_own_indents(before: &Package, after: &Package) -> Result<Vec<Check>> {
+    let (bs, as_) = (before.get_str("word/styles.xml")?, after.get_str("word/styles.xml")?);
+    if !as_.contains("Chars=\"") {
+        return Ok(Vec::new());
+    }
+    let (bdoc, adoc) = (parse(&bs)?, parse(&as_)?);
+    let (bst, ast) = (Styles::new(&bdoc), Styles::new(&adoc));
+    let default_of = |d: &Document| d.descendants().find(|s| is(s, NS_W, "style") && wattr(s, "type") == Some("paragraph") && wattr(s, "default") == Some("1")).and_then(|s| wattr(&s, "styleId").map(String::from));
+    let (bdef, adef) = (default_of(&bdoc), default_of(&adoc));
+    // 这个样式（排版前后各自的样式表）是否让磅值缩进被新的字符缩进盖掉
+    let leaked = |id: Option<&str>, before_id: Option<&str>| ["firstLineChars", "hangingChars"].iter().any(|k| ind_attr(&ast, id, k) != 0 && ind_attr(&bst, before_id, k) == 0);
+    let mut bad = Vec::new();
+    for (id, s) in &ast.by_id {
+        if wattr(&s.node, "type") != Some("paragraph") {
+            continue;
+        }
+        let ind = child(s.node, "pPr").and_then(|pp| child(pp, "ind"));
+        if own_twips_indent(ind) && leaked(Some(id), Some(id)) {
+            bad.push(format!("样式「{}」", s.name));
+        }
+    }
+    let ddoc_xml = after.get_str("word/document.xml")?;
+    let ddoc = parse(&ddoc_xml)?;
+    let mut paras = 0;
+    for p in ddoc.descendants().filter(|n| is(n, NS_W, "p") && !n.ancestors().skip(1).any(|a| is(&a, NS_W, "tbl") || is(&a, NS_W, "txbxContent"))) {
+        let ppr = child(p, "pPr");
+        let ind = ppr.and_then(|pp| child(pp, "ind"));
+        if !own_twips_indent(ind) {
+            continue;
+        }
+        let sid = ppr.and_then(|pp| child(pp, "pStyle")).and_then(|s| wattr(&s, "val")).map(String::from);
+        let (a_id, b_id) = (sid.clone().or(adef.clone()), sid.or(bdef.clone()));
+        if leaked(a_id.as_deref(), b_id.as_deref()) {
+            paras += 1;
+        }
+    }
+    if paras > 0 {
+        bad.push(format!("段落 {paras} 个"));
+    }
+    Ok(vec![Check {
+        item: "自带缩进：没有被继承来的字符缩进盖掉".into(),
+        ok: bad.is_empty(),
+        detail: if bad.is_empty() { "参考文献、编号列表等自己的悬挂 / 首行缩进照样生效".into() } else { format!("自己的磅值缩进会被正文的字符缩进盖掉：{}", bad.join("、")) },
+    }])
+}
+
+// ---------- 段前分页不和已有的分页叠加（W5；与排版器分开实现） ----------
+//
+// 段落要「段前分页」，而它前面已经另起了一页（分节符后隔着空段落、上一段以分页符结尾、
+// 空段落自己段前分页），Word 会再分一次页，多出一张空白页；紧挨着的上一段也段前分页（一个标题分两段写），
+// 标题会被拆到两页。只算排版带来的：原文档里本来就这样的不算。
+
+#[derive(Clone, Copy)]
+enum Block {
+    Para { blank: bool, ends_break: bool, pbb: bool, sect: Option<usize> },
+    Table,
+}
+
+fn toggled(n: Option<Node>) -> bool {
+    n.is_some_and(|n| !matches!(wattr(&n, "val"), Some("0" | "false" | "off")))
+}
+
+/// 段落里最后一样看得见的东西：Some(true) 分页符，Some(false) 别的，None 没有
+fn last_seen(p: Node) -> Option<bool> {
+    let mut last = None;
+    for d in p.descendants().skip(1) {
+        if d.ancestors().any(|a| is(&a, NS_W, "txbxContent") || is(&a, NS_W, "pPr") || is(&a, NS_W, "rPr") || is(&a, NS_M, "oMath")) {
+            continue;
+        }
+        if is(&d, NS_M, "oMath") {
+            last = Some(false);
+        } else if is(&d, NS_W, "br") {
+            last = Some(wattr(&d, "type") == Some("page"));
+        } else if is(&d, NS_W, "t") {
+            if d.text().is_some_and(|t| !t.trim().is_empty()) {
+                last = Some(false);
+            }
+        } else if ["tab", "ptab", "sym", "drawing", "pict", "object"].iter().any(|k| is(&d, NS_W, k)) {
+            last = Some(false);
+        }
+    }
+    last
+}
+
+fn blocks_of(n: Node, styles: &Styles, default_para: Option<&str>, out: &mut Vec<(Block, String)>, sects: &mut Vec<bool>) {
+    let page_type = |s: Node| !matches!(s.children().find(|c| is(c, NS_W, "type")).and_then(|t| wattr(&t, "val")), Some("continuous" | "nextColumn"));
+    for c in n.children().filter(|c| c.is_element()) {
+        if is(&c, NS_W, "p") {
+            let ppr = child(c, "pPr");
+            let sid = ppr.and_then(|pp| child(pp, "pStyle")).and_then(|s| wattr(&s, "val")).or(default_para);
+            let pbb = match ppr.and_then(|pp| child(pp, "pageBreakBefore")) {
+                Some(direct) => toggled(Some(direct)),
+                None => toggled(sid.and_then(|id| styles.resolve(id, "pPr", "pageBreakBefore"))),
+            };
+            let sect = ppr.and_then(|pp| child(pp, "sectPr")).map(|s| {
+                sects.push(page_type(s));
+                sects.len() - 1
+            });
+            let last = last_seen(c);
+            let text: String = c.descendants().filter(|d| is(d, NS_W, "t") && !d.ancestors().any(|a| is(&a, NS_W, "txbxContent"))).filter_map(|d| d.text()).collect();
+            out.push((Block::Para { blank: last.is_none(), ends_break: last == Some(true), pbb, sect }, text.chars().take(20).collect()));
+        } else if is(&c, NS_W, "tbl") {
+            out.push((Block::Table, String::new()));
+        } else if is(&c, NS_W, "sectPr") {
+            sects.push(page_type(c));
+        } else if c.tag_name().namespace() != Some(NS_M) {
+            blocks_of(c, styles, default_para, out, sects);
+        }
+    }
+}
+
+/// 按段落次序：每段的段前分页是否叠在已有的分页上；以及段落开头文字
+fn doubled_breaks(pkg: &Package) -> Result<Vec<(bool, String)>> {
+    let styles_xml = pkg.get_str("word/styles.xml")?;
+    let sdoc = parse(&styles_xml)?;
+    let styles = Styles::new(&sdoc);
+    let default_para = sdoc.descendants().find(|s| is(s, NS_W, "style") && wattr(s, "type") == Some("paragraph") && wattr(s, "default") == Some("1")).and_then(|s| wattr(&s, "styleId"));
+    let doc_xml = pkg.get_str("word/document.xml")?;
+    let ddoc = parse(&doc_xml)?;
+    let Some(body) = ddoc.descendants().find(|n| is(n, NS_W, "body")) else { return Ok(Vec::new()) };
+    let (mut items, mut sects) = (Vec::new(), Vec::new());
+    blocks_of(body, &styles, default_para, &mut items, &mut sects);
+    // 从前往后走：现在是不是在「刚另起的一页」上
+    enum At {
+        Flow,
+        NewSection(usize),
+        AfterBreak,
+        /// 上一段有字并且段前分页
+        AfterBrokenText,
+    }
+    let mut at = At::Flow;
+    let mut out = Vec::new();
+    for (b, text) in items {
+        let Block::Para { blank, ends_break, pbb, sect } = b else {
+            at = At::Flow;
+            continue;
+        };
+        let doubled = pbb && match at {
+            At::Flow => false,
+            At::NewSection(blanks) => blanks > 0,
+            At::AfterBreak | At::AfterBrokenText => true,
+        };
+        out.push((doubled, text));
+        // 段落带的分节符结束的是它所在的一节；下一节怎么开始看下一个分节符的类型
+        at = if sect.is_some_and(|k| sects.get(k + 1).copied().unwrap_or(true)) {
+            At::NewSection(0)
+        } else if ends_break || (blank && pbb) {
+            At::AfterBreak
+        } else if blank {
+            match at {
+                At::NewSection(n) => At::NewSection(n + 1),
+                At::AfterBrokenText => At::Flow,
+                other => other,
+            }
+        } else if pbb {
+            At::AfterBrokenText
+        } else {
+            At::Flow
+        };
+    }
+    Ok(out)
+}
+
+/// 段前分页有没有叠在已有的分页上（会多出空白页）。文档里没有段前分页就不出这一项。
+pub fn check_page_breaks(before: &Package, after: &Package) -> Result<Vec<Check>> {
+    let b = doubled_breaks(before)?;
+    let a = doubled_breaks(after)?;
+    let any_pbb = {
+        let styles_xml = after.get_str("word/styles.xml")?;
+        styles_xml.contains("pageBreakBefore") || after.get_str("word/document.xml")?.contains("pageBreakBefore")
+    };
+    if !any_pbb {
+        return Ok(Vec::new());
+    }
+    let same_count = a.len() == b.len();
+    let bad: Vec<&String> = a.iter().enumerate().filter(|(i, (d, _))| *d && !(same_count && b[*i].0)).map(|(_, (_, t))| t).collect();
+    Ok(vec![Check {
+        item: "段前分页：不多出空白页、不拆开标题".into(),
+        ok: bad.is_empty(),
+        detail: if bad.is_empty() {
+            "没有多出的空白页".into()
+        } else {
+            format!("{} 处段前分页多余（前面已经另起一页，或紧跟在另一段段前分页的段落后面）：{}", bad.len(), bad.iter().take(5).map(|t| format!("「{t}」")).collect::<Vec<_>>().join("、"))
+        },
+    }])
 }

@@ -28,6 +28,7 @@ pnpm check
 | 恢复与导出 | `transfer/tests.rs`、`lib.rs` | 见下 |
 | Word 集成（v0.2） | `word/*.rs` | 本机服务：没令牌 / 令牌错 401、带 Origin 403、分块 411、超大 413、`Expect: 100-continue`、service.json 0600、停止时只删自己那份；宏协议：新文档第一处引文、旧名换新、复制粘贴重复、缺数据、切换样式、比 App 新的数据、搜索窗（新插入 / 编辑预填 / 删除 / 取消）、编辑保留 ID 与创建时间、Style 菜单清单、Word 里的 Zotero 转换；搜索窗：搜索、预填（库里 / 文档快照 / 找不到 / 回收站）、一次只有一个会话；样式：内置清单与 CSL 文件一致、导入 / 替换 / 依赖样式 / 删除；Zotero 条目 key 对应；CSL 映射（含印刷品文章不出网址、「额外」字段换算）；模板含全部按钮的回调与图片；装进临时「家目录」再卸载（真跑 osacompile）、写不进时由用户选中的文件夹写入 |
 | 排版 Agent（v0.2 W3） | `agent/*.rs`、`agent/tests.rs` | 整条流程用模拟模型和合成文档（提炼 → 合成规范 → 计划 → 排版 → 报告，原文件不变、不覆盖）；预算按最坏情况拦、上月不算；截断 / 拒答 / 格式不对照样记账且不存结果；中途停止按估计记账；流（SSE）解析用录好的文本；出处摘录核对、数值换算表、冲突取确定度高的；计划里不存在的样式 / 编不过的正则 / 越界的分节被丢掉；存档编号防路径穿越；测试不碰钥匙串、不联网 |
+| W5 版面（文档引擎） | `crates/docx-engine/tests/w5_layout.rs` | 已经另起一页的段落不再加段前分页（分节符后隔空段落、上一段以分页符结尾、一个标题分两段写）；新一节第一段、前面是正文的照样分页；受保护分节不动；表格里参考文献样式的段落换成表格文字；自带悬挂缩进的样式和列表段落写明 0 字符，参考文献保持原对齐；**改坏**（去掉段前不分页、去掉 0 字符）核对都查得出 |
 | 结构类排版（文档引擎，W4） | `crates/docx-engine/tests/structure.rs` | 「像论文」的合成文档上六类结构（分区与分节、页眉、页码、奇数页起、三线表、脚注编号、标题紧跟）；单面 / 双面；已有分节符后隔着空段落不多切一节；重复执行不重复加；表格可跳过、受保护分节不动；没给正文起点时如实标出；过期的分界点被拒绝；**把排好的文档逐项改坏，校验器都查得出**（含多一个部件、多一条关系、子元素顺序挪乱） |
 | 结构摘要与检查（文档引擎） | `crates/docx-engine/tests/outline.rs`、`src/checks.rs` | 分节的数法与排版器一致；计划预览的命中数 = 排版器实际改的段落数；页面设置缺省的项不动；摘要字数（Word 的算法）、关键词、参考文献条数与外文占比、题注是否按章编号 |
 | 引文（文档引擎） | `crates/docx-engine/tests/cite.rs`、`src/cite/`、`src/vba.rs`、`src/template.rs` | 合成文档刷新 → 引文 / 书目 / 数据部件 / 悬挂缩进；独立核对（另一套解析器）查出手改；0-B 旧格式迁移；控件以外的文字、域、其他部件不变（含 0-C 的合成论文）；中文姓名合成全名；Zotero：域代码与文档设置解析、按 key 对应、合成 Zotero 文档转换（页码、多条、库里没有的、修订里的不动、书目跨段带分页符、别的域不动）、样式对应、已有 Pith 数据的文档；.csl 检查；VBA 压缩（含规范样例）、加密、工程读回；模板确定（含图片） |
@@ -83,6 +84,24 @@ Zotero 读取层与审计：`cargo test -p zotero-import -- --ignored`（同样�
 6. 测完：退出 Word 与测试用的 Pith，把第 4 步备份的桥接脚本放回去（或从自己平时用的 Pith 重新安装）。
 
 调试模板：`cargo run -p docx-engine -- dotm <输出.dotm> --bas <模块.bas> --ribbon <customUI.xml>` 生成后直接用 Word 打开（不用装）；`cargo run -p docx-engine -- vba-dump <vbaProject.bin>` 对照 Word 自己存的工程（比如 Zotero 安装包里的 Zotero.dotm）。
+
+## 在 Word 里看排版结果（v0.2 W5，`decisions/0021`）
+
+用 Mac Word 把排好的副本导出 PDF，再逐页渲染、列出每页页眉页脚文字、找出空白页（只用 macOS 自带的 PDFKit）：
+
+```bash
+bash scripts/word-pdf.sh <排好的.docx> <输出目录>
+```
+
+输出目录里有 `<名字>.pdf`、`<名字>-pages/pNNN.png`（每页一张图）、`<名字>-pages.txt`（每页一行：页眉区、页脚区文字；空白页标 BLANK-BODY）。文档先复制到输出目录再打开，原件不动，关闭时不保存。Word 是沙盒应用：第一次往某个目录写 PDF 时会弹「Grant File Access」，要用户点一次授权，所以固定用一个输出目录。只渲染已有的 PDF：`swift scripts/pdf-pages.swift <in.pdf> <输出目录> [倍数]`。
+
+不花钱地复查（引擎改了以后）：用存下来的模型计划在论文副本上按 App 的同一条路径重排，结果写到 `PITH_OUT_DIR`（存下来的计划不动；同名输出不覆盖，另存「（Pith 排版 2）」）。路径用绝对路径（测试在 `src-tauri` 下运行）：
+
+```bash
+PITH_ACCEPT_DIR=<存计划的目录> PITH_RULESET=<规范 id> PITH_RUN=<计划 id> PITH_THESIS=<原论文.docx> PITH_OUT_DIR=<输出目录> cargo test -p pith real_agent_reapply -- --ignored --nocapture
+```
+
+W5 用的是 `local/agent-acceptance-w4` 里规范 `01M748Z7NH0TZ0B5ATK3A4ZK0A` 的 4 份计划，输出在 `local/real-thesis/out/agent-w5/`。排好的论文再做引文转换和切换 APA：`PITH_THESIS=<排好的.docx>` 跑上面「真实数据」里的 `real_thesis_zotero`。
 
 ## 排版 Agent 的真实模型验收（v0.2 W3，`decisions/0018`）
 

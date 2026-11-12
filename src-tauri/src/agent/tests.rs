@@ -399,6 +399,33 @@ fn real_agent_plan() {
     }
 }
 
+/// 不联网、不花钱：用存下来的计划（`PITH_ACCEPT_DIR` 里的 `PITH_RULESET` / `PITH_RUN`）在论文副本上按 App 的同一条路径
+/// 重新排一遍，结果写到 `PITH_OUT_DIR`。引擎改了以后复查用；存下来的计划和结果不动。
+#[test]
+#[ignore]
+fn real_agent_reapply() {
+    let dir = accept_dir();
+    let store = Store::new(&dir);
+    let ruleset = store.ruleset(&std::env::var("PITH_RULESET").expect("设 PITH_RULESET")).unwrap();
+    let mut run = store.run(&ruleset.id, &std::env::var("PITH_RUN").expect("设 PITH_RUN")).unwrap();
+    let source = std::path::PathBuf::from(std::env::var("PITH_THESIS").expect("设 PITH_THESIS"));
+    let bytes = std::fs::read(&source).unwrap();
+    let sha: String = <sha2::Sha256 as sha2::Digest>::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(sha, run.thesis_sha256, "论文和计划当时用的不是同一份");
+    let out = std::path::PathBuf::from(std::env::var("PITH_OUT_DIR").expect("设 PITH_OUT_DIR")).join(if run.mode == Mode::Full { "full" } else { "brief" });
+    std::fs::create_dir_all(&out).unwrap();
+    let thesis = out.join(source.file_name().unwrap());
+    std::fs::write(&thesis, &bytes).unwrap();
+    run.thesis_path = thesis.display().to_string();
+    let res = apply::apply(&ruleset.name, &ruleset.requirements, &run.draft, &thesis, &text::now_iso()).unwrap();
+    println!("排版（{}）：写出 {}，保真问题 {}，规范核对 {} 项中 {} 项不符", run.mode.label(), res.delivered, res.fidelity_problems, res.spec_checks, res.spec_failed);
+    for line in res.report_md.lines().filter(|l| l.contains("| ✗ |") || l.contains("段前分页") || l.contains("参考文献样式的段落") || l.starts_with("- 分区") || l.starts_with("- 排成三线表")) {
+        println!("报告：{line}");
+    }
+    println!("输出：{:?}\n报告：{:?}", res.output_path, res.report_path);
+    assert!(res.delivered, "{}", res.report_md);
+}
+
 /// 不联网：看真实论文按两种方式各要发多少（`PITH_THESIS=<论文.docx>`，可加 `PITH_SHOW=1` 打印发送的文字）
 #[test]
 #[ignore]

@@ -50,7 +50,17 @@ pub struct Report {
     pub runs_cleaned: usize,
     pub paragraphs_cleaned: usize,
     pub table_paragraphs: usize,
+    /// 其中原来用参考文献样式的（有的论文把表格文字设成参考文献样式）
+    pub table_bib_paragraphs: usize,
     pub figure_paragraphs: usize,
+    /// 已经另起一页、因此不再加段前分页的段落（否则会多出空白页）
+    pub page_breaks_not_doubled: usize,
+    /// 自带缩进、写明「0 字符」以免被继承来的字符缩进盖掉的样式（报告用的样式名）
+    pub own_indent_styles: Vec<String>,
+    /// 同上，段落上直接写的缩进（编号列表、参考文献）
+    pub own_indent_paragraphs: usize,
+    /// 规范没定参考文献的对齐时，参考文献样式保持的原对齐
+    pub bibliography_align_kept: Option<String>,
     pub code_paragraphs_kept: usize,
     pub list_paragraphs_kept_indent: usize,
     pub sections: usize,
@@ -519,6 +529,8 @@ struct Walker<'a> {
     /// 只在 document.xml 里按分节计数
     track_sections: bool,
     sect_no: usize,
+    /// document.xml 顶层段落（不含表格里的）依次是否在受保护分节里，给排完结构后的段前分页检查用
+    top_protected: Vec<bool>,
 }
 
 impl Walker<'_> {
@@ -579,7 +591,11 @@ impl Walker<'_> {
 
     fn paragraph(&mut self, p: &mut El, in_table: bool) {
         let w = self.w.clone();
-        if self.track_sections && self.plan.is_protected(self.sect_no) {
+        let protected = self.track_sections && self.plan.is_protected(self.sect_no);
+        if self.track_sections && !in_table {
+            self.top_protected.push(protected);
+        }
+        if protected {
             self.freeze_paragraph(p);
         } else {
             self.remap(p);
@@ -603,6 +619,8 @@ impl Walker<'_> {
         let pict = q(&w, "pict");
         let has_figure = p.has_descendant(&|e: &El| e.name == drawing || e.name == pict) || p.child(&q(&self.m, "oMathPara")).is_some();
         let plain = style_id.is_none() || style_id.as_deref() == Some(self.book.normal_id.as_str());
+        // 表格里用参考文献样式的段落按表格文字排：参考文献的缩进放进窄单元格，字会被挤得一个个断开
+        let cell_text = in_table && (plain || is_bib);
         let df = &self.spec.direct_formatting;
 
         if is_code {
@@ -613,7 +631,7 @@ impl Walker<'_> {
                 if df.strip_paragraph_spacing {
                     removed += ppr.remove_children(&q(&w, "spacing"));
                     removed += ppr.remove_children(&q(&w, "jc"));
-                    if has_num || is_bib {
+                    if has_num || (is_bib && !in_table) {
                         if ppr.child(&q(&w, "ind")).is_some() {
                             self.rep.list_paragraphs_kept_indent += 1;
                         }
@@ -624,11 +642,17 @@ impl Walker<'_> {
                 if let Some(mark) = ppr.child_mut(&q(&w, "rPr")) {
                     removed += clean_rpr(mark, &w, self.spec);
                 }
+                if (has_num || (is_bib && !in_table))
+                    && let Some(ind) = ppr.child_mut(&q(&w, "ind"))
+                    && guard_own_indent(ind, &w, &self.old.para(style_id.as_deref()), &self.new.para(style_id.as_deref()))
+                {
+                    self.rep.own_indent_paragraphs += 1;
+                }
                 if removed > 0 {
                     self.rep.paragraphs_cleaned += 1;
                 }
             }
-            let target = if in_table && plain {
+            let target = if cell_text {
                 self.table_style.clone()
             } else if has_figure && plain {
                 self.figure_style.clone()
@@ -640,6 +664,9 @@ impl Walker<'_> {
                 ppr.ensure_child(&q(&w, "pStyle"), &w, P_ORDER).set_attr(&q(&w, "val"), &sid);
                 if in_table {
                     self.rep.table_paragraphs += 1;
+                    if is_bib {
+                        self.rep.table_bib_paragraphs += 1;
+                    }
                 } else {
                     self.rep.figure_paragraphs += 1;
                 }
@@ -819,6 +846,228 @@ fn clean_rpr(rpr: &mut El, w: &str, spec: &Spec) -> usize {
     n
 }
 
+// ---------- 自带的缩进不被继承来的字符缩进盖掉 ----------
+//
+// Word 里按字符计的缩进（firstLineChars / hangingChars）优先于按磅值写的（firstLine / hanging），
+// 而且 ind 的各个属性是分别继承的。正文 Normal 改成「首行缩进 2 字符」以后，参考文献、编号列表这类
+// 自带悬挂缩进（磅值）的样式和段落会继承到 firstLineChars，自己的悬挂缩进就失效了（W5 在 Word 里看到
+// 参考文献变成首行缩进）。只在字符缩进是这次排版新带来的时候，给它们写明 0 字符。
+
+fn chars_of(p: &Props, k: &str) -> i64 {
+    p.get("ind").and_then(|a| a.get(k)).and_then(|v| v.parse::<i64>().ok()).unwrap_or(0)
+}
+
+/// 自己用磅值写了首行 / 悬挂缩进、没写字符缩进，而这次排版让它继承到了字符缩进：写明 0 字符。返回改没改。
+fn guard_own_indent(ind: &mut El, w: &str, old: &Props, new: &Props) -> bool {
+    let has = |k: &str| ind.attr(&q(w, k)).is_some();
+    if !(has("firstLine") || has("hanging")) || has("firstLineChars") || has("hangingChars") {
+        return false;
+    }
+    let mut changed = false;
+    for k in ["firstLineChars", "hangingChars"] {
+        if chars_of(new, k) != 0 && chars_of(old, k) == 0 {
+            ind.set_attr(&q(w, k), "0");
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// 样式这一层：自带磅值缩进的段落样式写明 0 字符；规范没定参考文献的对齐时，参考文献保持原来的对齐。
+fn keep_own_indents(pkg: &mut Package, old: &Resolver, spec: &Spec, rep: &mut Report) -> Result<()> {
+    let mut doc = xml::parse(&pkg.get_str("word/styles.xml")?)?;
+    let Some(w) = doc.prefix_of(NS_W) else { return Ok(()) };
+    let new = Resolver::read(&doc, &w);
+    let bib_align_free = spec.bibliography.as_ref().and_then(|b| b.align.as_ref()).is_none();
+    let jc_of = |p: &Props| p.get("jc").and_then(|a| a.get("val")).cloned().unwrap_or_else(|| "left".into());
+    for s in doc.root.els_mut().filter(|e| e.local() == "style" && e.attr(&q(&w, "type")) == Some("paragraph")) {
+        let id = s.attr(&q(&w, "styleId")).unwrap_or("").to_string();
+        let name = s.child(&q(&w, "name")).and_then(|n| n.attr(&q(&w, "val"))).unwrap_or("").to_string();
+        let (o, n) = (old.para(Some(&id)), new.para(Some(&id)));
+        if let Some(ind) = s.child_mut(&q(&w, "pPr")).and_then(|pp| pp.child_mut(&q(&w, "ind")))
+            && guard_own_indent(ind, &w, &o, &n)
+        {
+            rep.own_indent_styles.push(name.clone());
+        }
+        if bib_align_free && name.eq_ignore_ascii_case("bibliography") && jc_of(&o) != jc_of(&n) {
+            let keep = jc_of(&o);
+            let ppr = s.ensure_child(&q(&w, "pPr"), &w, STYLE_ORDER);
+            ppr.put_child(El::new(q(&w, "jc")).with_attr(&q(&w, "val"), &keep), &w, P_ORDER);
+            rep.bibliography_align_kept = Some(keep);
+        }
+    }
+    if !rep.own_indent_styles.is_empty() || rep.bibliography_align_kept.is_some() {
+        pkg.set("word/styles.xml", doc.to_xml().into_bytes());
+    }
+    Ok(())
+}
+
+// ---------- 已经另起一页的段落不再加段前分页 ----------
+//
+// 规范常要求「每章另起一页」（一级标题段前分页）。W5 在 Word 里看到两种问题：
+// - 很多论文原来就用分节符或分页符让每章另起一页，后面往往还跟着一两个空段落。再加段前分页，
+//   空段落单独占一页，标题被挤到下一页：多出空白页。
+// - 一个标题分两段写（题目太长、主副标题），两段都段前分页，标题被拆到两页。
+// 这样的段落直接写「段前不分页」，版面和原稿一样。
+
+/// document.xml 里顶层段落（按文档顺序；表格是隔断）与「另起一页」有关的情况
+enum Flow {
+    Para {
+        /// 没有任何看得见的内容
+        empty: bool,
+        /// 最后一样看得见的东西是分页符：段落标记会落到下一页第一行
+        trailing_break: bool,
+        /// 实际生效的段前分页
+        pbb: bool,
+        /// 段落里带的分节符是第几个
+        sect: Option<usize>,
+    },
+    Table,
+}
+
+fn toggle_on(attrs: Option<&BTreeMap<String, String>>) -> bool {
+    attrs.is_some_and(|a| !matches!(a.get("val").map(String::as_str), Some("0" | "false" | "off")))
+}
+
+/// 段落里最后一样看得见的东西：Some(true) 分页符，Some(false) 别的内容，None 什么都没有
+fn last_visible(e: &El, w: &str, last: &mut Option<bool>) {
+    for c in e.els() {
+        let local = c.local();
+        if local == "oMath" || local == "oMathPara" {
+            *last = Some(false);
+            continue;
+        }
+        if c.prefix() == w {
+            match local {
+                "pPr" | "rPr" | "txbxContent" | "instrText" | "delText" => continue,
+                "br" => {
+                    *last = Some(c.attr(&q(w, "type")) == Some("page"));
+                    continue;
+                }
+                "t" => {
+                    let has_text = c.children.iter().any(|n| matches!(n, xml::Node::Raw(r) if !unescape(r).trim().is_empty()));
+                    if has_text {
+                        *last = Some(false);
+                    }
+                    continue;
+                }
+                "tab" | "ptab" | "sym" | "drawing" | "pict" | "object" => {
+                    *last = Some(false);
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        last_visible(c, w, last);
+    }
+}
+
+/// 分节符开始的那一节是否另起一页（连续、分栏的不算）
+fn starts_page(sect: &El, w: &str) -> bool {
+    !matches!(sect.child(&q(w, "type")).and_then(|t| t.attr(&q(w, "val"))), Some("continuous" | "nextColumn"))
+}
+
+fn flow(e: &El, w: &str, m: &str, styles: &Resolver, out: &mut Vec<Flow>, sects: &mut Vec<bool>) {
+    for c in e.els() {
+        if c.name == q(w, "p") {
+            let ppr = c.child(&q(w, "pPr"));
+            let style = ppr.and_then(|pp| pp.child(&q(w, "pStyle"))).and_then(|s| s.attr(&q(w, "val")));
+            let direct = props_of(ppr, &["pageBreakBefore"]);
+            let pbb = match direct.get("pageBreakBefore") {
+                Some(a) => toggle_on(Some(a)),
+                None => toggle_on(styles.para(style).get("pageBreakBefore")),
+            };
+            let mut last = None;
+            last_visible(c, w, &mut last);
+            let sect = ppr.and_then(|pp| pp.child(&q(w, "sectPr"))).map(|s| {
+                sects.push(starts_page(s, w));
+                sects.len() - 1
+            });
+            out.push(Flow::Para { empty: last.is_none(), trailing_break: last == Some(true), pbb, sect });
+        } else if c.name == q(w, "tbl") {
+            out.push(Flow::Table);
+        } else if c.name == q(w, "sectPr") {
+            sects.push(starts_page(c, w));
+        } else if c.prefix() != m {
+            flow(c, w, m, styles, out, sects);
+        }
+    }
+}
+
+/// 第 i 项的段前分页是否多余：和前面已有的分页叠在一起（多出一页），或会把一个标题拆到两页
+fn doubled(items: &[Flow], sects: &[bool], i: usize) -> bool {
+    if !matches!(items[i], Flow::Para { pbb: true, .. }) {
+        return false;
+    }
+    let mut blanks = 0;
+    for item in items[..i].iter().rev() {
+        match item {
+            Flow::Table => return false,
+            // 新的一节另起一页；标题正好是这一节第一段时 Word 不会再分一次页，前面隔着空段落才会
+            Flow::Para { sect: Some(k), .. } => return blanks > 0 && sects.get(k + 1).copied().unwrap_or(true),
+            Flow::Para { trailing_break: true, .. } => return true,
+            Flow::Para { empty: true, pbb, .. } => {
+                if *pbb {
+                    return true;
+                }
+                blanks += 1;
+            }
+            // 紧挨着的上一段自己也段前分页：一个标题分两段写，不拆开
+            Flow::Para { pbb: true, .. } if blanks == 0 => return true,
+            Flow::Para { .. } => return false,
+        }
+    }
+    false
+}
+
+fn mark_no_break(e: &mut El, w: &str, m: &str, targets: &HashSet<usize>, n: &mut usize) {
+    for i in 0..e.children.len() {
+        let xml::Node::El(c) = &mut e.children[i] else { continue };
+        if c.name == q(w, "p") {
+            if targets.contains(n) {
+                let ppr = c.ensure_child(&q(w, "pPr"), w, &["pPr"]);
+                ppr.put_child(El::new(q(w, "pageBreakBefore")).with_attr(&q(w, "val"), "0"), w, P_ORDER);
+            }
+            *n += 1;
+        } else if c.name != q(w, "tbl") && c.name != q(w, "sectPr") && c.prefix() != m {
+            mark_no_break(c, w, m, targets, n);
+        }
+    }
+}
+
+/// 排完格式和结构以后：已经另起一页的段落写「段前不分页」。受保护分节里的不动。返回改了几处。
+fn keep_single_page_breaks(pkg: &mut Package, protected: &[bool]) -> Result<usize> {
+    let sdoc = xml::parse(&pkg.get_str("word/styles.xml")?)?;
+    let Some(sw) = sdoc.prefix_of(NS_W) else { return Ok(0) };
+    let styles = Resolver::read(&sdoc, &sw);
+    let mut doc = xml::parse(&pkg.get_str("word/document.xml")?)?;
+    let Some(w) = doc.prefix_of(NS_W) else { return Ok(0) };
+    let m = doc.prefix_of(NS_M).unwrap_or_else(|| "m".into());
+    let (mut items, mut sects) = (Vec::new(), Vec::new());
+    flow(&doc.root, &w, &m, &styles, &mut items, &mut sects);
+    let paras = items.iter().filter(|f| matches!(f, Flow::Para { .. })).count();
+    if paras != protected.len() {
+        // 段落数对不上（不该发生：排版不增删段落）就不动，交给核对器报出来
+        return Ok(0);
+    }
+    let mut targets = HashSet::new();
+    let mut n = 0;
+    for i in 0..items.len() {
+        if let Flow::Para { .. } = items[i] {
+            if !protected[n] && doubled(&items, &sects, i) {
+                targets.insert(n);
+            }
+            n += 1;
+        }
+    }
+    if !targets.is_empty() {
+        let mut n = 0;
+        mark_no_break(&mut doc.root, &w, &m, &targets, &mut n);
+        pkg.set("word/document.xml", doc.to_xml().into_bytes());
+    }
+    Ok(targets.len())
+}
+
 fn count(xml: &str, needle: &str) -> usize {
     xml.matches(needle).count()
 }
@@ -836,10 +1085,12 @@ pub fn apply_with_plan(pkg: &mut Package, spec: &Spec, plan: &Plan) -> Result<Re
     };
     let old = styles_resolver(pkg)?;
     let book = format_styles(pkg, spec, plan, &mut rep)?;
+    keep_own_indents(pkg, &old, spec, &mut rep)?;
     let new = styles_resolver(pkg)?;
     let table_style = spec.table_text.as_ref().and_then(|_| book.id_by_name(&TABLE_TEXT_STYLE.1.to_lowercase()));
     let figure_style = spec.figure.as_ref().and_then(|_| book.id_by_name(&FIGURE_STYLE.1.to_lowercase()));
     let bib_style = book.id_by_name("bibliography");
+    let mut top_protected = Vec::new();
 
     for part in story_parts(pkg) {
         if part.ends_with("comments.xml") {
@@ -886,8 +1137,12 @@ pub fn apply_with_plan(pkg: &mut Package, spec: &Spec, plan: &Plan) -> Result<Re
             bib_style: bib_style.clone(),
             track_sections: part == "word/document.xml",
             sect_no: 1,
+            top_protected: Vec::new(),
         };
         walker.block(&mut doc.root, false);
+        if part == "word/document.xml" {
+            top_protected = std::mem::take(&mut walker.top_protected);
+        }
         pkg.set(&part, doc.to_xml().into_bytes());
     }
     if !plan.protect_sections.is_empty() {
@@ -909,6 +1164,8 @@ pub fn apply_with_plan(pkg: &mut Package, spec: &Spec, plan: &Plan) -> Result<Re
     }
     // 结构类要求（页眉、页码、三线表等）在格式排完之后做
     rep.structure = crate::structure::apply(pkg, spec, plan)?;
+    // 分节符都定下来以后，再看哪些段落已经另起一页
+    rep.page_breaks_not_doubled = keep_single_page_breaks(pkg, &top_protected)?;
     rep.parts_changed = pkg.changed_parts().into_iter().map(String::from).collect();
     Ok(rep)
 }
