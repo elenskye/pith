@@ -50,6 +50,15 @@ const LABELS: &[(&str, &str)] = &[
     ("duplicate_dismissals", "「不是重复」"),
     ("import_runs", "导入记录"),
     ("settings", "设置"),
+    ("research_questions", "调查的问题"),
+    ("research_runs", "调查"),
+    ("research_searches", "调查的搜索"),
+    ("research_sources", "调查的来源"),
+    ("research_facts", "调查的事实"),
+    ("research_calcs", "调查的计算"),
+    ("research_conclusions", "调查的结论"),
+    ("research_conclusion_facts", "结论与事实的对应"),
+    ("research_steps", "调查的步骤与费用"),
 ];
 
 fn label(table: &str) -> String {

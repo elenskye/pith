@@ -56,6 +56,11 @@ pub(crate) fn rich_library(name: &str) -> Lib {
          INSERT INTO tags (name) VALUES ('没人用的标签');"
     ))
     .unwrap();
+    // v0.3：两次调查（第二次是重查），第一个来源连到一条文献
+    let q = crate::research::store::question_create(&c, research_engine::fixture::QUESTION, "2026-11-12T08:59:00.000Z").unwrap();
+    let first = crate::research::store::tests::investigate(&c, q, "01JRESEARCHRUN000000000001", 1, None);
+    crate::research::store::tests::investigate(&c, q, "01JRESEARCHRUN000000000002", 2, Some(&first));
+    crate::research::store::source_set_item(&c, &first.uid, "S1", id).unwrap();
     crate::search::rebuild(&c).unwrap();
     Lib { _dir: dir, paths, c }
 }
@@ -101,6 +106,12 @@ fn exercise(c: &Connection) {
         crate::import::runs_get(c, r.id).unwrap();
     }
     crate::metadata::settings_get(c).unwrap();
+    for q in crate::research::store::questions_list(c).unwrap() {
+        for r in &q.runs {
+            let run = crate::research::store::run_load(c, &r.uid).unwrap();
+            research_engine::report::build(&run, None);
+        }
+    }
     crate::search::rebuild(c).unwrap();
 }
 

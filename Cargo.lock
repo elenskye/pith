@@ -2941,6 +2941,7 @@ dependencies = [
  "getrandom 0.3.4",
  "md-5",
  "regex",
+ "research-engine",
  "roxmltree",
  "rusqlite",
  "security-framework",

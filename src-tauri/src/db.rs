@@ -18,6 +18,7 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration { version: 3, name: "manage", sql: include_str!("../migrations/0003_manage.sql") },
     Migration { version: 4, name: "reader", sql: include_str!("../migrations/0004_reader.sql") },
     Migration { version: 5, name: "metadata", sql: include_str!("../migrations/0005_metadata.sql") },
+    Migration { version: 6, name: "research", sql: include_str!("../migrations/0006_research.sql") },
 ];
 
 pub fn latest() -> i64 {
@@ -140,11 +141,12 @@ pub mod tests {
         for t in [
             "items", "item_fields", "creators", "item_relations", "collections", "collection_items", "tags", "item_tags", "files", "attachments", "notes",
             "annotations", "import_runs", "settings", "attachment_tags", "note_tags", "annotation_tags", "collection_attachments", "collection_notes",
-            "duplicate_dismissals", "reader_states", "metadata_lookups",
+            "duplicate_dismissals", "reader_states", "metadata_lookups", "research_questions", "research_runs", "research_searches", "research_sources", "research_facts",
+            "research_calcs", "research_conclusions", "research_conclusion_facts", "research_steps",
         ] {
             assert!(names.contains(&t), "缺表 {t}");
         }
-        assert_eq!(names.len(), 22);
+        assert_eq!(names.len(), 31);
         assert!(tables.iter().all(|(_, sql)| sql.trim_end().ends_with("STRICT")), "全部是 STRICT 表");
         // 外键生效：不存在的条目不能挂作者
         let bad = c.execute("INSERT INTO creators (item_id, role, position) VALUES (999, 'author', 0)", []);

@@ -16,6 +16,7 @@ mod metadata;
 mod paths;
 mod protocol;
 mod reader;
+mod research;
 mod search;
 mod store;
 mod text;
