@@ -141,6 +141,26 @@ App 图标（`src-tauri/icons/`）由一次性脚本绘制（三本书脊 + 书�
 | --- | --- | --- |
 | Office.js（`appsforoffice.microsoft.com`） | 微软服务条款 | Word 加载项 API，微软要求从官方 CDN 加载 |
 
+## Rust · v0.3 事实调查（src-tauri 的 `research` 模块与 crates/research-engine，云端 2026-11-12 加）
+
+| 名称 | 版本 | 许可证 | 用途 | 链接 |
+| --- | --- | --- | --- | --- |
+| research-engine（本仓库 `crates/research-engine`） | 0.3.0 | 本项目 | 事实调查的纯逻辑：流程、核对、可信度、计算、新旧对比、渲染（只依赖 serde / serde_json） | — |
+| scraper | 0.27.0 | ISC | 下载到的网页取正文（HTML 解析；和 Tauri 共用 html5ever，不多带一套） | https://github.com/rust-scraper/scraper |
+| encoding_rs | 0.8.44 | (Apache-2.0 OR MIT) AND BSD-3-Clause | 网页、CSV 的编码识别（GBK / GB18030 等）；已是 Tauri 的间接依赖，现在直接用 | https://github.com/hsivonen/encoding_rs |
+| calamine | 0.38.0 | MIT | 读 XLSX / XLS 统计表 | https://github.com/tafia/calamine |
+| pdf-extract | 0.12.1 | MIT | PDF 取文字（取不出的标「取文字失败」） | https://github.com/jrmuizel/pdf-extract |
+
+许可证评估：都是 MIT / ISC / Apache-2.0 一类的宽松许可证，没有 GPL / AGPL。
+
+新增的间接依赖：
+- calamine 带入 atoi_simd、debug_unsafe、fast-float2、codepage（MIT OR Apache-2.0）。
+- pdf-extract 带入 lopdf、pom、adobe-cmap-parser、type1-encoding-parser（MIT），cff-parser、ttf-parser、postscript、euclid、unicode-bidi（MIT OR Apache-2.0）；
+  lopdf 又带入 nom 8（MIT）、ecb（MIT）、aes / cbc / cipher / block-padding / inout / md-5 0.10 / rand 0.10 / rand_core / chacha20（RustCrypto 与 rust-random，MIT OR Apache-2.0，读加密 PDF 用）、rangemap（MIT/Apache-2.0）、stringprep（MIT/Apache-2.0）、unicode-properties（(MIT OR Apache-2.0) AND Unicode-3.0）。
+- scraper 带入 ego-tree（ISC）；html5ever、selectors、cssparser 与 Tauri 共用同一个版本（MPL-2.0 的 selectors、cssparser 原来就在，见上）。
+
+测试与假服务器只用标准库（`std::net::TcpListener`），没有新的开发依赖。
+
 ## 参考但未引入
 
 | 名称 | 许可证 | 关系 |
