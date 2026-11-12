@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, FileWarning, Folder, FolderPlus, Globe, Import, Inbox, Library, PencilRuler, Settings, Tag, Trash2, X } from "lucide-react";
+import { Copy, FileWarning, Folder, FolderPlus, Globe, Import, Inbox, Library, PencilRuler, Settings, Tag, Telescope, Trash2, X } from "lucide-react";
 import { LookupStatus } from "@/metadata/LookupStatus";
 import { api, type CollectionNode, type TagCount } from "@/shared/ipc";
 import { Chevron, childrenMap, useMutate, useStoredState, useUi } from "@/shared/ui";
 
-export type View = "library" | "settings" | "import" | "format";
+export type View = "library" | "settings" | "import" | "format" | "research";
 export type Scope =
   | { kind: "all" }
   | { kind: "unfiled" }
@@ -110,6 +110,7 @@ export function Sidebar({ view, scope, onScope, onView, tags, onTags }: Props) {
         <Row icon={<Import size={15} />} label="导入" active={view === "import"} onClick={() => onView("import")} />
         <Row icon={<Trash2 size={15} />} label="回收站" count={o?.trash} active={active({ kind: "trash" })} onClick={() => onScope({ kind: "trash" })} />
         <Row icon={<PencilRuler size={15} />} label="排版" active={view === "format"} onClick={() => onView("format")} />
+        <Row icon={<Telescope size={15} />} label="调查" active={view === "research"} onClick={() => onView("research")} />
         <Row icon={<Settings size={15} />} label="设置" active={view === "settings"} onClick={() => onView("settings")} />
       </div>
     </nav>

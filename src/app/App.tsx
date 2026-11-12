@@ -9,13 +9,14 @@ import { DetailPane } from "@/library/ItemDetail";
 import { SettingsPage } from "@/settings/SettingsPage";
 import { ImportPage } from "@/import/ImportPage";
 import { FormatPage, type FormatAt } from "@/format/FormatPage";
+import { ResearchPage, type ResearchAt } from "@/research/ResearchPage";
 import { ReadContext } from "@/reader/useRead";
 import { MetadataProvider } from "@/metadata/MetadataProvider";
 
 // 阅读器连同 pdf.js 单独打包，第一次阅读时才加载
 const Reader = lazy(() => import("@/reader/Reader"));
 
-/** 三栏外框：左侧文献库导航，中间列表，右侧详情；设置页、导入页、排版页占中右两栏。
+/** 三栏外框：左侧文献库导航，中间列表，右侧详情；设置页、导入页、排版页、调查页占中右两栏。
  *  阅读 PDF 时阅读器占满窗口；文献库只是藏起来（搜索词、滚动位置都还在），返回就回到原样。 */
 export function App() {
   return (
@@ -33,6 +34,8 @@ function Shell() {
   const [reading, setReading] = useState<number | null>(null);
   // 排版页看到哪一层：记在外框，去设置填完密钥再回来还在原处
   const [formatAt, setFormatAt] = useState<FormatAt>({ rulesetId: null, runId: null });
+  // 调查页看到哪一次：同上
+  const [researchAt, setResearchAt] = useState<ResearchAt>({ uid: null });
   const info = useQuery({ queryKey: ["appInfo"], queryFn: api.appInfo });
 
   // 换范围：清空选择与标签筛选；列表用 key 重建，搜索词、类型筛选、排序也清空
@@ -103,6 +106,8 @@ function Shell() {
               <ImportPage onDone={() => choose({ kind: "all" })} />
             ) : view === "format" ? (
               <FormatPage at={formatAt} onAt={setFormatAt} onSettings={() => setView("settings")} />
+            ) : view === "research" ? (
+              <ResearchPage at={researchAt} onAt={setResearchAt} onSettings={() => setView("settings")} />
             ) : (
               <>
                 <ItemList key={scopeKey} scope={scope} tags={tags} selection={selection} onSelection={setSelection} onImport={() => setView("import")} />

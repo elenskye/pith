@@ -693,6 +693,278 @@ export type FormatPlanPreview = {
   hasKey: boolean;
 };
 
+// ---------- 事实调查（v0.3，decisions/0020；Rust：src-tauri/src/research/、crates/research-engine） ----------
+
+export type ResearchStage = "plan" | "search" | "download" | "extract" | "verify" | "conclude" | "report";
+/** awaiting_plan 计划出来了等确认 | running 后台在做 | cancelled 停下了（可以接着做）| failed 出错停下（可以接着做）| done 做完 */
+export type ResearchRunStatus = "awaiting_plan" | "running" | "cancelled" | "failed" | "done";
+export type ResearchTier = "high" | "medium" | "low";
+export type ResearchProducerKind =
+  | "intl_org"
+  | "foreign_gov_stats"
+  | "academic"
+  | "independent_survey"
+  | "platform_data"
+  | "industry_report"
+  | "commercial_media"
+  | "cn_gov_stats"
+  | "cn_state_media"
+  | "self_media"
+  | "unknown";
+export type ResearchUncertainty = "not_found" | "conflicting" | "outdated" | "unclear_definition" | "low_trust_only";
+
+export type ResearchSubQuestion = {
+  id: string;
+  text: string;
+  metric: string;
+  definition: string;
+  population: string;
+  region: string;
+  period: string;
+  /** official 官方统计 | alternative 官方统计之外的维度 */
+  angle: "official" | "alternative";
+  sourceTypes: string[];
+  queries: string[];
+  enabled: boolean;
+};
+export type ResearchDimension = { name: string; why: string; sources: string };
+export type ResearchPlan = { summary: string; subQuestions: ResearchSubQuestion[]; dimensions: ResearchDimension[]; caveats: string[]; problems: string[] };
+export type ResearchHit = { url: string; title: string; snippet: string; published: string | null };
+export type ResearchSearch = { subQuestion: string; query: string; engine: string; hits: ResearchHit[]; error: string | null; at: string };
+
+export type ResearchSource = {
+  id: string;
+  url: string;
+  origin: "search" | "manual";
+  subQuestions: string[];
+  title: string;
+  finalUrl: string | null;
+  fetchedAt: string | null;
+  sha256: string | null;
+  kind: string | null;
+  contentType: string | null;
+  ext: string | null;
+  bytes: number;
+  textChars: number;
+  fetchError: string | null;
+  textError: string | null;
+  extracted: boolean;
+  readChars: number;
+  truncated: boolean;
+  extractError: string | null;
+  publisher: string;
+  published: string;
+  tier: ResearchTier | null;
+  itemId: number | null;
+};
+
+export type ResearchFact = {
+  id: string;
+  source: string;
+  subQuestion: string;
+  metric: string;
+  value: string;
+  unit: string;
+  region: string;
+  population: string;
+  period: string;
+  definition: string;
+  producer: string;
+  producerKind: ResearchProducerKind;
+  relayed: boolean;
+  quote: string;
+  unitQuote: string;
+  check: { status: "pending" | "verified" | "unverified"; reason: string | null; span: { start: number; end: number } | null; occurrences: number; parsed: unknown };
+  tier: ResearchTier;
+};
+
+export type ResearchCalc = { id: string; op: "diff" | "ratio" | "pct_change" | "mean" | "sum"; inputs: string[]; label: string; decimals: number; result: string | null; shown: string; unit: string; steps: string; error: string | null };
+
+export type ResearchSegment = { kind: "text"; text: string } | { kind: "fact"; id: string; text: string } | { kind: "calc"; id: string; text: string } | { kind: "unmatched"; text: string; why: string };
+
+export type ResearchConclusion = { id: string; template: string; segments: ResearchSegment[]; facts: string[]; calcs: string[]; uncertainty: ResearchUncertainty[]; note: string; issues: string[] };
+
+export type ResearchStep = {
+  kind: ResearchStage;
+  label: string;
+  at: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  searches: number;
+  costUsd: number;
+  mock: boolean;
+  ok: boolean;
+  note: string | null;
+};
+
+export type ResearchModelRef = { provider: string; model: string };
+
+export type ResearchRun = {
+  uid: string;
+  question: string;
+  seq: number;
+  previous: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  stage: ResearchStage;
+  status: ResearchRunStatus;
+  error: string | null;
+  mock: boolean;
+  config: { planner: ResearchModelRef; worker: ResearchModelRef; searchEngine: string; trust: { tiers: Partial<Record<ResearchProducerKind, ResearchTier>> }; limits: Record<string, number> };
+  plan: ResearchPlan;
+  searches: ResearchSearch[];
+  sources: ResearchSource[];
+  facts: ResearchFact[];
+  calcs: ResearchCalc[];
+  conclusions: ResearchConclusion[];
+  gaps: string[];
+  steps: ResearchStep[];
+};
+
+/** state：ok 可读并摘过 | failed 下载失败 | no_text 取不出文字 | pending 还没做到 */
+export type ResearchSourceRow = ResearchSource & { tierLabel: string | null; facts: number; verified: number; producers: string[]; state: "ok" | "failed" | "no_text" | "pending" };
+export type ResearchFactRow = ResearchFact & { producerKindLabel: string; tierLabel: string; sourceTitle: string; sourceUrl: string };
+export type ResearchFactBrief = { id: string; metric: string; region: string; population: string; period: string; producer: string; value: string; source: string };
+export type ResearchDiff = {
+  previousUid: string;
+  previousAt: string;
+  changed: { old: ResearchFactBrief; new: ResearchFactBrief }[];
+  added: ResearchFactBrief[];
+  removed: ResearchFactBrief[];
+  unchanged: number;
+  sourcesAdded: { id: string; title: string; url: string }[];
+  sourcesRemoved: { id: string; title: string; url: string }[];
+  conclusionsAdded: string[];
+  conclusionsRemoved: string[];
+  conclusionsSame: number;
+};
+
+export type ResearchReport = {
+  uid: string;
+  question: string;
+  seq: number;
+  status: ResearchRunStatus;
+  createdAt: string;
+  finishedAt: string | null;
+  mock: boolean;
+  plannerModel: string;
+  workerModel: string;
+  searchEngine: string;
+  conclusions: ResearchConclusion[];
+  gaps: string[];
+  tableName: string;
+  table: { tier: ResearchTier; label: string; kinds: string[] }[];
+  tableChanges: string[];
+  summary: string;
+  subQuestions: ResearchSubQuestion[];
+  dimensions: ResearchDimension[];
+  caveats: string[];
+  planProblems: string[];
+  searches: ResearchSearch[];
+  sources: ResearchSourceRow[];
+  facts: ResearchFactRow[];
+  calcs: ResearchCalc[];
+  steps: ResearchStep[];
+  totals: {
+    subQuestions: number;
+    searches: number;
+    sources: number;
+    readable: number;
+    downloadFailed: number;
+    noText: number;
+    facts: number;
+    verified: number;
+    unverified: number;
+    conclusionIssues: number;
+    costUsd: number;
+    calls: number;
+  };
+  notes: string[];
+  diff: ResearchDiff | null;
+};
+
+/** 审计：对存下来的调查从头再核一遍发现的问题 */
+export type ResearchFinding = { kind: "quote" | "value" | "unit" | "text" | "tier" | "calc" | "conclusion" | "order"; target: string; message: string };
+
+export type ResearchRunView = { questionId: number; run: ResearchRun; report: ResearchReport; findings: ResearchFinding[]; running: boolean; planEditable: boolean };
+
+export type ResearchRunSummary = {
+  uid: string;
+  seq: number;
+  stage: ResearchStage;
+  status: ResearchRunStatus;
+  mock: boolean;
+  createdAt: string;
+  finishedAt: string | null;
+  sources: number;
+  verifiedFacts: number;
+  conclusions: number;
+  costUsd: number;
+};
+export type ResearchQuestion = { id: number; uid: string; text: string; createdAt: string; updatedAt: string; runs: ResearchRunSummary[] };
+
+export type ResearchEstimateLine = { label: string; count: number; typicalUsd: number; maxUsd: number };
+export type ResearchEstimate = { typicalUsd: number; maxUsd: number; budgetUsd: number; monthSpentUsd: number; withinBudget: boolean; lines: ResearchEstimateLine[] };
+
+export type ResearchPlanPreview = { ticket: number; question: string; chars: number; provider: string; model: string; webSearches: number; estimate: ResearchEstimate; mock: boolean; missingKeys: string[] };
+export type ResearchExecutePreview = {
+  ticket: number;
+  uid: string;
+  stage: ResearchStage;
+  subQuestions: number;
+  queries: number;
+  searchEngine: string;
+  maxSources: number;
+  manualSources: number;
+  workerModel: string;
+  plannerModel: string;
+  estimate: ResearchEstimate;
+  mock: boolean;
+  missingKeys: string[];
+  /** 最坏情况会超过月度上限：做到一半可能停下 */
+  mayStop: boolean;
+};
+
+export type ResearchProgress = { uid: string | null; stage: ResearchStage; done: number; total: number; message: string };
+export type ResearchDone = { uid: string; status: ResearchRunStatus | null; error: string | null };
+
+export type ResearchKeyWhich = "anthropic" | "deepseek" | "tavily";
+export type ResearchEndpoint = { provider: "anthropic" | "openai_compatible"; model: string; baseUrl: string | null };
+export type ResearchPrice = { input: number; output: number };
+export type ResearchSettings = {
+  planner: ResearchEndpoint;
+  worker: ResearchEndpoint;
+  /** 每个模型接口的专用搜索：claude_web_search | none（用 Tavily） */
+  dedicatedSearch: Record<string, string>;
+  tavilyDepth: "basic" | "advanced";
+  planWebSearches: number;
+  trust: { tiers: Partial<Record<ResearchProducerKind, ResearchTier>> };
+  prices: { models: Record<string, ResearchPrice>; tavilyCreditUsd: number | null; claudeSearchUsd: number | null };
+};
+export type ResearchStatus = {
+  mock: boolean;
+  settings: ResearchSettings;
+  keys: { which: ResearchKeyWhich; label: string; has: boolean; place: AgentKeyPlace; needed: boolean }[];
+  searchEngine: string;
+  planWebSearches: number;
+  prices: { role: "planner" | "worker"; model: string; input: number; output: number; known: boolean }[];
+  tavilyCreditUsd: number;
+  claudeSearchUsd: number;
+  trust: { kind: ResearchProducerKind; label: string; hint: string; tier: ResearchTier; defaultTier: ResearchTier }[];
+  trustName: string;
+  budgetUsd: number;
+  month: string;
+  monthSpentUsd: number;
+  calls: (AgentCall & { provider: string; kind: string; searches: number })[];
+  ledgerError: string | null;
+  running: string | null;
+};
+export type ResearchAdded = { key: string; itemId: number; created: boolean; attachmentId: number | null; attachmentError: string | null };
+export type ResearchExportFormat = "markdown" | "html" | "docx";
+
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   revealDataDir: () => invoke<void>("app_reveal_data_dir"),
@@ -801,6 +1073,34 @@ export const api = {
   formatApply: (rulesetId: string, runId: string) => invoke<FormatRunView>("format_apply", { rulesetId, runId }),
   /** 停止进行中的模型调用 */
   formatCancel: () => invoke<void>("format_cancel"),
+  /** 事实调查：设置、密钥 */
+  researchStatus: () => invoke<ResearchStatus>("research_status"),
+  researchSettingsSet: (settings: ResearchSettings) => invoke<ResearchStatus>("research_settings_set", { settings }),
+  researchKeySet: (which: ResearchKeyWhich, key: string) => invoke<ResearchStatus>("research_key_set", { which, key }),
+  researchKeyClear: (which: ResearchKeyWhich) => invoke<ResearchStatus>("research_key_clear", { which }),
+  researchQuestionsList: () => invoke<ResearchQuestion[]>("research_questions_list"),
+  researchQuestionGet: (id: number) => invoke<ResearchQuestion>("research_question_get", { id }),
+  /** prepare 不联网：算出要发什么、大概多少钱；用户确认后拿 ticket 调 run（联网） */
+  researchPlanPrepare: (question: string) => invoke<ResearchPlanPreview>("research_plan_prepare", { question }),
+  researchPlanRun: (ticket: number) => invoke<ResearchRunView>("research_plan_run", { ticket }),
+  researchRunGet: (uid: string) => invoke<ResearchRunView>("research_run_get", { uid }),
+  researchPlanUpdate: (uid: string, plan: ResearchPlan) => invoke<ResearchRunView>("research_plan_update", { uid, plan }),
+  researchSourceAdd: (uid: string, url: string) => invoke<ResearchRunView>("research_source_add", { uid, url }),
+  researchSourceRemove: (uid: string, key: string) => invoke<ResearchRunView>("research_source_remove", { uid, key }),
+  researchExecutePrepare: (uid: string) => invoke<ResearchExecutePreview>("research_execute_prepare", { uid }),
+  /** 在后台做；进度看 research-progress 事件，做完看 research-done */
+  researchExecute: (uid: string, ticket: number) => invoke<void>("research_execute", { uid, ticket }),
+  researchCancel: () => invoke<void>("research_cancel"),
+  researchRerun: (uid: string) => invoke<ResearchRunView>("research_rerun", { uid }),
+  researchRunDelete: (uid: string) => invoke<void>("research_run_delete", { uid }),
+  researchQuestionDelete: (id: number) => invoke<void>("research_question_delete", { id }),
+  /** 写到 dir 下的新文件（不覆盖），返回路径 */
+  researchExport: (uid: string, format: ResearchExportFormat, dir: string) => invoke<string>("research_export", { uid, format, dir }),
+  researchReveal: (path: string) => invoke<void>("research_reveal", { path }),
+  researchAddToLibrary: (uid: string, keys: string[]) => invoke<{ added: ResearchAdded[]; view: ResearchRunView }>("research_add_to_library", { uid, keys }),
+  /** 手动加的来源文件 */
+  pickResearchFile: async () =>
+    (await open({ directory: false, multiple: false, title: "选择要加进来的文件", filters: [{ name: "网页、PDF、表格、文档", extensions: ["pdf", "html", "htm", "xlsx", "xls", "csv", "tsv", "docx", "txt", "md"] }] })) as string | null,
   /** 置顶搜索窗 */
   pickerSession: () => invoke<PickerSession | null>("picker_session"),
   pickerSearch: (q: string) => invoke<PickInfo[]>("picker_search", { q }),

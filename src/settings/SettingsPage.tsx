@@ -9,6 +9,7 @@ import { ExportSection, RestoreResult } from "@/settings/Transfer";
 import { WordSettingsSection } from "@/settings/WordSettings";
 import { CiteStylesSection, ZoteroConvertSection } from "@/settings/CiteSettings";
 import { AgentSettingsSection } from "@/settings/AgentSettings";
+import { ResearchSettingsSection } from "@/settings/ResearchSettings";
 
 /** onRestored：库被整个换掉（恢复）之后，让外框回到初始状态 */
 export function SettingsPage({ onRestored }: { onRestored: () => void }) {
@@ -112,6 +113,8 @@ export function SettingsPage({ onRestored }: { onRestored: () => void }) {
         <ZoteroConvertSection />
 
         <AgentSettingsSection />
+
+        <ResearchSettingsSection />
 
         <ExportSection exportsDir={i ? `${i.dataDir}/exports` : undefined} onRestored={afterRestore} />
 

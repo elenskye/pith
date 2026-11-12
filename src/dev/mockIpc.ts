@@ -3,6 +3,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import { agentHandlers } from "./mockAgent";
+import { researchHandlers } from "./mockResearch";
 import type {
   Annotation,
   AnnotationPatch,
@@ -133,7 +134,7 @@ const tagId = (name: string) => {
   return tagIds.get(name)!;
 };
 const backups: BackupInfo[] = [{ fileName: "library-20261108-090000-daily.db", label: "daily", createdAt: "2026-11-08 09:00:00", size: 286720 }];
-const info: AppInfo = { appVersion: "0.2.0", isDev: true, dataDir: "/Users/mock/Pith Dev", schemaVersion: 5, latestSchema: 5, startupError: null };
+const info: AppInfo = { appVersion: "0.3.0", isDev: true, dataDir: "/Users/mock/Pith Dev", schemaVersion: 6, latestSchema: 6, startupError: null };
 
 // ---- 联网补全（模拟：不联网，按条目编一份「查到的记录」；规则的来源是 Rust） ----
 const mSettings: MetadataSettings = { enabled: null, auto: true, email: null };
@@ -758,12 +759,17 @@ const handlers: Record<string, (a: Args) => unknown> = {
   import_runs_get: ({ id }) => runs.find((r) => r.id === id) ?? fail("找不到这次导入的记录"),
   // 排版 Agent（模拟实现和示例数据在 mockAgent.ts）
   ...agentHandlers,
+  // 事实调查（模拟实现和示例数据在 mockResearch.ts）
+  ...researchHandlers,
   // 系统对话框（@tauri-apps/plugin-dialog）：返回合成路径
   "plugin:dialog|open": (a) => {
     const o = (a.options ?? {}) as { directory?: boolean; multiple?: boolean; title?: string; filters?: unknown[] };
     // 排版：规范文档（多选）、要排的论文
     if (o.multiple) return ["/Users/mock/Documents/学校规范/某某大学本科毕业论文撰写规范（示例）.docx", "/Users/mock/Documents/学校规范/论文模板.docx"];
     if (o.title?.includes("要排版的论文")) return "/Users/mock/Documents/毕业论文/论文二稿.docx";
+    // 调查：手动加的来源文件、导出报告的文件夹
+    if (o.title?.includes("要加进来的文件")) return "/Users/mock/Downloads/示例市统计年鉴2024.xlsx";
+    if (o.title?.includes("导出到哪个文件夹")) return "/Users/mock/Documents/调查报告";
     if (o.directory) {
       if (o.title?.includes("整库导出的文件夹")) return "/Users/mock/Pith Dev/exports/Pith 导出 20261109-130000";
       if (o.title?.includes("导出到")) return "/Users/mock/Pith Dev/exports";
