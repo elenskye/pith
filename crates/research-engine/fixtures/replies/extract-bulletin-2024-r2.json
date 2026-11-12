@@ -1,0 +1,9 @@
+{
+  "publisher": "示例市统计局",
+  "published": "2025 年 9 月 1 日修订",
+  "facts": [
+    { "sub_question": "Q1", "metric": "16–24 岁城镇青年调查失业率", "value": "12.6", "unit": "%", "region": "示例市", "population": "16–24 岁城镇青年", "period": "2024 年", "definition": "城镇调查失业率，不含在校学生；修订数", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2024 年，全市 16–24 岁城镇青年调查失业率为 12.6%（修订数），比上年下降 0.8 个百分点。", "unit_quote": "" },
+    { "sub_question": "Q2", "metric": "城镇非私营单位就业人员年平均工资", "value": "98,560", "unit": "元", "region": "示例市", "population": "城镇非私营单位就业人员", "period": "2024 年", "definition": "", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "全年城镇非私营单位就业人员年平均工资为 98,560 元", "unit_quote": "" },
+    { "sub_question": "Q2", "metric": "城镇私营单位就业人员年平均工资", "value": "61,240", "unit": "元", "region": "示例市", "population": "城镇私营单位就业人员", "period": "2024 年", "definition": "", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "城镇私营单位就业人员年平均工资为 61,240 元", "unit_quote": "" }
+  ]
+}

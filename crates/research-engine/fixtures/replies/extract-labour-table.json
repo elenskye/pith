@@ -1,0 +1,9 @@
+{
+  "publisher": "示例市统计局、示例市人力资源和社会保障局",
+  "published": "",
+  "facts": [
+    { "sub_question": "Q1", "metric": "16–24 岁城镇青年调查失业率", "value": "14.2", "unit": "%", "region": "示例市", "population": "16–24 岁城镇青年", "period": "2022 年", "definition": "城镇调查失业率", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2022\t14.2\t1.18", "unit_quote": "16–24岁城镇青年调查失业率（%）" },
+    { "sub_question": "Q1", "metric": "16–24 岁城镇青年调查失业率", "value": "13.4", "unit": "%", "region": "示例市", "population": "16–24 岁城镇青年", "period": "2023 年", "definition": "城镇调查失业率", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2023\t13.4\t1.21", "unit_quote": "16–24岁城镇青年调查失业率（%）" },
+    { "sub_question": "Q3", "metric": "求人倍率", "value": "1.25", "unit": "", "region": "示例市", "population": "", "period": "2024 年", "definition": "", "producer": "示例市人力资源和社会保障局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2024\t12.3\t1.25", "unit_quote": "" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "publisher": "示例市统计局",
+  "published": "2025 年 7 月 18 日",
+  "facts": [
+    { "sub_question": "Q1", "metric": "16–24 岁城镇青年调查失业率", "value": "11.9", "unit": "%", "region": "示例市", "population": "16–24 岁城镇青年", "period": "2025 年上半年", "definition": "城镇调查失业率", "producer": "示例市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2025 年上半年，全市 16–24 岁城镇青年调查失业率为 11.9%。", "unit_quote": "" }
+  ]
+}
