@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pith v0.3 计划问卷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 布局：单栏问卷，顶部粘性进度条按部分计数，底部固定操作栏。色调取统计年鉴的深蓝与冷灰。 */
+  :root {
+    --paper: #f3f5f8;
+    --card: #ffffff;
+    --ink: #172030;
+    --muted: #5b6575;
+    --line: #dde2e9;
+    --accent: #1d4f91;
+    --accent-ink: #ffffff;
+    --accent-soft: #e6eef9;
+    --done: #2f7a4d;
+    --note-bg: #eef2f7;
+    --font-display: "Noto Serif SC", "Songti SC", "STSong", serif;
+    --font-body: -apple-system, "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #11151b;
+      --card: #191f28;
+      --ink: #e5e9ef;
+      --muted: #98a2b1;
+      --line: #2a323e;
+      --accent: #84abe8;
+      --accent-ink: #0f1a2b;
+      --accent-soft: #1c2940;
+      --done: #6fc28f;
+      --note-bg: #1a2230;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #11151b;
+    --card: #191f28;
+    --ink: #e5e9ef;
+    --muted: #98a2b1;
+    --line: #2a323e;
+    --accent: #84abe8;
+    --accent-ink: #0f1a2b;
+    --accent-soft: #1c2940;
+    --done: #6fc28f;
+    --note-bg: #1a2230;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 15px/1.7 var(--font-body); }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 36px 18px 140px; }
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--note-bg); padding: 1px 5px; border-radius: 4px; }
+
+  header { display: grid; gap: 10px; }
+  .eyebrow { font-size: 12.5px; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; }
+  h1 { font-family: var(--font-display); font-size: 30px; line-height: 1.3; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+  .lede { color: var(--muted); margin: 0; max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
+  .meta span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--card); }
+
+  .settled { margin: 22px 0 6px; background: var(--note-bg); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; }
+  .settled h2 { font-size: 14px; margin: 0; color: var(--accent); }
+  .settled ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 14px; }
+
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line); padding: 10px 0; margin: 18px 0 8px; display: grid; gap: 8px; }
+  .bar-top { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .chip.full { border-color: var(--done); color: var(--done); }
+  .chip:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section.part { margin: 34px 0 10px; display: grid; gap: 4px; scroll-margin-top: 90px; }
+  section.part h2 { font-family: var(--font-display); font-size: 20px; margin: 0; text-wrap: balance; }
+  section.part h2 b { color: var(--accent); margin-right: 8px; }
+  section.part p { color: var(--muted); margin: 0; font-size: 14px; max-width: 64ch; }
+
+  .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 12px 0; display: grid; gap: 6px; }
+  .q.answered { border-left: 3px solid var(--done); }
+  .q .num { font-size: 12px; color: var(--muted); letter-spacing: .05em; font-variant-numeric: tabular-nums; }
+  .q .num em { font-style: normal; margin-left: 6px; color: var(--accent); }
+  .q h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.55; }
+  .q .hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+  .opts { display: grid; gap: 2px; margin-top: 4px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .opt:hover { background: var(--accent-soft); }
+  .opt input { margin-top: 6px; flex: none; accent-color: var(--accent); }
+  .opt .lab { flex: 1; }
+  .opt .desc { display: block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .rec { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; font-weight: 600; }
+  textarea, input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font: inherit; background: var(--paper); color: var(--ink); }
+  textarea { min-height: 76px; resize: vertical; }
+  .extra { margin: 4px 0 0 30px; }
+
+  #out { display: none; margin-top: 26px; gap: 8px; }
+  #out.show { display: grid; }
+  #out h3 { margin: 0; font-size: 15px; }
+  #md { min-height: 300px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+
+  .footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; }
+  .footer-in { max-width: 780px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  #status { flex: 1 1 220px; font-size: 13px; color: var(--muted); min-width: 0; }
+  #status.ok { color: var(--done); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.act { font: inherit; font-size: 14px; font-weight: 600; border-radius: 9px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.act:disabled { opacity: .55; cursor: default; }
+
+  @media (max-width: 420px) {
+    h1 { font-size: 25px; }
+    .extra { margin-left: 0; }
+    .q { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PITH · 第二轮问卷 · 2026-11-11</div>
+    <h1>v0.3 开发计划问卷</h1>
+    <p class="lede">定三件事：v0.2 怎么收尾，v0.3「事实调查」做什么、怎么做，以及这一版怎么和云端 Claude 分工。收到回答后，我拟出 v0.3 的分期（类似 v0.2 的 W1–W5），写进 <code>ROADMAP.md</code> 和新的 decision，并标出哪几期交给云端。</p>
+    <div class="meta"><span>5 部分</span><span id="qcount">— 题</span><span>约 12 分钟</span><span>草稿自动保存</span></div>
+  </header>
+
+  <div class="settled">
+    <h2>已经定了，不用再答</h2>
+    <ul>
+      <li>云端规则（你刚定的）：云端 Claude 只提交推送到 <code>cloud/v0.3</code>；Linux 上编不过的 macOS 部分不改；提交信息全英文、极简、不署名；最后一律本地验收。已写进 <code>CLAUDE.md</code> 规则 7。</li>
+      <li>先证据后答案：每个重要数字都能点回来源、段落和抓取时间；查不到就说查不到，并分清「找不到 / 互相矛盾 / 已过时 / 口径没说清」。</li>
+      <li>数字的比较、换算、同比一律由代码算；模型只负责找和摘，摘到的数字必须在原文里核对得上。</li>
+      <li>云端不调用真实模型、不碰你的密钥；花钱的真实验收只在本地做，事先问你上限。</li>
+    </ul>
+  </div>
+
+  <div class="bar" id="bar">
+    <div class="bar-top"><span id="pcount">0 / 0</span><div class="track"><i id="pbar"></i></div></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <form id="form" novalidate></form>
+
+  <div id="out">
+    <h3>回答（Markdown）</h3>
+    <textarea id="md" readonly aria-label="生成的回答"></textarea>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-in">
+    <div id="status" role="status">填完点「提交给 Claude」，再回对话说一声「填好了」。</div>
+    <div class="btns">
+      <button type="button" class="act primary" id="submit">提交给 Claude</button>
+      <button type="button" class="act" id="copy">复制 Markdown</button>
+      <button type="button" class="act" id="reset">清空草稿</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// opts 每项：[选项文字, 说明(可空), 是否建议]
+const Q = [
+ {part:'A', name:'v0.2 收尾', lead:'v0.2 的 W1–W4 都做完了，W5 验收还没做。'},
+ {id:'a1', type:'single', title:'W5 验收（在 Word 里目视 W4 排出来的页眉、页码、三线表，至今没人看过）怎么安排？',
+  opts:[['本地先做完 W5，云端同时开始 v0.3 第一期','两边不碰同一批文件；W5 发现的问题在本地修。',true],
+        ['先做完 W5，再开 v0.3（不并行）'],
+        ['W5 先放着，v0.2 按现状算完成，用到时再看']], other:true},
+ {id:'a2', type:'single', title:'「应用程序」里的正式版还是 W2。要不要更新到 W4？',
+  hint:'命令是 <code>pnpm app:install</code>，约 2 分钟，没有数据库改动。上一轮问过，没回。',
+  opts:[['现在就装','',true],['等 W5 看完再装'],['先不装']]},
+
+ {part:'B', name:'v0.3 要回答什么', lead:'v0.3 是 Fact Research（事实调查），驱动问题是你第一轮给的「不同城市真实就业情况」。'},
+ {id:'b1', type:'single', title:'事实调查做多宽？',
+  opts:[['通用：什么事实问题都能问，用就业问题验收','符合 Brief 的「日常事实调查」（政策、城市数据、跨境转账路径等）；就业问题是第一个样例。',true],
+        ['窄而深：只做城市统计数据一类（就业、工资、人口等），先把这一类做扎实']], other:true},
+ {id:'b2', type:'multi', title:'关于「不同城市真实就业情况」，你最想弄清的是哪种？',
+  opts:[['几座城市的官方数字能不能直接比','统计口径、范围、发布时间是否一致。'],
+        ['官方数字和其他来源对不上时，哪个更接近真实','其他来源指招聘平台、抽样调查、学术研究。'],
+        ['某一类人的情况','例如应届生、16–24 岁青年、某个行业。'],
+        ['给自己找工作、选城市做参考']], other:true},
+ {id:'b3', type:'text', title:'具体是哪几座城市、哪类人、哪段时间？',
+  hint:'例如「北京、天津、重庆、成都；青年和应届生；2022 年至今」。不确定就写个大概，开发到验收前还能改。',
+  placeholder:'城市 / 人群 / 时间段'},
+ {id:'b4', type:'multi', title:'想看哪些指标？',
+  hint:'有些指标只有全国或省级的数，城市级不一定公布；查不到时报告会照实写「找不到」。',
+  opts:[['城镇调查失业率'],['青年（16–24 岁）失业率'],['城镇新增就业人数'],['平均工资（非私营 / 私营单位）'],
+        ['岗位数与求职人数之比（求人倍率）'],['高校毕业生去向（就业质量报告）'],['灵活就业、平台就业'],['社保参保人数']], other:true},
+ {id:'b5', type:'single', title:'来源怎么取舍？',
+  opts:[['只用官方和一手来源','统计局、人社局、统计公报、统计年鉴、政府工作报告。'],
+        ['官方为主，学术研究、权威媒体、招聘平台报告作对照，分开标注','你说的「真实」多半要靠对照才看得出；每条结论都标明来源类型。',true],
+        ['不限来源，按可信度排序']], other:true},
+ {id:'b6', type:'single', title:'结果默认怎么呈现？',
+  opts:[['先给短答，展开才看全过程','3–5 条结论，每条带数字、出处链接和「哪里不确定」；点开看检索路径和完整报告。Brief 原方案。',true],
+        ['直接给完整报告'],
+        ['以对比表格为主，文字少']], other:true},
+ {id:'b7', type:'multi', title:'要能导出成什么？',
+  opts:[['Markdown'],['Word（.docx，用 v0.2 的文档引擎生成）'],['网页（单个 HTML 文件）'],['不用导出，在 Pith 里看就行']], other:true},
+ {id:'b8', type:'single', title:'调查里用到的网页、公报，要不要能存进文献库？',
+  opts:[['能，结论页上一键加入文献库','以后写论文可以直接引用。',true],
+        ['不需要，调查和文献库分开'],
+        ['用到的全部自动加入']]},
+
+ {part:'C', name:'v0.3 怎么做', lead:'技术上的取舍。费用按 Anthropic 当前价目：Opus 5.5 每百万 token 输入 $4 / 输出 $20，Sonnet 5.5 $2 / $10，Haiku 5.5 $0.10 / $0.50；Claude 的网页搜索每 1000 次 $10。'},
+ {id:'c1', type:'single', title:'网上的资料怎么找、怎么取？',
+  hint:'不管选哪种，都能随时手动加链接或文件（PDF、Excel）。',
+  opts:[['Claude 搜索，本机下载','用 Claude 自带的网页搜索找链接；网页和文件由 Pith 在你的 Mac 上下载，再把正文交给模型。国内政府网站从境外访问常常很慢或打不开，本机下载更稳；只用你现有的 Anthropic 密钥。',true],
+        ['全交给 Claude','搜索和抓网页都由 Claude 在云上做，最省事，但部分国内网站可能抓不到。'],
+        ['另接一个搜索服务','如 Brave、Tavily；要多申请一个密钥。'],
+        ['不自动搜索','我给链接或文件，Pith 只负责读、摘证据、核对。']], other:true},
+ {id:'c2', type:'single', title:'用哪个模型？',
+  opts:[['全程 Opus 5.5，验收时记下每个问题花多少，贵了再换','和排版 Agent 同一个模型；读网页这类简单步骤调低思考强度来省钱。',true],
+        ['Opus 5.5 定计划、下结论，读网页摘证据交给便宜的模型','Sonnet 5.5 或 Haiku 5.5；要多测一轮比较质量。'],
+        ['全程 Sonnet 5.5']], other:true},
+ {id:'c3', type:'single', title:'月预算上限怎么定？（现在排版 Agent 是每月 $20）',
+  hint:'一次事实调查估计 $0.5–2，验收时实测。',
+  opts:[['和排版 Agent 共用一个上限，提到 $30','一个数好管。',true],
+        ['共用，保持 $20'],
+        ['分开设，事实调查单独一个上限（在「其他」里写数）']], other:true},
+ {id:'c4', type:'single', title:'单次调查的上限？',
+  hint:'每次发送前仍然会列出要发的内容和预计费用，等你确认。',
+  opts:[['$1，到了先停下问你要不要继续','',true],['$2'],['不设单次上限，只看月上限']], other:true},
+ {id:'c5', type:'single', title:'抓下来的网页和文件存多少？',
+  opts:[['原件 + 提取的正文 + 网址、抓取时间、哈希','原件指 HTML、PDF、Excel。以后能证明「当时网页上就是这么写的」，占空间不大。',true],
+        ['只存正文和网址、时间'],
+        ['再加整页截图','最接近原样，占空间最多。']]},
+ {id:'c6', type:'single', title:'证据怎么存（Brief 里的「证据层」）？',
+  opts:[['只做 v0.3 用得上的，存进主库','来源、片段、结论、结论与证据的对应、每次调查的记录；新加 migration。v0.4 读书、v0.6 学术研究再往上加。',true],
+        ['一步到位按 Brief 全套','包括语义检索、跨语言检索。'],
+        ['先每次调查存一个文件，不进主库','v0.4 再定表结构。']], other:true},
+ {id:'c7', type:'single', title:'同一个问题隔几个月再查一次，要不要对比新旧结果？',
+  opts:[['v0.3 就做：重查后标出哪些数字、结论变了'],
+        ['v0.3 只保存历史记录，对比以后再做','',true],
+        ['不需要']]},
+ {id:'c8', type:'single', title:'视觉：路线图说视觉设计和 Visual Atelier 联动大约在 v0.3 前后。v0.3 做吗？',
+  opts:[['v0.3 仍然简约，视觉单独排一期','',true],['v0.3 顺带把调查页面做好看'],['v0.3 先做一轮全局视觉']], other:true},
+
+ {part:'D', name:'和云端 Claude 怎么分工', lead:'云端是 Ubuntu Linux：Rust、Node、pnpm 都有，能装系统库，推送分支名不受限制。Mac 专用的钥匙串、AppleScript、Word、.app 打包编不过，按规则不改。另外 src-tauri（App 后端）现在无条件依赖 Mac 的钥匙串库，所以云端目前连整个 App 后端都编不过。'},
+ {id:'d1', type:'multi', title:'云端 Claude 负责哪些？',
+  hint:'钥匙串、Tauri 接线里碰 Mac 的部分、真实模型调用、正式版安装，一律在本地。',
+  opts:[['新的纯 Rust 逻辑','证据层、调查流程、网页与表格解析、数字核对；放进一个不依赖 macOS 的新 crate。',true],
+        ['调查页面的前端','用浏览器示例数据模式（?mock）开发。',true],
+        ['合成测试夹具和自动测试','假网页、假统计表、假模型回复。',true],
+        ['文档','decision、architecture、testing。'],
+        ['v0.2 的遗留小项','例如要求清单不能新增条目。']], other:true},
+ {id:'d2', type:'single', title:'云端开工前，本地要不要先做一步准备？',
+  opts:[['要：本地先把 Mac 专用代码用条件编译隔开','Linux 上换成「不支持」的空实现，Mac 上行为不变。之后云端能编译 App 后端、跑那 197 项测试。一次性的小改动，本地做、本地验，不违反「云端不改 macOS 部分」。',true],
+        ['不要：云端只编独立的 crate 和前端','App 后端的接线和测试全留给本地。']], other:true},
+ {id:'d3', type:'single', title:'v0.3 里两边的节奏？',
+  opts:[['交替','云端做一期 → 你抓取、本地验收、合进 main → 云端从新的 main 接着做。每期都有验收点，问题不堆到最后。',true],
+        ['并行','云端和本地同时各做一部分，最后一起合并，可能要手动解冲突。'],
+        ['云端一口气做完它能做的部分，最后本地一次性验收']], other:true},
+ {id:'d4', type:'single', title:'云端的交接记录写在哪？',
+  opts:[['单独写 HANDOFF-cloud.md，本地验收时并进 HANDOFF.md','两边从不改同一个交接文件，合并不会冲突。',true],
+        ['同一个 HANDOFF.md'],
+        ['同一个 HANDOFF.md，云端只写其中「云端」一节']], other:true},
+ {id:'d5', type:'multi', title:'本地验收看什么？',
+  opts:[['Mac 上 pnpm check 全过、clippy 0 警告','',true],
+        ['本地 Agent 逐项审云端的改动','有没有动 macOS 部分，有没有违反 git 和费用规则。',true],
+        ['真实问题 + 真实模型跑一轮','花钱，事先问你上限。',true],
+        ['你自己在正式版里点一遍']], other:true},
+ {id:'d6', type:'single', title:'云端推完分支后，要不要开 PR？',
+  opts:[['不开，只推分支，你在本地抓取','规则 7 现在就是这么写的。',true],
+        ['开草稿 PR，方便在 GitHub 上看改动（不合并）']]},
+
+ {part:'E', name:'其他', lead:''},
+ {id:'e1', type:'text', title:'还有什么想说的？', hint:'对规则 7 的补充、对 v0.3 的担心、想先插队的小功能，都可以写。', placeholder:'自由填写'}
+];
+
+const KEY = 'pith-q2-draft';
+const DRAFT_DOC = 'drafts/round2';
+const ANSWER_DOC = 'answers/round2';
+const form = document.getElementById('form');
+const statusEl = document.getElementById('status');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const plain = s => String(s).replace(/<[^>]+>/g, '');
+
+// 渲染
+const parts = [];
+let cur = null, total = 0;
+Q.forEach(q => {
+  if (q.part) {
+    cur = {key:q.part, name:q.name, qs:[]}; parts.push(cur);
+    const s = document.createElement('section'); s.className = 'part'; s.id = 'sec-' + q.part.toLowerCase();
+    s.innerHTML = `<h2><b>${q.part}</b>${esc(q.name)}</h2>${q.lead ? `<p>${esc(q.lead)}</p>` : ''}`;
+    form.appendChild(s); return;
+  }
+  total++; cur.qs.push(q); q.label = cur.key + cur.qs.length;
+  const d = document.createElement('div'); d.className = 'q'; d.id = 'q-' + q.id;
+  const kind = q.type === 'multi' ? '可多选' : q.type === 'single' ? '单选' : '';
+  let h = `<div class="num">${q.label}${kind ? `<em>${kind}</em>` : ''}</div><h3 id="${q.id}-t">${esc(q.title)}</h3>`;
+  if (q.hint) h += `<p class="hint">${q.hint}</p>`;
+  if (q.type === 'single' || q.type === 'multi') {
+    const t = q.type === 'single' ? 'radio' : 'checkbox';
+    h += `<div class="opts" role="group" aria-labelledby="${q.id}-t">`;
+    q.opts.forEach((o, i) => {
+      h += `<label class="opt" for="${q.id}-${i}"><input type="${t}" id="${q.id}-${i}" name="${q.id}" value="${i}"><span class="lab">${esc(o[0])}${o[2] ? '<span class="rec">建议</span>' : ''}${o[1] ? `<span class="desc">${esc(o[1])}</span>` : ''}</span></label>`;
+    });
+    if (q.other) h += `<label class="opt" for="${q.id}-o"><input type="${t}" id="${q.id}-o" name="${q.id}" value="other"><span class="lab">其他</span></label>`;
+    h += `</div><div class="extra"><input type="text" id="${q.id}-note" placeholder="${q.other ? '选「其他」时写在这里；也可以补充说明' : '补充说明（可空）'}" aria-label="${esc(q.label)} 补充说明"></div>`;
+  } else {
+    h += `<textarea id="${q.id}-text" placeholder="${esc(q.placeholder || '自由填写')}" aria-labelledby="${q.id}-t"></textarea>`;
+  }
+  d.innerHTML = h; form.appendChild(d);
+});
+document.getElementById('qcount').textContent = total + ' 题';
+const chips = document.getElementById('chips');
+parts.forEach(p => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.id = 'chip-' + p.key;
+  b.addEventListener('click', () => document.getElementById('sec-' + p.key.toLowerCase()).scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}));
+  chips.appendChild(b);
+});
+
+// 状态
+const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+function answered(q) {
+  if (q.type === 'text') return !!val(q.id + '-text').trim();
+  return !!form.querySelector(`input[name="${q.id}"]:checked`);
+}
+function progress() {
+  let a = 0;
+  parts.forEach(p => {
+    const n = p.qs.filter(answered).length; a += n;
+    const c = document.getElementById('chip-' + p.key);
+    c.textContent = `${p.key} ${p.name} ${n}/${p.qs.length}`;
+    c.classList.toggle('full', n === p.qs.length);
+    p.qs.forEach(q => document.getElementById('q-' + q.id).classList.toggle('answered', answered(q)));
+  });
+  document.getElementById('pcount').textContent = `已答 ${a} / ${total}`;
+  document.getElementById('pbar').style.width = (100 * a / total) + '%';
+}
+function snapshot() {
+  const s = {};
+  form.querySelectorAll('input,textarea').forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') { if (el.checked) s[el.name + '=' + el.value] = 1; }
+    else if (el.value) s['#' + el.id] = el.value;
+  });
+  return s;
+}
+function apply(s) {
+  form.querySelectorAll('input,textarea').forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') el.checked = !!s[el.name + '=' + el.value];
+    else el.value = s['#' + el.id] || '';
+  });
+  progress();
+}
+function localLoad() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+function localSave(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+
+// 远端存储（Artifact 的 db）；拿不到就只用本机草稿 + 复制
+let db = null, writing = Promise.resolve(), draftTimer = null, lastDraft = '';
+function queueWrite(path, body) {
+  writing = writing.then(() => db.doc(path).set(body)).catch(e => { setStatus('保存到云端失败：' + (e && e.message || e) + '。可以用「复制 Markdown」粘贴回对话。'); });
+  return writing;
+}
+function scheduleDraft(s) {
+  if (!db) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const json = JSON.stringify(s);
+    if (json === lastDraft) return;
+    lastDraft = json;
+    queueWrite(DRAFT_DOC, {state: json, savedAt: new Date().toISOString()});
+  }, 1500);
+}
+function onChange() { const s = snapshot(); localSave(s); scheduleDraft(s); progress(); }
+form.addEventListener('input', onChange);
+form.addEventListener('change', onChange);
+form.addEventListener('submit', e => e.preventDefault());
+
+function setStatus(t, ok) { statusEl.textContent = t; statusEl.classList.toggle('ok', !!ok); }
+
+const initial = localLoad();
+if (initial) apply(initial); else progress();
+
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('db').then(async d => {
+    if (!d) return;
+    db = d;
+    try {
+      if (!initial) {
+        const snap = await db.doc(DRAFT_DOC).get();
+        if (snap.exists) { const st = snap.data().state; if (typeof st === 'string') { lastDraft = st; apply(JSON.parse(st)); localSave(JSON.parse(st)); } }
+      }
+      const done = await db.doc(ANSWER_DOC).get();
+      if (done.exists && done.data().submittedAt) setStatus('上次提交于 ' + fmt(done.data().submittedAt) + '。改了可以再提交一次，以最后一次为准。', true);
+    } catch (e) {}
+  }).catch(() => {});
+}
+function fmt(iso) { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('zh-CN', {hour12: false}); }
+
+// 生成 Markdown
+function gen() {
+  const now = new Date();
+  let md = `# Pith · 第二轮问卷回答（v0.3 开发计划）\n\n> 生成时间：${now.toLocaleString('zh-CN', {hour12: false})}\n\n`;
+  Q.forEach(q => {
+    if (q.part) { md += `## ${q.part} · ${q.name}\n\n`; return; }
+    md += `**${q.label}. ${plain(q.title)}**\n\n`;
+    if (q.type === 'text') {
+      const t = val(q.id + '-text').trim();
+      md += (t ? t.split('\n').map(l => '> ' + l).join('\n') : '> （未答）') + '\n\n';
+      return;
+    }
+    const note = val(q.id + '-note').trim();
+    const sel = [...form.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value === 'other' ? `其他：${note || '（未填）'}` : q.opts[+el.value][0]);
+    md += sel.length ? sel.map(s => `- ${s}`).join('\n') + '\n' : '- （未答）\n';
+    const otherPicked = sel.some(s => s.startsWith('其他：'));
+    if (note && !otherPicked) md += `- 补充：${note}\n`;
+    md += '\n';
+  });
+  const out = document.getElementById('out'); document.getElementById('md').value = md; out.classList.add('show');
+  return md;
+}
+
+document.getElementById('submit').addEventListener('click', async () => {
+  const md = gen();
+  const btn = document.getElementById('submit');
+  if (!db) { setStatus('这里没法直接提交。请点「复制 Markdown」，粘贴回对话。'); document.getElementById('out').scrollIntoView(); return; }
+  btn.disabled = true; setStatus('正在提交…');
+  const at = new Date().toISOString();
+  const body = {markdown: md, state: JSON.stringify(snapshot()), submittedAt: at, answered: parts.reduce((n, p) => n + p.qs.filter(answered).length, 0), total};
+  let ok = true;
+  writing = writing.then(() => db.doc(ANSWER_DOC).set(body)).catch(e => { ok = false; setStatus('提交失败：' + (e && e.message || e) + '。请点「复制 Markdown」，粘贴回对话。'); });
+  await writing;
+  btn.disabled = false;
+  if (ok) setStatus('已提交（' + fmt(at) + '）。回到对话说一声「填好了」即可。', true);
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  const md = gen();
+  try { await navigator.clipboard.writeText(md); setStatus('已复制，可以粘贴回对话。', true); }
+  catch (e) { const ta = document.getElementById('md'); ta.focus(); ta.select(); setStatus('浏览器不让自动复制，已选中下方文本，请手动复制。'); }
+});
+
+const resetBtn = document.getElementById('reset');
+let resetArmed = null;
+resetBtn.addEventListener('click', () => {
+  if (!resetArmed) {
+    resetBtn.textContent = '再点一次确认清空';
+    resetArmed = setTimeout(() => { resetArmed = null; resetBtn.textContent = '清空草稿'; }, 3000);
+    return;
+  }
+  clearTimeout(resetArmed); resetArmed = null; resetBtn.textContent = '清空草稿';
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  apply({}); scheduleDraft({});
+  document.getElementById('out').classList.remove('show');
+  setStatus('草稿已清空。已提交过的回答不受影响。');
+});
+</script>
+</body>
+</html>

@@ -41,3 +41,4 @@ v0.1.x 候选（不阻塞 v0.2，用户反馈时插队）：PDF 全文搜索、P
 - 版本号跟着在做的版本走：开新版本时 `package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json` 一起改（现在 0.2.0）。
 - 加新 migration 之前先冻结当前版本的样本库（`docs/testing.md`「升级流程」）。
 - 每轮更新 `HANDOFF.md`；需要用户资料时写在 HANDOFF「等你」一节。
+- v0.3 起部分开发交给云端 Claude，只推 `cloud/v0.x`，最后本地验收（`CLAUDE.md` 规则 7）。v0.3 的分期等第二轮问卷（`docs/questionnaire/round-2.html`）回答后定。
