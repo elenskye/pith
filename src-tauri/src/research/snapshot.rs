@@ -64,6 +64,13 @@ impl Snapshots {
         Ok(self.dir(sha)?.join(format!("{sha}.{ext}")))
     }
 
+    /// 一个来源的原件在哪（加入文献库时作为附件）
+    pub fn original_of(&self, source: &research_engine::model::Source) -> Result<PathBuf, String> {
+        let sha = source.sha256.as_deref().ok_or_else(|| "这个来源没有下载到".to_string())?;
+        let path = self.original(sha, source.ext.as_deref().unwrap_or(""))?;
+        if path.is_file() { Ok(path) } else { Err("快照文件不见了（可能是从备份恢复的库，快照没有一起恢复）".into()) }
+    }
+
     pub fn text_file(&self, sha: &str) -> Result<PathBuf, String> {
         Ok(self.dir(sha)?.join(format!("{sha}.txt")))
     }

@@ -297,11 +297,10 @@ impl Downloader {
         Ok(Fetched { final_url, fetched_at: (self.now)(), sha256, kind: ex.kind.key().to_string(), content_type, ext: ex.ext.to_string(), bytes: body.len() as u64, title: ex.title, text: ex.text })
     }
 
-    /// 快照文件在哪（加入文献库时把原件作为附件）
+    /// 快照文件在哪（测试用；App 里直接用 `Snapshots::original_of`）
+    #[cfg(test)]
     pub fn original_path(&self, source: &Source) -> Result<std::path::PathBuf, String> {
-        let sha = source.sha256.as_deref().ok_or_else(|| "这个来源没有下载到".to_string())?;
-        let path = self.snapshots.original(sha, source.ext.as_deref().unwrap_or(""))?;
-        if path.is_file() { Ok(path) } else { Err("快照文件不见了（可能是从备份恢复的库，快照没有一起恢复）".into()) }
+        self.snapshots.original_of(source)
     }
 }
 

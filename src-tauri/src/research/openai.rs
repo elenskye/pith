@@ -107,7 +107,7 @@ impl Model for OpenAiCompatible {
                 attempt += 1;
                 continue;
             }
-            let kind = if matches!(status, 401 | 402 | 403 | 404) { ErrorKind::Fatal } else { ErrorKind::Failed };
+            let kind = if matches!(status, 401..=404) { ErrorKind::Fatal } else { ErrorKind::Failed };
             return Err(PortError::new(kind, format!("{}这次没有产生费用。", error_message(who, status, message))));
         };
         let text = resp.body_mut().with_config().limit(8 * 1024 * 1024).read_to_string().map_err(|e| {

@@ -210,7 +210,7 @@ pub fn error_message(status: u16, kind: &str, message: &str) -> String {
 }
 
 fn fatal(status: u16, kind: &str) -> bool {
-    matches!(status, 401 | 402 | 403 | 404) || matches!(kind, "authentication_error" | "billing_error" | "permission_error" | "not_found_error")
+    matches!(status, 401..=404) || matches!(kind, "authentication_error" | "billing_error" | "permission_error" | "not_found_error")
 }
 
 // ---------- 从内容块里取东西 ----------

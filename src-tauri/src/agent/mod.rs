@@ -48,7 +48,8 @@ pub fn official() -> bool {
     !paths::is_dev() && std::env::var_os(paths::DATA_DIR_ENV).is_none_or(|v| v.is_empty())
 }
 
-fn use_real_model() -> bool {
+/// 事实调查（`research`）也按这个决定用真接口还是模拟接口
+pub(crate) fn use_real_model() -> bool {
     official() || std::env::var(REAL_MODEL_ENV).is_ok_and(|v| v == "1")
 }
 
@@ -199,6 +200,11 @@ impl Default for AgentState {
 }
 
 impl AgentState {
+    /// Anthropic 的密钥（事实调查也用这一把）
+    pub(crate) fn secret(&self) -> &secret::Secret {
+        &self.secret
+    }
+
     fn ticket(&self, t: Ticket) -> u64 {
         let id = self.next_ticket.fetch_add(1, Ordering::SeqCst);
         if let Ok(mut m) = self.tickets.lock() {
@@ -218,15 +224,16 @@ impl AgentState {
     }
 }
 
-const BUDGET_KEY: &str = "agent.budget_usd";
-const KEY_SAVED: &str = "agent.key_saved";
+// 事实调查和排版 Agent 共用月度上限和 Anthropic 的密钥（`decisions/0020`）
+pub(crate) const BUDGET_KEY: &str = "agent.budget_usd";
+pub(crate) const KEY_SAVED: &str = "agent.key_saved";
 const SEND_MODE: &str = "agent.send_mode";
 
-fn setting(state: &AppState, key: &str) -> Option<String> {
+pub(crate) fn setting(state: &AppState, key: &str) -> Option<String> {
     state.with_db(|c| crate::metadata::setting(c, key)).ok().flatten()
 }
 
-fn budget(state: &AppState) -> f64 {
+pub(crate) fn budget(state: &AppState) -> f64 {
     setting(state, BUDGET_KEY).and_then(|v| v.parse::<f64>().ok()).filter(|v| (usage::MIN_BUDGET_USD..=usage::MAX_BUDGET_USD).contains(v)).unwrap_or(usage::DEFAULT_BUDGET_USD)
 }
 

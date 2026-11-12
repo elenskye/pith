@@ -137,13 +137,13 @@ pub fn detail(message: &str) -> String {
 // ---------- 模拟接口的记账 ----------
 
 /// 模拟的模型：调用照常记一行账，标「模拟」、不算钱
-pub struct Logged<'a, T> {
+pub struct Logged<T> {
     pub inner: T,
-    pub ledger: &'a Ledger,
+    pub ledger: Ledger,
     pub now: fn() -> String,
 }
 
-impl<T: Model> Model for Logged<'_, T> {
+impl<T: Model> Model for Logged<T> {
     fn info(&self) -> ModelRef {
         self.inner.info()
     }
@@ -174,7 +174,7 @@ impl<T: Model> Model for Logged<'_, T> {
     }
 }
 
-impl<T: Search> Search for Logged<'_, T> {
+impl<T: Search> Search for Logged<T> {
     fn engine(&self) -> String {
         self.inner.engine()
     }

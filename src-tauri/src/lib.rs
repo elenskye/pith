@@ -1,5 +1,5 @@
 //! Pith 后端：唯一读写 SQLite 的地方；v0.2 起还有 Word 集成（`word`：本机服务、引文排版桥、模板安装）
-//! 和排版 Agent（`agent`：调用 Claude 提炼要求、出文档计划，其余交给文档引擎）。
+//! 和排版 Agent（`agent`：调用 Claude 提炼要求、出文档计划，其余交给文档引擎）；v0.3 起有事实调查（`research`）。
 //! Tauri 命令是界面（以及以后的 Agent 工具）共用的应用服务层，命名「模块_动作」；
 //! 返回 `Result<T, String>`，错误信息是给用户看的中文。
 
@@ -57,6 +57,7 @@ impl AppState {
         let opened = paths.ensure().and_then(|_| {
             let mut conn = db::open(&paths.library_db)?;
             db::migrate(&mut conn, db::MIGRATIONS, &paths.backups)?;
+            research::commands::on_startup(&conn);
             attach_search(&conn, &paths);
             if existed {
                 // 尽力而为：自动备份失败不挡启动，设置页能看到备份列表
@@ -675,6 +676,8 @@ pub fn run() {
             app.manage(word::WordState::default());
             // 排版 Agent：密钥、进行中的调用
             agent::manage(app);
+            // 事实调查：DeepSeek、Tavily 的密钥，后台进行中的调查
+            research::commands::manage(app);
             word::start_service(app.handle());
             Ok(())
         })
@@ -778,7 +781,28 @@ pub fn run() {
             agent::format_run_delete,
             agent::format_plan_update,
             agent::format_apply,
-            agent::format_cancel
+            agent::format_cancel,
+            research::commands::research_status,
+            research::commands::research_settings_set,
+            research::commands::research_key_set,
+            research::commands::research_key_clear,
+            research::commands::research_questions_list,
+            research::commands::research_question_get,
+            research::commands::research_plan_prepare,
+            research::commands::research_plan_run,
+            research::commands::research_run_get,
+            research::commands::research_plan_update,
+            research::commands::research_source_add,
+            research::commands::research_source_remove,
+            research::commands::research_execute_prepare,
+            research::commands::research_execute,
+            research::commands::research_cancel,
+            research::commands::research_rerun,
+            research::commands::research_run_delete,
+            research::commands::research_question_delete,
+            research::commands::research_export,
+            research::commands::research_reveal,
+            research::commands::research_add_to_library
         ])
         .build(tauri::generate_context!())
         .expect("Pith 启动失败")
