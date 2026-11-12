@@ -28,6 +28,10 @@ md-5 = "0.11"
 biblatex = "0.12"
 regex = "1"
 ureq = { version = "3.5.1", default-features = false, features = ["native-tls", "gzip"] }
+scraper = { version = "0.27", default-features = false }
+encoding_rs = "0.8.44"
+calamine = "0.38.0"
+pdf-extract = "0.12.1"
 
 # 只有 Mac 用得上的依赖（钥匙串）。Linux 上不编译，云端开发环境才编得过（CLAUDE.md 规则 7）
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -85,7 +85,7 @@ pub fn call(ctx: &Ctx, req: &Request, typical_output: u64) -> Result<(String, Ca
         }
     }
     let record = |model: &str, tokens: usage::Tokens, estimated: bool, note: Option<String>, request_id: Option<String>| -> Result<Call, String> {
-        let c = Call { at: ctx.now.clone(), purpose: req.purpose.to_string(), model: model.to_string(), tokens, cost_usd: if mock { 0.0 } else { usage::cost_usd(model, &tokens) }, estimated, mock, note, request_id };
+        let c = Call { at: ctx.now.clone(), purpose: req.purpose.to_string(), provider: usage::PROVIDER_ANTHROPIC.into(), kind: usage::KIND_MODEL.into(), searches: 0, model: model.to_string(), tokens, cost_usd: if mock { 0.0 } else { usage::cost_usd(model, &tokens) }, estimated, mock, note, request_id };
         ledger.append(&c)?;
         Ok(c)
     };

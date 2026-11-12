@@ -1,9 +1,13 @@
-//! 用量账本与月度预算（`decisions/0004`、`0015`、`0018`）。
+//! 用量账本与月度预算（`decisions/0004`、`0015`、`0018`、`0020`）。
 //!
-//! 每次调用模型记一行（`数据目录/agent/usage.jsonl`，只追加）：token 数取接口返回的 `usage`，费用按单价表算，
+//! 每次调用模型或搜索记一行（`数据目录/agent/usage.jsonl`，只追加）：token 数取接口返回的 `usage`，费用按单价表算，
 //! 不由模型自己报。发送前按「估计的输入 + 输出上限」算最坏情况，加上本月已花的超过上限就拒绝调用。
 //! 账本不在 library.db 里：恢复旧备份不会把已经花掉的钱抹掉。
+//!
+//! v0.3 起排版 Agent 和事实调查共用这本账和同一个月度上限：每行记着是哪个接口（`provider`）、
+//! 是模型调用还是搜索（`kind`），月度合计不分接口。
 
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -11,12 +15,13 @@ use serde::{Deserialize, Serialize};
 
 /// 排版 Agent 用的模型（`decisions/0015`）
 pub const MODEL: &str = "claude-opus-5-5";
-pub const DEFAULT_BUDGET_USD: f64 = 20.0;
+/// v0.3 起默认 $30（`decisions/0020`）；设置里存过的值不动
+pub const DEFAULT_BUDGET_USD: f64 = 30.0;
 pub const MIN_BUDGET_USD: f64 = 1.0;
 pub const MAX_BUDGET_USD: f64 = 50.0;
 
 /// 美元 / 百万 token
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Price {
     pub input: f64,
     pub output: f64,
@@ -27,7 +32,67 @@ pub fn price(model: &str) -> Price {
     match model {
         "claude-opus-5-5" => Price { input: 4.0, output: 20.0 },
         "claude-opus-5" | "claude-opus-4-8" | "claude-opus-4-7" => Price { input: 5.0, output: 25.0 },
-        _ => Price { input: 10.0, output: 50.0 },
+        "claude-sonnet-5-5" | "claude-sonnet-5" => Price { input: 2.0, output: 10.0 },
+        "claude-haiku-5-5" => Price { input: 0.5, output: 2.5 },
+        // DeepSeek 高峰价（闲时半价也按这个记，宁可多记）
+        "deepseek-flash" => Price { input: 0.30, output: 1.20 },
+        _ => UNKNOWN_PRICE,
+    }
+}
+
+/// 不认识的模型按这个价记
+pub const UNKNOWN_PRICE: Price = Price { input: 10.0, output: 50.0 };
+/// Tavily：每点多少美元（基础搜索 1 点、高级 2 点；免费额度也照价记）
+pub const TAVILY_CREDIT_USD: f64 = 0.008;
+/// Claude 网页搜索：每次多少美元（每千次 $10）
+pub const CLAUDE_SEARCH_USD: f64 = 0.01;
+
+/// 设置里覆盖的单价（`decisions/0020`：模型名、接口地址、单价都可以改）。没写的用内置表。
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Prices {
+    /// 模型名 → 美元 / 百万 token
+    pub models: BTreeMap<String, Price>,
+    pub tavily_credit_usd: Option<f64>,
+    pub claude_search_usd: Option<f64>,
+}
+
+impl Prices {
+    pub fn model(&self, model: &str) -> Price {
+        self.models.get(model).copied().unwrap_or_else(|| price(model))
+    }
+
+    /// 这个模型有没有单价（内置表或设置里）；没有的按最贵的记，界面上提醒去填
+    pub fn knows(&self, model: &str) -> bool {
+        self.models.contains_key(model) || price(model) != UNKNOWN_PRICE
+    }
+
+    pub fn tavily_credit(&self) -> f64 {
+        self.tavily_credit_usd.unwrap_or(TAVILY_CREDIT_USD)
+    }
+
+    pub fn claude_search(&self) -> f64 {
+        self.claude_search_usd.unwrap_or(CLAUDE_SEARCH_USD)
+    }
+
+    /// 一次模型调用的费用。缓存命中的 token 已经算在输入里的接口（OpenAI 兼容）不另算，等于按原价记，宁可多记。
+    pub fn tokens_usd(&self, model: &str, input: u64, output: u64) -> f64 {
+        let p = self.model(model);
+        (input as f64 * p.input + output as f64 * p.output) / 1e6
+    }
+
+    /// 设置里填的单价要是正常的数
+    pub fn check(&self) -> Result<(), String> {
+        let ok = |v: f64| v.is_finite() && (0.0..=1000.0).contains(&v);
+        for (name, p) in &self.models {
+            if name.trim().is_empty() || !ok(p.input) || !ok(p.output) {
+                return Err(format!("「{name}」的单价不对：要是 0 到 1000 之间的数（美元 / 百万 token）。"));
+            }
+        }
+        if self.tavily_credit_usd.is_some_and(|v| !ok(v)) || self.claude_search_usd.is_some_and(|v| !ok(v)) {
+            return Err("搜索的单价不对：要是 0 到 1000 之间的数。".into());
+        }
+        Ok(())
     }
 }
 
@@ -53,8 +118,17 @@ pub fn cost_usd(model: &str, t: &Tokens) -> f64 {
 pub struct Call {
     /// 本地时间 2026-11-10T16:20:31
     pub at: String,
-    /// extract 提炼要求 / plan 文档计划
+    /// extract 提炼要求 / plan 文档计划；事实调查的是 research_plan / research_extract / research_conclude / research_search
     pub purpose: String,
+    /// 哪个接口：anthropic / openai_compatible / tavily。v0.2 写的行没有这一项，都是 anthropic
+    #[serde(default = "anthropic")]
+    pub provider: String,
+    /// model 模型调用 / search 搜索
+    #[serde(default = "model_kind")]
+    pub kind: String,
+    /// 搜索次数（Tavily 是点数）；模型调用里用了自带搜索的也记在这
+    #[serde(default)]
+    pub searches: u64,
     pub model: String,
     pub tokens: Tokens,
     pub cost_usd: f64,
@@ -69,6 +143,18 @@ pub struct Call {
     #[serde(default)]
     pub request_id: Option<String>,
 }
+
+fn anthropic() -> String {
+    PROVIDER_ANTHROPIC.into()
+}
+
+fn model_kind() -> String {
+    KIND_MODEL.into()
+}
+
+pub const PROVIDER_ANTHROPIC: &str = "anthropic";
+pub const KIND_MODEL: &str = "model";
+pub const KIND_SEARCH: &str = "search";
 
 pub struct Ledger {
     path: PathBuf,
@@ -160,7 +246,7 @@ mod tests {
     use crate::db::tests::temp_dir;
 
     fn call(at: &str, cost: f64, mock: bool) -> Call {
-        Call { at: at.into(), purpose: "extract".into(), model: MODEL.into(), tokens: Tokens::default(), cost_usd: cost, estimated: false, mock, note: None, request_id: None }
+        Call { at: at.into(), purpose: "extract".into(), provider: PROVIDER_ANTHROPIC.into(), kind: KIND_MODEL.into(), searches: 0, model: MODEL.into(), tokens: Tokens::default(), cost_usd: cost, estimated: false, mock, note: None, request_id: None }
     }
 
     #[test]
@@ -197,6 +283,40 @@ mod tests {
         let over = estimate(50_000, 8_000, 32_000, 20.0, 19.2);
         assert!(!over.within_budget);
         assert!(over_budget_message(&over).contains("没有发送"));
+    }
+
+    #[test]
+    fn all_providers_share_one_ledger_and_one_monthly_total() {
+        let dir = temp_dir("agent-ledger-providers");
+        let l = Ledger::new(&dir);
+        // v0.2 写的行没有 provider / kind：读成 anthropic 的模型调用
+        std::fs::create_dir_all(dir.join("agent")).unwrap();
+        std::fs::write(dir.join("agent/usage.jsonl"), "{\"at\":\"2026-11-10T12:00:00\",\"purpose\":\"extract\",\"model\":\"claude-opus-5-5\",\"tokens\":{\"input\":1000,\"output\":100},\"costUsd\":0.5}\n").unwrap();
+        l.append(&Call { provider: "openai_compatible".into(), model: "deepseek-flash".into(), purpose: "research_extract".into(), ..call("2026-11-12T09:00:00", 0.02, false) }).unwrap();
+        l.append(&Call { provider: "tavily".into(), kind: KIND_SEARCH.into(), searches: 2, model: "tavily".into(), purpose: "research_search".into(), ..call("2026-11-12T09:00:05", 0.016, false) }).unwrap();
+        let all = l.all().unwrap();
+        assert_eq!(all.iter().map(|c| (c.provider.as_str(), c.kind.as_str(), c.searches)).collect::<Vec<_>>(), [("anthropic", "model", 0), ("openai_compatible", "model", 0), ("tavily", "search", 2)]);
+        // 月上限对所有接口合计
+        assert!((l.month_total("2026-11").unwrap() - 0.536).abs() < 1e-9);
+        assert_eq!(DEFAULT_BUDGET_USD, 30.0);
+    }
+
+    #[test]
+    fn prices_follow_the_plan_and_settings_can_override() {
+        let p = Prices::default();
+        assert_eq!(p.model("claude-opus-5-5"), Price { input: 4.0, output: 20.0 });
+        assert_eq!(p.model("deepseek-flash"), Price { input: 0.30, output: 1.20 });
+        assert!((p.tokens_usd("deepseek-flash", 1_000_000, 500_000) - 0.90).abs() < 1e-9);
+        assert_eq!((p.tavily_credit(), p.claude_search()), (0.008, 0.01));
+        assert!(p.knows("deepseek-flash") && !p.knows("some-new-model"));
+        assert_eq!(p.model("some-new-model"), UNKNOWN_PRICE);
+        let custom: Prices = serde_json::from_str(r#"{"models":{"some-new-model":{"input":0.1,"output":0.2},"deepseek-flash":{"input":0.15,"output":0.6}},"tavilyCreditUsd":0.005}"#).unwrap();
+        assert!(custom.knows("some-new-model"));
+        assert_eq!(custom.model("deepseek-flash"), Price { input: 0.15, output: 0.6 });
+        assert_eq!((custom.tavily_credit(), custom.claude_search()), (0.005, 0.01));
+        assert!(custom.check().is_ok());
+        let bad: Prices = serde_json::from_str(r#"{"models":{"x":{"input":-1,"output":0.2}}}"#).unwrap();
+        assert!(bad.check().unwrap_err().contains("单价不对"));
     }
 
     #[test]
