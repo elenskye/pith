@@ -12,3 +12,5 @@ pub mod anthropic;
 pub mod meter;
 pub mod openai;
 pub mod tavily;
+pub mod docx;
+pub mod library;
