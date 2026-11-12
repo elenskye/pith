@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "pith"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "biblatex",
  "docx-engine",
@@ -3257,6 +3257,14 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
+]
+
+[[package]]
+name = "research-engine"
+version = "0.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

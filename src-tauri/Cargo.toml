@@ -1,6 +1,6 @@
 [package]
 name = "pith"
-version = "0.2.0"
+version = "0.3.0"
 description = "Pith：本地优先的研究工作台"
 edition.workspace = true
 publish.workspace = true

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["src-tauri", "crates/zotero-import", "crates/docx-engine"]
+members = ["src-tauri", "crates/zotero-import", "crates/docx-engine", "crates/research-engine"]
 
 [workspace.package]
 edition = "2024"
