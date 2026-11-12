@@ -1,69 +1,92 @@
 # HANDOFF — 交接记录
 
-> 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
+> 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。云端 Claude 的交接在 `HANDOFF-cloud.md`。
 
-## 现在：v0.3 计划问卷已发出，等你填；云端协作规则已写好；v0.2 W5 验收仍没做（2026-11-11）
+## 现在：v0.3 计划已定，云端开工前的准备（F0）做完了；接下来本地做 v0.2 W5，云端做 v0.3 F1–F3（2026-11-12）
 
 ### 本轮
 
-1. **云端协作规则**（你定的）：`CLAUDE.md` 新增规则 7，规则 4 同步改了。要点：
-   - 部分开发交给另一个账号的云端 Claude，最后一律本地验收。
-   - 云端自己搭编译环境，能编的编；Linux 上编不过的 macOS 部分（钥匙串、AppleScript、Word 桥接、`.app` 打包）不许改。
-   - 云端可以 commit 并 push，这是「Git 全部由用户自己做」的唯一例外；分支只能是 `cloud/v0.x`（现在是 `cloud/v0.3`）；不推 main、不开 PR、不合并、不打标签、不 force push。
-   - 提交信息全英文、极简：大阶段完成 `v0.3.0 finished`，小阶段 `v0.3.0: <xxx> improve`；不写正文、不署名。
-   - 新增 `.claude/settings.json`，关掉 Claude Code 默认加在提交和 PR 里的署名（`Co-Authored-By`、会话链接）。云端会话会读仓库里的这个文件。
-   - `docs/requirements.md`「协作」一节同步。
-2. **v0.3 计划问卷**：源文件 `docs/questionnaire/round-2.html`，已发成 Artifact：<https://claude.ai/artifact/E7vNutMkCth5dwfCaCPtGt>。5 部分 25 题：v0.2 收尾、v0.3 回答什么问题、怎么做（检索方式、模型、预算、快照、证据层）、和云端怎么分工、其他。回答点「提交给 Claude」会存进这个 Artifact 的存储（文档 `answers/round2`），下一轮 Agent 用 `db_get` 直接读；页面也能复制 Markdown 粘贴回对话。
-3. **查清的云端环境**（claude.ai/code 官方文档，2026-11-11）：
-   - Ubuntu 24.04 x86_64，约 4 核 / 16 GB；自带 Rust、Node 22、pnpm；setup script 以 root 运行，可以 `apt install`；setup script 5 分钟内跑完才会被缓存。
-   - 网络默认「Limited」，白名单含 crates.io、npm、Ubuntu 软件源、api.anthropic.com。
-   - GitHub 代理不限分支名（`cloud/v0.3` 可推），拒绝推标签和删分支；PR 不会自动开。
-   - 默认在提交里加 `Co-Authored-By` 和 `Claude-Session` 两行，已用 `.claude/settings.json` 关掉。
-4. **发现的阻碍**：`src-tauri` 无条件依赖 Mac 钥匙串库 `security-framework`，云端整个 App 后端编不过。问卷 D2 问你要不要本地先用条件编译把 Mac 专用代码隔开（推荐要）。
+1. **问卷回答**取回并存档：`docs/questionnaire/round-2-answers.md`（24 / 25 题，E1 未答）。
+2. **正式版不用再装**（问卷 A2）：「应用程序」里的 Pith 是 2026-11-11 12:36 装的 0.2.0。二进制里有 W4 的新功能，之后源代码没再改过，所以就是 W4。
+3. **v0.3 计划**：`docs/decisions/0020-v0.3-plan.md`。`ROADMAP.md`「现在」改成两条线：本地 W5、云端 v0.3。`requirements.md` 加了 v0.3 一节。要点：
+   - 通用事实调查，用「2022–2026 北京、天津青年就业，对比其他一线和热门二线城市」验收。
+   - 不限来源、按可信度排序；中国政府官方统计默认降权，设置里可改，报告写明。
+   - Opus 5.5 定计划、下结论；DeepSeek（`deepseek-flash`）读网页、摘证据。
+   - 搜索用 Claude 网页搜索 + Tavily：每个模型接口配它的专用搜索，没有的用 Tavily。
+   - Pith 在 Mac 上下载网页和文件，存原件 + 正文 + 哈希。摘录和数字由代码逐字核对，计算由代码做。
+   - 短答在前；能导出 Markdown / Word / HTML；来源能加入文献库；能重查对比。
+   - 和排版 Agent 共用月上限 $30，不设单次上限。
+   - 分期：F0 本地准备（本轮）→ F1–F3 云端一口气做 → F4 本地一次性验收。
+4. **F0 代码准备**（问卷 D2）：
+   - 钥匙串依赖 `security-framework` 改成只在 macOS 上编译；`secret.rs` 的钥匙串模块同样只在 macOS 编译，其他系统换成「钥匙串只在 macOS 上可用」的空实现。
+   - 3 个要用 `osacompile` 编译 AppleScript 的安装测试，只在 Mac 上跑。
+   - 钥匙串按名字存多把密钥：`ApiKey`（Anthropic / DeepSeek / Tavily），各有形状检查和条目名。Anthropic 的条目名不变，已存的密钥不用重填；`PITH_API_KEY_FILE` 一个文件可以放几把。新增 3 项测试。
+   - 这样云端以后不用碰这段 Mac 专用代码。Mac 上行为不变。
+   - **没在 Linux 上实际编过**：本机 Docker 没开，我没为这个启动它。云端开工第一步就是在 Linux 上跑 `pnpm check`；还有编不过的，按规则不改、记下来。
+5. **给云端的交接**：
+   - `HANDOFF-cloud.md`：任务说明，包括先读什么、环境、F1–F3 做到什么程度、不碰什么、自查标准、提交格式。
+   - `scripts/cloud-setup.sh`：云端环境脚本，装 Tauri 在 Linux 上要的系统库、更新 Rust、装 pnpm 12。
+   - `CLAUDE.md`：规则 1、2、7 加了「云端写 `HANDOFF-cloud.md`，不改 `HANDOFF.md`、`ROADMAP.md` 和已有的 decisions」「云端只用小阶段提交格式，`finished` 留给你」。
+6. **没写进去的一条**（问卷 D6）：「允许本地 Claude 自己执行 git 抓取命令来验收」。我往 `CLAUDE.md` 写这条时被安全检查拦下了（Agent 在给自己加权限），需要你自己加，见「等你」第 2 条。
 
 ## 等你
 
-1. **填问卷**：<https://claude.ai/artifact/E7vNutMkCth5dwfCaCPtGt>，填完点「提交给 Claude」，回对话说一声。
-2. **把本轮改动推到 GitHub 的 main**：云端是从 GitHub 克隆仓库的，要看到规则 7 和 `.claude/settings.json` 才会照做。
-3. **云端账号的准备**（不急，等 v0.3 计划定了再弄，到时我给具体步骤和 setup script）：用另一个账号登录 claude.ai/code，连上 GitHub 仓库 `elenskye/pith`（私有仓库要装 Claude GitHub App），新建环境、网络保持默认。
-4. **v0.2 W5 相关**（上一轮留下的，仍然有效）：
-   - 在 Word 里看一眼 W4 的结果：打开 `local/real-thesis/out/agent-w4/终稿-结构和片段.docx`，看能否正常打开；摘要页起有页眉（奇数页章名、偶数页「重庆大学本科学生毕业论文（设计）」，下有横线），封面和原创性声明起没有页眉；摘要、目录页码是 Ⅰ、Ⅱ…，正文从 1 起；两个附录表格是三线表。有不对把现象发我。
-   - 要不要把正式版更新到 W4（`pnpm app:install`，约 2 分钟，没有数据库改动）：问卷 A2 也问了。
-   - 装完之后：把「应用程序」里的 Pith 拖进程序坞；设置 › Word 点一次「更新」。
-   - 第一次在正式版里用排版 Agent：设置 › 排版 Agent 填密钥 → 排版 › 新建规范 → 选 `local/real-thesis/src/` 的三份 Requirement（约 $0.5）。不想花钱先试：`pnpm app:dev`，选 `src-tauri/fixtures/agent/示例规范.txt`。
+1. **提交并推送本轮**：云端从 GitHub 拉代码，要看得到 `HANDOFF-cloud.md` 和 F0 的改动。
+2. **（可选）把抓取权限加进 `CLAUDE.md` 规则 4**。想让本地 Claude 自己抓云端分支验收，就在规则 4「唯一例外：云端 Claude…」那一行下面加：
+
+   ```
+   - 本地 Agent 验收云端分支时可以自己抓取（2026-11-12 用户定）：`git fetch origin`，在 `.claude/worktrees/` 下用 `git worktree add --detach` 建临时工作树跑检查，验收完 `git worktree remove` 删掉。不提交、不合并、不切换用户正在用的分支。
+   ```
+
+   临时工作树的好处：验收时不会打断你同时在用的 main（W5 在那里做）。就算加了，本地会话执行这些命令时，权限系统可能还是会弹窗问你，点允许即可。
+3. **设置云端**（另一个账号）：
+   1. 用另一个账号登录 claude.ai/code，连上 GitHub，让它能访问 `elenskye/pith`（私有仓库要在 GitHub 上把 Claude GitHub App 装到这个仓库）。
+   2. 新建环境：网络保持默认的 Limited（已包含 crates.io、npm、Ubuntu 软件源）；Setup script 粘贴 `scripts/cloud-setup.sh` 的全部内容。
+   3. 新建会话：仓库 `elenskye/pith`，起始分支 `main`，第一句话粘贴：
+
+      ```
+      先读 CLAUDE.md 和 HANDOFF-cloud.md，然后按 HANDOFF-cloud.md 的「任务」一口气做完 v0.3 的 F1–F3。只推到 cloud/v0.3，交接写在 HANDOFF-cloud.md 的「云端记录」里。
+      ```
+
+   4. 云端做完后回来说一声，我开始 F4 验收。
+4. **F4 之前准备两把密钥**（云端用不上，不急）：
+   - DeepSeek：platform.deepseek.com，按平台要求充值少量余额；
+   - Tavily：app.tavily.com，免费额度每月 1000 点。
+   F4 时在 Pith 设置里填，或者放进 `PITH_API_KEY_FILE` 指的文件做真实验收。
+5. **W5 要你在 Word 里看的**（下一轮本地就做）：打开 `local/real-thesis/out/agent-w4/终稿-结构和片段.docx`，看：
+   - 能否正常打开；
+   - 页眉：摘要页起有页眉，奇数页是章名，偶数页是「重庆大学本科学生毕业论文（设计）」，下面有横线；封面和原创性声明起没有页眉；
+   - 页码：摘要、目录是 Ⅰ、Ⅱ…，正文从 1 起；
+   - 两个附录表格是三线表。
+   有不对把现象发我。
+6. 上一轮留下的（仍有效）：
+   - 把「应用程序」里的 Pith 拖进程序坞；设置 › Word 点一次「更新」。
+   - 第一次在正式版里用排版 Agent：设置 › 排版 Agent 填密钥 → 排版 › 新建规范 → 选 `local/real-thesis/src/` 的三份 Requirement（约 $0.5）。
    - 文献库里 7 位英文作者是单栏姓名；「Pith 控制访达」可以在系统设置里关掉。
 
-### 以后抓云端分支的命令（供参考）
+## 下一轮（本地）：v0.2 W5 验收
 
-```bash
-git fetch origin
-```
+按 `ROADMAP.md` W5：两份真实论文 + 重庆大学规范，Mac Word 目视正确，保真校验与规范核对全部通过，引文可切换刷新。先处理你在 Word 里看到的问题（「等你」第 5 条）。云端同时在改 `cloud/v0.3`；W5 尽量只动 `crates/docx-engine`、排版 Agent 和文档，不加 migration。
 
-```bash
-git switch cloud/v0.3
-```
+## 云端回来之后（本地）：v0.3 F4 验收
 
-本地验收通过后合进 main：
-
-```bash
-git switch main
-```
-
-```bash
-git merge cloud/v0.3
-```
-
-## 下一轮：读问卷回答，定 v0.3 计划
-
-1. 读回答：Artifact slug `6a3e2912-0da0-44ff-969b-f0ccdf522c45`，`db_get` 路径 `answers/round2`（`markdown` 字段是整份回答）。存成 `docs/questionnaire/round-2-answers.md`。
-2. 写 `docs/decisions/0020-v0.3-plan.md`；`ROADMAP.md` 把 v0.3 拆成分期，标出哪几期给云端；`requirements.md` 加 v0.3 一节。
-3. 开 v0.3 时版本号改 0.3.0（`package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json`）。
-4. 如果 D2 选「要」：本地先做条件编译准备（Mac 上行为不变，`pnpm check` 全过），再写给云端的第一期任务说明和 setup script（装 Tauri 需要的 Linux 系统库）。
-5. W5 按问卷 A1 的回答安排。
+1. 抓取 `cloud/v0.3`：你来抓，或者「等你」第 2 条加上后由本地 Claude 在临时工作树里抓。
+2. 逐项审云端改动：
+   - macOS 部分有没有被改（尤其 `secret.rs` 的 `keychain` 模块）；
+   - 提交信息和分支是否合规；
+   - 有没有真实调用。
+3. Mac 上跑 `pnpm check` 和 `cargo clippy --workspace --all-targets`。
+4. 钥匙串接线；用真实接口跑北京、天津青年就业的问题（事先问你上限）；对照官方价目页核对单价；在 Mac Word 里看导出的 Word。
+5. 把 `HANDOFF-cloud.md` 的记录并进本文件；云端的工程选择并进 `decisions/0020`、`architecture.md`、`testing.md`。
+6. 合进 `main` 由你做。
 
 ## v0.2 状态（W1–W4 完成，W5 未做）
 
-细节见 `ROADMAP.md` 与 `decisions/0016`–`0019`。W4 真实模型验收（Opus 5.5，6 次调用共 $1.63）：三份重庆大学规范提炼 46 条、摘录全部核对上，合成规范与手写的一致 86 项、不同 0 项；终稿两种发送方式保真 0 问题、核对 78 / 78；完整稿 71 / 71。排出来的文档在 `local/real-thesis/out/agent-w4/`。
+细节见 `ROADMAP.md` 与 `decisions/0016`–`0019`。W4 真实模型验收（Opus 5.5，6 次调用共 $1.63）：
+- 三份重庆大学规范提炼 46 条，摘录全部核对上；合成规范与手写的一致 86 项、不同 0 项。
+- 终稿两种发送方式：保真 0 问题，核对 78 / 78。
+- 完整稿：71 / 71。
+- 排出来的文档在 `local/real-thesis/out/agent-w4/`。
 
 W4 留下的（不急）：
 - 还做不了的结构类要求：公式编号的位置、四线表、表注的位置、脚注与正文之间的分隔线、目录的生成与各级格式。
@@ -74,16 +97,22 @@ W4 留下的（不急）：
 
 ## 本轮改动
 
-- `CLAUDE.md`：规则 4（Git 例外、提交模板）、新增规则 7（云端协作）。
-- `.claude/settings.json`（新）：关闭提交与 PR 里的署名。
-- `docs/requirements.md`：「协作」加提交信息格式和云端协作两条。
-- `docs/questionnaire/round-2.html`（新）：v0.3 计划问卷。
-- `ROADMAP.md`：「规矩」加云端协作一条。
+- 代码：
+  - `src-tauri/Cargo.toml`：`security-framework` 移到只在 macOS 编译的依赖。
+  - `src-tauri/src/agent/secret.rs`：钥匙串只在 macOS 编译、其他系统的空实现、`ApiKey` 多把密钥、3 项新测试。
+  - `src-tauri/src/word/install.rs`：3 个测试只在 macOS 跑。
+- 文档：
+  - `docs/decisions/0020-v0.3-plan.md`（新）
+  - `docs/questionnaire/round-2-answers.md`（新）
+  - `ROADMAP.md`、`docs/requirements.md`
+  - `CLAUDE.md`：规则 1、2、7
+- 云端：`HANDOFF-cloud.md`（新）、`scripts/cloud-setup.sh`（新）。
 - `HANDOFF.md`。
 
 ## 测试
 
-- 只改了文档和配置，没碰代码。
-- `pnpm check` 通过（与 W4 结束时相同）：前端引文排版 16；文档引擎 26 + 引文 18 + 排版器 12（另 1 项默认忽略）+ 结构摘要 5 + 计划 7 + 结构类 10；App 后端 197（另 15 项默认忽略）；Zotero 读取 9；Word PoC 29。
-- 问卷：`node --check` 通过，题目结构检查 25 题；Artifact 已发布并开启存储。页面要登录 claude.ai 才能看，内置浏览器没登录，所以没有目视过渲染效果。
+- `pnpm check` 通过：前端引文排版 16；文档引擎 26 + 引文 18 + 排版器 12（另 1 项默认忽略）+ 结构摘要 5 + 计划 7 + 结构类 10；App 后端 200（原 197 + 密钥 3，另 15 项默认忽略）；Zotero 读取 9；Word PoC 29。
+- `cargo clippy --workspace --all-targets`：0 警告。
+- `Cargo.lock` 没变。
+- `scripts/cloud-setup.sh`：`bash -n` 语法检查通过；没在 Ubuntu 上实际跑过。
 - 没碰 `~/Pith/`、`~/Zotero/`、钥匙串；没运行任何改动 git 的命令。

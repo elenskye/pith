@@ -26,8 +26,11 @@ sha2 = "0.11"
 md-5 = "0.11"
 biblatex = "0.12"
 regex = "1"
-security-framework = "3"
 ureq = { version = "3.5.1", default-features = false, features = ["native-tls", "gzip"] }
+
+# 只有 Mac 用得上的依赖（钥匙串）。Linux 上不编译，云端开发环境才编得过（CLAUDE.md 规则 7）
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
 
 [dev-dependencies]
 roxmltree = "0.21"

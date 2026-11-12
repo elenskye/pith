@@ -342,6 +342,7 @@ mod tests {
 
     /// 装进临时的「家目录」：模板、脚本、记录都在；再装一次是最新；卸载干净
     #[test]
+    #[cfg(target_os = "macos")] // 安装要用 osacompile 编译 AppleScript，只有 Mac 有
     fn install_and_uninstall() {
         let dir = temp_dir("word-install");
         let p = places(&dir);
@@ -364,6 +365,7 @@ mod tests {
 
     /// 写不进启动文件夹：先存数据目录；用户在对话框里选中文件夹后写进去；选错文件夹拒绝
     #[test]
+    #[cfg(target_os = "macos")] // 安装要用 osacompile 编译 AppleScript，只有 Mac 有
     fn install_into_the_folder_the_user_chose() {
         let dir = temp_dir("word-install-into");
         let mut p = places(&dir);
@@ -388,6 +390,7 @@ mod tests {
 
     /// Word 启动文件夹写不进去：模板存进数据目录，等用户手动放
     #[test]
+    #[cfg(target_os = "macos")] // 安装要用 osacompile 编译 AppleScript，只有 Mac 有
     fn falls_back_to_manual_template() {
         let dir = temp_dir("word-install-manual");
         let mut p = places(&dir);
