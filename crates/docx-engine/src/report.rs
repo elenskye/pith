@@ -24,6 +24,28 @@ pub fn markdown(rep: Option<&Report>, problems: &[Problem], checks: &[Check]) ->
             "- 清理直接格式：run {} 处、段落 {} 处\n- 表格段落套用表格文字样式：{}；图片 / 公式段落套用居中样式：{}\n- 代码段落保留原格式：{}；列表 / 参考文献段落保留缩进：{}\n- 分节页面设置：{} 处\n\n",
             r.runs_cleaned, r.paragraphs_cleaned, r.table_paragraphs, r.figure_paragraphs, r.code_paragraphs_kept, r.list_paragraphs_kept_indent, r.sections
         ));
+        if r.table_bib_paragraphs > 0 {
+            s.push_str(&format!("- 表格里原来用参考文献样式的段落：{} 个，按表格文字排（参考文献的缩进放进窄单元格会把字挤断）\n", r.table_bib_paragraphs));
+        }
+        if r.page_breaks_not_doubled > 0 {
+            s.push_str(&format!("- 不再加段前分页：{} 处（前面已有分节符或分页符，再加会多出空白页；或是一个标题分两段写，再加会拆到两页）\n", r.page_breaks_not_doubled));
+        }
+        if !r.own_indent_styles.is_empty() || r.own_indent_paragraphs > 0 {
+            let mut what = Vec::new();
+            if !r.own_indent_styles.is_empty() {
+                what.push(format!("样式 {}", r.own_indent_styles.join("、")));
+            }
+            if r.own_indent_paragraphs > 0 {
+                what.push(format!("段落 {} 个", r.own_indent_paragraphs));
+            }
+            s.push_str(&format!("- 自带缩进写明 0 字符缩进：{}（正文改成按字符缩进后，Word 会用继承来的字符缩进盖掉它们自己的悬挂缩进）\n", what.join("；")));
+        }
+        if let Some(a) = &r.bibliography_align_kept {
+            s.push_str(&format!("- 参考文献保持原来的对齐（{}）：规范没写参考文献的对齐，不跟着正文两端对齐\n", align_label(a)));
+        }
+        if r.table_bib_paragraphs > 0 || r.page_breaks_not_doubled > 0 || !r.own_indent_styles.is_empty() || r.own_indent_paragraphs > 0 || r.bibliography_align_kept.is_some() {
+            s.push('\n');
+        }
         if !r.remapped.is_empty() {
             s.push_str("## 段落角色映射（排版计划）\n\n");
             for (k, v) in &r.remapped {
@@ -97,4 +119,14 @@ pub fn markdown(rep: Option<&Report>, problems: &[Problem], checks: &[Check]) ->
         }
     }
     s
+}
+
+fn align_label(v: &str) -> &str {
+    match v {
+        "left" | "start" => "左对齐",
+        "both" => "两端对齐",
+        "center" => "居中",
+        "right" | "end" => "右对齐",
+        other => other,
+    }
 }

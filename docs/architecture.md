@@ -176,6 +176,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - 只有「应用程序」里用正式数据目录的 Pith 用真模型和钥匙串；开发版、测试、`PITH_DATA_DIR` 的打包版用模拟模型（`PITH_REAL_MODEL=1` + `PITH_API_KEY_FILE` 可显式改用真模型）。
 - 模型的输出只是数据：结构由 JSON Schema 和 Rust 的反序列化定死，内容逐项核对后才用；排版、校验、统计都是确定性的。
 - 结构类排版（W4，`decisions/0019`）：规范的 `structure`（页眉、页码、奇数页起、三线表、脚注编号、标题紧跟）由要求清单的设置合成；计划的 `layout`（各部分从哪段开始、单面 / 双面、不排三线表的表格）由模型提出、Rust 核对、用户在计划页确认。排版器在格式排完后调 `structure::apply`；`verify::verify_all` 放行的结构改动由校验器自己从规范和计划推出。
+- W5（`decisions/0021`）：排完结构后，已经另起一页的段落不再加段前分页（`format::keep_single_page_breaks`）；表格里参考文献样式的段落按表格文字排；自带磅值缩进的样式和段落写明 0 字符，免得被正文的字符缩进盖掉（`format::keep_own_indents`）；规范没定参考文献对齐时保持原对齐。校验器各有一项独立核对（`verify::check_page_breaks`、`check_own_indents`）。
 - 模型拒答时直接报错让用户重试，不换模型；论文默认按「结构和片段」发送，设置里可换成「全文」（`agent_send_mode_set`）。
 
 ## 联网（`decisions/0004`、`0012`）
