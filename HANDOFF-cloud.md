@@ -139,3 +139,134 @@
 ## 云端记录
 
 （云端从这里往下写，最新的放最上面。）
+
+### 2026-11-13 · v0.4 C1–C3（云端，分支 `cloud/v0.4`）
+
+**一句话**：C1 文本层、C2 引擎与接口、C3 页面都做完了，推在 `cloud/v0.4`（6 个提交）。Linux 上 `pnpm check` 全过、clippy 0 警告；两本真实 EPUB 第一篇第 1–3 章 11 / 5 / 8 段、英文第 109–126 页、中英三章全部对齐；`?mock` 里概念页全流程用无头浏览器点通（0 个控制台错误）。真实模型、Mathpix、钥匙串、Word 宏留给 C4。
+
+#### 做了什么、改了哪些文件
+
+新增：
+
+- `crates/concept-engine`（新 crate，进 workspace；纯逻辑，只依赖 research-engine、serde、zip）：`markup`（容错 XHTML 读取）、`epub`、`text`（单元 / 角色 / 段落号 / 页码 / 结构预览）、`mathpix`（lines.json → 段落；本机取文字的后备）、`align`、`fold`、`skill`、`model`、`prompts`、`verify`、`audit`、`flow`、`graph`、`render`、`fixture`、`mock`；`examples/mock_data.rs`；`tests/{text,flow,real_books}.rs`；`fixtures/wealth/`（英文 PG 文字、合成中文、README）、`fixtures/replies/`（9 份录制回复）；README（模块表、角色规则、SKILL.md 格式、命令）。
+- `skills/` 七个内置技能：chapter（整章分析）、passage（读一段）、ask（问这本书）、trace（追踪概念）、critics（反方与后世评论）、counterfactual（假设推演）、free（自由）。
+- `src-tauri/migrations/0008_concept.sql`（13 张表，只建表、加索引）。
+- `src-tauri/src/concept/`：`commands.rs`（26 个 `concept_*` 命令）、`store.rs`、`search.rs`（段落进 search.db）、`responses.rs`（OpenAI Responses + web_search）、`mathpix.rs`、`library.rs`（文献库检索作反方来源、网页快照复制、来源加入文献库、附件文件）、`keys.rs`（两把新密钥）、`fixtures.rs`（合成 lines.json）、`tests.rs`。
+- 前端 `src/concept/`（ConceptPage、ConceptSidebar、Reader、RunView、Confirm、Entries、ParseDialog、labels）、`src/settings/ConceptSettings.tsx`、`src/picker/conceptLocator.ts`、`src/cite/concept-locator.test.ts`、`src/dev/mockConcept.{ts,json}`。
+
+改动的已有文件（都是加，不改 v0.2 / v0.3 的行为）：
+
+| 文件 | 改了什么 |
+| --- | --- |
+| `crates/research-engine/src/ports.rs` | `Purpose` 加 `Concept`（账本用途名 `concept`） |
+| `crates/research-engine/src/fixture.rs` | 模拟模型对 `Purpose::Concept` 返回错误（多一个 match 分支） |
+| `src-tauri/src/research/anthropic.rs` | effort 的 match 多一个 `Concept => "medium"`（概念研究选 Opus 5.5 时） |
+| `src-tauri/src/research/commands.rs` | `key_saved_setting` / `secret_of` 多 OpenAI、Mathpix 两个分支（指向 `concept::keys`）；加 `key_known` / `key_load` 两个 `pub(crate)` 包装 |
+| `src-tauri/src/research/snapshot.rs` | 加 `Snapshots::at(root)`：概念研究的快照放 `数据目录/concept/sources/`，不会被事实调查的清理删掉 |
+| `src-tauri/src/agent/secret.rs` | `ApiKey` 加 `Openai`、`Mathpix`（条目 `openai-api-key`、`mathpix-api-key`）；密钥文件改成每行 `名字=密钥`，旧写法照认（见下）。**`keychain` 模块没动** |
+| `src-tauri/src/agent/usage.rs` | 单价表加 `gpt-6.1-sol`（$2 / $10） |
+| `src-tauri/src/search.rs` | `index_text`、`parse_query`、`Parsed` 改成 `pub(crate)`（段落检索沿用同一套分词） |
+| `src-tauri/src/db.rs` | 登记 migration 8；`schema_has_all_tables_strict_with_foreign_keys` 的表清单加 13 张、总数 31 → 44 |
+| `src-tauri/src/transfer.rs` | `LABELS` 加 13 张概念表（中文名和恢复时的插入顺序） |
+| `src-tauri/src/lib.rs` | `mod concept`、启动时 `concept::commands::on_startup`（在挂上 search.db 之后）、`manage`、登记命令 |
+| `src/format/parts.tsx` | `Page` 加可选的 `wide`（中英并排时用宽版） |
+| `src/library/ItemDetail.tsx` | EPUB / PDF 附件上加「解析成文本」（解析过的显示「概念页」） |
+| `src/picker/Picker.tsx` | 「卡片里的原文」一栏、页 / 段切换 |
+| `src/app/{Rail,App}.tsx`、`src/settings/{SettingsPage,KeysSettings}.tsx`、`src/shared/ipc.ts`、`src/dev/mockIpc.ts` | 第四个主页面「概念」、设置页「概念研究」、密钥页两行、命令封装、mock（模拟文献库多两本书和两个 EPUB 附件） |
+| `THIRD_PARTY.md` | 加 v0.4 一节（没有新的第三方依赖） |
+
+#### 工程选择（本地验收时并进 decisions / architecture）
+
+1. **XHTML 自己读**（`markup.rs`，只用标准库）：roxmltree 遇到 `&nbsp;` 报错；scraper 按 HTML 解析会把 XHTML 的自闭合 `<a id="page_110"/>` 当成没关上的 `<a>`，后面每段都重建一份同 id 的元素。自己读的：认自闭合、HTML 实体（常用的约 120 个，不认识的原样留着）、没关上的标签、多余的结束标签，读不懂的当文字，从不失败。
+2. **页码表的文件名**：Penguin 的 `page-map.xml` 写的是 calibre 拆分之前的名字（`book1.html#page_110`，实际文件是 `book1_split_001.html`），按 `<名>_split_*.<扩展名>` 找回来。页码来源优先级：EPUB 3 page-list → ncx 的 pageList → page-map.xml；都没有时才认正文里 `id="page_N"` 这种锚点。Penguin 实际用的是 ncx 的 pageList。
+3. **角色规则**（详见 concept-engine README）：先按目录文字分单元（篇 / 章 / 节 / 导读 / 注释 / 前后附，导读先认：「〔第四章导读〕」不是第四章；上一层是导读、注释、前后附的跟着它；平铺目录里章跟着前面同层的篇），再在正文单元里逐块认：h1–h6、单元开头全粗体或链接（或和目录文字一样）的是标题；≤160 字的 `blockquote` 是旁注；以「［N］」开头（或开头是回链）、并且是注释引用指向的段落开始「注释区」，到单元结尾都是注释（译者按接在上一条注释后面）；只认方括号（「（1）熟练程度的提高」是列举不是注释）。
+4. **注释的引用标记不进正文**（上标里带链接的「［1］」、epub:type=noteref），记下位置；小型大写照原样（`THE greatest`）。
+5. **引用名全书唯一**：正文 `I.i.3`、旁注 `I.i.3 旁注`、注释 `I.i 注 1`（续写 `I.i 注 1（2）`）、标题 `I.i 标题`、其他单元 `前三章导读 ¶2`；不在章里的正文单元（引言）写 `Intro.5`；PDF 只有段 `5`。锚点里译本的写 `译:I.i 注 1`。
+6. **对齐**：章按（第几篇, 第几章）对，引言按引用名对；段数相同才一段对一段。
+7. **表结构**（0008）：concept_texts（附件 SHA-256、解析器版本 `concept-text-1`、meta JSON、original_id 关联原著）、concept_units、concept_paragraphs（含 page、breaks JSON、noterefs JSON）、concept_alignments + concept_aligned、concept_runs（scope / model / targets 是 JSON）、concept_steps（含模型原始输出 raw）、concept_cards、concept_sentences、concept_anchors（一句一行：段落号、状态、位置、页码、中译核对）、concept_relations（说明句是 JSON）、concept_sources、concept_rejected。保存一次研究 = 一个事务里整份换掉子表（同 v0.3）。
+8. **段落检索**：`search.concept_paras`（FTS5，rowid = 段落 id），只收正文 / 旁注 / 注释 / 导读；启动时和每次检索前比对主库，对不上就重建这张表（恢复备份后自动对上）。中文词搜英文原著：先搜对齐的中译（旁注、注释映射到它挂的正文段），再映射回原著。
+9. **概念研究的折叠**（`concept_engine::fold`）：在 v0.3 折叠（去空白、全半角）之外，再容忍弯直引号、撇号样式、拉丁字母大小写；v0.3 的 `fold` 没动。
+10. **核对**（`verify.rs`）：原文句的文字必须就是引文（文字和引文不一致的拦下——「推演混进原文类」靠这条）；原文只能挂原著的正文段；他人要有来源（S1）或挂旁注 / 注释 / 导读；解释挂的段落不存在或引文找不到 → 去掉锚点、标「没挂上原文」；推演带前提的，前提按原文核对。一句不剩的卡片不要；关系两头要都在。
+11. **技能元数据**：YAML 小子集（README 有完整格式）；本轮加了一个键 `instruction: required | optional`（「自由」必须写要求；「推演」可写可不写）。
+12. **工作流估费**：`flow::planned` 给每个模型步骤组请求；后面步骤要看前面的卡片 / 来源的，按前面步骤的 `max_output_tokens` 和每条来源 1.2 万字写满来估输入（`extra_input_tokens`）。
+13. **关系图布局**：分层（深度优先找回头的边 → 最长路径分层 → 层内按邻居平均位置排四遍 → 从左往右），同样的输入同样的图；SVG 自带浅色 / 深色样式，节点 `data-card`、边 `data-relation`。
+14. **渲染**：Markdown 和 Word 用同一份 `research_engine::render::Doc`（Markdown 复用 v0.3 的 `markdown`，把「短答」标题换成「概要」；Word 调 `research/docx.rs::write`，没复制代码）；HTML 是自己的单文件（卡片筛选、点节点跳卡片、点锚点跳到「引到的原文段落」并高亮）。
+15. **反方的来源**：文献库（沿用文献库的搜索索引搜检索词，取标题 / 作者 / 摘要 / 笔记 / 标注 / 第一个 PDF 附件的正文）→ 正文存快照；网页走 v0.3 的下载器（`Downloader` + `WithFallback`，这里没开 Claude 网页抓取后备），下载器存在 `research/sources/` 的快照复制一份到 `concept/sources/`。
+16. **密钥文件**：每行 `名字=密钥`（名字含 anthropic / claude / deepseek / tavily / openai / mathpix 就算，不分大小写，`export`、引号都认）；写了名字的只给那一把。旧写法（一行只有密钥、或名字不是这几家的）照旧按形状认，但 OpenAI 和 Mathpix 必须写名字。Mathpix 是 `mathpix=app_id:app_key`。
+17. **Word 引文**（citeproc 各排一遍，写成了测试 `src/cite/concept-locator.test.ts`）：
+    - 英文（有页码）：label `page`、locator `110 (I.i.3)` → APA 7「(Smith, 1999, p. 110 (I.i.3))」，跨页「pp. 110–111 (I.i.3)」；GB/T 7714-2015 顺序编码「[1]110 (I.i.3)」；
+    - 中文（没有页码）或选了「段」：label `paragraph`、locator `I.i.3` → APA「(斯密, 2011, para. I.i.3)」；GB/T 顺序编码「[1]I.i.3」；
+    - **GB/T 著者-出版年制这份样式的引文里不出定位**（「(Smith, 1999)」），C4 在 Word 里看要不要改；
+    - 不用「110, I.i.3」：APA 会把逗号当成多页，写成「pp.」。
+    - 搜索窗返回的每条引文多一个字段 `pithQuote: { text, lang, paragraph, pages, card }`（CiteItemRef 的 extra 原样带给宏），宏用它在引文前面插这句原文。
+
+#### 新命令
+
+`concept_status`、`concept_settings_set`、`concept_key_set`（Mathpix 两个框：`key` = app_id、`appKey`）、`concept_key_clear`、`concept_skills_reveal`；
+解析：`concept_text_prepare`（EPUB 出预览；PDF 出页数和费用）→ `concept_pdf_convert`（`local` 选本机取文字）→ `concept_text_renumber` → `concept_text_save`（先做「导入前」备份；`originalUid` 连原著并对齐）；`concept_text_link`、`concept_text_delete`、`concept_texts_list`、`concept_attachment_text`、`concept_text_get`、`concept_unit_get`、`concept_search`；
+研究：`concept_run_prepare`（新的或 `resume` 接着做）、`concept_rerun_prepare`、`concept_run_execute`（后台，事件 `concept-progress` / `concept-done`）、`concept_cancel`、`concept_runs_list`、`concept_run_get`（每次审计一遍）、`concept_run_delete`、`concept_export`（三种；在访达中显示复用 `research_reveal`）、`concept_add_to_library`；Word 搜索窗：`concept_quotes`。
+
+命令行：
+
+```bash
+cargo test -p concept-engine
+```
+
+```bash
+PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p concept-engine --test real_books -- --ignored --nocapture
+```
+
+```bash
+cargo run -q -p concept-engine --example mock_data > src/dev/mockConcept.json
+```
+
+#### 测试
+
+- 开工：`pnpm install` 后 `pnpm check` 里 tsc、node 测试、cargo test 全过（pith 244 个），只有 `poc/word-addin` 没装依赖；在那个目录 `pnpm install` 后全过。云端 pnpm 是 10.28（锁文件是 12 写的，照样装得上）。
+- 收尾：`pnpm check` **全过**（exit 0）：node 17 + poc 29；cargo：pith 258 过 / 18 忽略（新增 14：概念 12、密钥 2），concept-engine 36 过 / 1 忽略（单元 20、text 6、flow 10），research-engine、docx-engine、zotero-import 原样全过。`cargo clippy --workspace --all-targets` **0 警告**。
+- 没跑的：3 个 `#[cfg(target_os = "macos")]` 的 Word 模板安装测试（Linux 上不编）；默认忽略的真实数据测试。
+- **两本真实 EPUB**：用户在会话里上传了，放在 `local/wealth-of-nations/`（不进 Git）。`real_books` 测试通过（只打印聚合数字）：
+  - 英文：Glasgow 式；页码来源 ncx 的 pageList；第一篇第 1–3 章正文 11 / 5 / 8 段，页码 109–117、117–121、121–126；全书 5721 段（正文 3663、注释 149、导读 298、前后附 1420）。
+  - 中文：没有页码；第 1–3 章正文 11 / 5 / 8，旁注 10 / 5 / 7，注释 6 / 1 / 1（含译者按）；全书导读 187 段、旁注 1983、注释 880。
+  - 对齐：第一篇 1–3 章三章全部对齐；全书 35 章里 19 章对上、16 章段数不同（见「已知问题」）。
+- **Cannan 夹具没做成 Cannan 版**：Project Gutenberg 上没有 Cannan 版（只有 #3300 和带 Garnier 注的 #38194），Online Library of Liberty 拒绝自动下载（CloudFront 403，没有绕）；用户说「不用下载」。改用 PG #3300（公有领域）的第一篇第 1–3 章，按 Glasgow 分段拆成 11 / 5 / 8，去掉 PG 的商标和许可说明，来源写在 `fixtures/wealth/README.md`。为了下载 PG，经用户批准新建了个人云环境「pith」（放行 gutenberg.org、oll.libertyfund.org，带 Tauri 系统库的 setup script；setup script 要等下次新会话才真正跑一遍）。
+- 改坏测试（`tests/flow.rs`）：引文改一个字、挂错段落（提示在哪一段找得到）、不存在的段落号（原文拦下、解释去锚点标「没挂上原文」）、标成原文却没有锚点、推演混进原文类（文字和引文不一致；编造的引文）、旁注 / 导读被标成原文（译本旁注、英文编者导言）、他人观点没有来源、他人挂到原著正文、卡片种类不对——全部拦下；审计查出存下的结果被改（引文、锚点、状态、页码、关系、存下的文本）。
+- 四种入口 + 反方（只查文献库 / 再上网，一个 404 记原因）+ 推演 + 自由，录制回复跑到核对、审计、三种导出；取消后接着做、第二步出错停下再接着做（第一步不重做）、密钥错整次停下；发送前估算。
+- App 一侧（`concept/tests.rs`）：两本夹具 EPUB 作附件 → 解析 → 存（导入前备份）→ 关联对齐 → 读回逐段一致；检索（英文词、中文词映射回原著、旁注里的词）；搜索表被清空后自动重建；从 v7 升级；研究存库读回一致；Word 搜索窗的原文（英文带页码、中文只有段落号）；进行中的标成已停止；OpenAI Responses（请求形状、缓存命中计价、272K 以上加价、截断 / 拒答照样记账、401 不回显密钥、余额不足不重试、503 重试、超预算不发）；OpenAI 网页搜索（工具、引用、每次 $0.01）；Mathpix（multipart 上传、查状态、lines.json + mmd、DELETE、按页记账；出错照样 DELETE 并按页估计记账；密钥错不记钱；超预算不上传）；端到端：真实的 Responses / 网页搜索 / 下载器连本地假服务器，跑整章分析和反方（文献库 + 上网），存库、审计、三种导出、加入文献库（再加一次连上已有的），两次研究的步骤费用合计 = 账本合计。
+- **浏览器 `?mock`**：`pnpm dev` 起得来，用 Playwright 无头浏览器点了一遍：书架 → 书 → 章（中英并排、旁注 / 导读样式、页码）→ 点段落号选两段 → 读一段 → 确认框 → 进度 → 结果；整章分析的关系图点节点、点锚点看原文 → 去原文（引文高亮）；卡片上「反方与后世评论」打开「上网找」；没对齐的第三章；问这本书、追踪概念的检索和勾选；整章分析去掉「关系」、跑到一半停止、继续；设置的「概念研究」「密钥与费用」；文献库 PDF 附件「解析成文本」→ Mathpix（模拟）→ 预览 → 存；Word 搜索窗选书 → 卡片里的原文 → 定位自动填「101 (I.i.1)」。控制台 0 个错误。**没起 `pnpm app:dev`**（Tauri 窗口，云端没有桌面）。
+
+#### Linux 上没编、没测的（macOS 部分，没改）
+
+- 钥匙串（`secret.rs` 的 `keychain` 模块，Linux 上是返回错误的桩）：两个新条目 `openai-api-key`、`mathpix-api-key` 在正式版里能不能存取，C4 在签名过的 App 里试。
+- Word 模板安装、`Pith.bas` 宏、`customUI.xml`、AppleScript / 桥接脚本：一行没动。
+- `.app` 打包没试。
+
+#### 留给本地 C4 的事
+
+1. **宏插入原文**：搜索窗交回的引文条目多一个字段 `pithQuote: { text, lang, paragraph, pages, card }`（跟着 locator / label 一起，经 `bridge.rs` 的 `OK\nP\t<json>` 交给宏）。宏要：在引文控件前面插入「“原文”」；确认文档数据部件（`urn:pith:citations:v1`）里多出来的字段保留、刷新时不丢；切换样式、刷新都正常。英文带页码和段落号、中文带段落号，在 Mac Word 里各看一遍；GB/T 著者-出版年制不出定位的问题定一下。
+2. **钥匙串接线**：上面那两个条目；设置页「密钥与费用」里 Mathpix 是两个框（app_id、app_key），存成一个条目 `app_id:app_key`。
+3. **OpenAI Responses 真实调用要核对的点**（官方文档云端访问不了，照记忆和录制样例写）：
+   - 地址 `POST https://api.openai.com/v1/responses`、`Authorization: Bearer`；
+   - 请求：`instructions` + `input`（一条 user 消息，`input_text`）、`text.format = {type: "json_schema", name: "concept_cards", schema, strict: true}`（schema 里可空字段写成 `["string", "null"]`，严格模式认不认）、`reasoning.effort`（`gpt-6.1-sol` 认不认 `xhigh` / `max`）、`store: false`、`max_output_tokens`（推理 token 算不算在内）；
+   - 回复：`status`（`completed` / `incomplete`）、`incomplete_details.reason`（`max_output_tokens`）、`output[]` 里 `message` 的 `output_text` / `refusal`、`model`（带日期的快照名按设置的模型计价）、`usage.input_tokens` / `input_tokens_details.cached_tokens` / `output_tokens` / `output_tokens_details.reasoning_tokens`；错误 `error.code`（`insufficient_quota`）；
+   - 网页搜索：工具名是 `web_search`（还是 `web_search_preview`）、`tool_choice: "required"`、`include: ["web_search_call.action.sources"]` 能不能拿到搜过的网址、`url_citation` 注释、每次 $0.01 和搜到的内容按输入 token 计；
+   - 选 Opus 5.5 时：走 v0.3 的 `research/anthropic.rs`（effort medium、`output_config.format` 用同一份 schema），要试一次；
+   - 单价核对：输入 $2、缓存 $0.10、输出 $10、272K 以上 2 倍 / 1.5 倍（`concept/responses.rs::cost`）；Mathpix 每页 $0.005。
+4. **Mathpix 真实调用要核对的点**：上传是 multipart（`file` + `options_json`，现在发 `{"conversion_formats": {}, "rm_spaces": true, "include_line_data": true}`）、回 `pdf_id`；`GET /v3/pdf/{id}` 的 `status`（`split` / `processing` / `completed` / `error`）、`num_pages`、`percent_done`；`GET /v3/pdf/{id}.lines.json` 的结构（`pages[].page`、`lines[].type` 有哪些、`text`、`region`、`parent_id` 是不是按段落分组、`conversion_output`）；`.mmd`；`DELETE /v3/pdf/{id}`。由行拼段落的规则（`concept_engine::mathpix` 文件头）用真实 PDF 调一遍，特别是跨页续段和页眉页码的类型名。
+5. 真实 GPT-6.1 Sol 跑分工三章（事先问上限）、短 PDF 经 Mathpix、三种导出在 Mac 上打开、用户抽查卡片；`pnpm app:dev` 里把概念页点一遍（WebKit 里划选、SVG 关系图的样式）。
+6. 文档并入：本记录的「工程选择」并进 `decisions/0024`（或新开一篇）、`architecture.md`（目录、命令、v0.4 一节）、`testing.md`（概念研究的测试和命令）、`schema.md`（0008）。
+
+#### 已知问题、没做的
+
+- **重新解析**没做：「解析成文本」再做一次是存成第二份文本（旧文本和它的卡片照留），没有「按引文给旧卡片重新找锚点、找不到的列出来」。
+- **全书对齐**只保证了第一篇第 1–3 章：35 章里 16 章中英段数不同（I.iv、I.v、I.vii、I.viii、I.x、I.xi、II.ii、II.iv、III.iii、第四、五篇多数章），原因多半是版本的分段、表格、Penguin 第二册的结构不同，没逐章查。Penguin 第二册的编者「Introduction」被认成了正文单元（`Intro`，和斯密的引言同名，段落号后面加了 `#2`）——它的目录项就叫「Introduction」，规则分不开。
+- 中文版几个篇名单元（第一到第五篇）下面有少量段落被算成了正文（4 / 4 / 9 / 7 / 3 段），没逐一看是什么（可能是没有单独目录项的导读或篇的说明）；导读只认目录里写了「导读」「导言」的单元。
+- 「问这本书」的本地检索是按词的 FTS（中文二元组、西文前缀），长问句要拆关键词；没有做语义检索。
+- 每次读一章 / 打开一次研究都从库里读整本书（Penguin 约 6000 段），本机应该在 100 ms 以内，没测。
+- 概念研究的网页下载没有开「下载失败改用 Claude 网页抓取」（v0.3 的后备）。
+- `?mock` 里各技能的结果是预先生成的（`mockConcept.json`），换章、换范围时内容不跟着变（真实 App 的开发版用模拟模型现编）。
+
+#### 等用户
+
+- C4 之前（照 `0024`「等用户」）：OpenAI 密钥（能用 `gpt-6.1-sol`）、Mathpix 的 app_id + app_key、一份短 PDF（放 `local/concept-pdf/`）、真实验收的花费上限。
+- Cannan 版：要的话请从 OLL 手动下载第一卷的 HTML / PDF 放进 `local/`，本地再换夹具（现在用的是 PG #3300，测试只依赖分段和结构，不依赖版本）。
