@@ -3159,6 +3159,7 @@ version = "0.4.0"
 dependencies = [
  "biblatex",
  "calamine",
+ "concept-engine",
  "docx-engine",
  "encoding_rs",
  "getrandom 0.3.4",
