@@ -96,7 +96,7 @@ let busy = false;
 
 function modelCall<T>(purpose: string, done: () => T): Promise<T> {
   if (busy) fail("上一次调用还没有结束。");
-  if (real && !hasKey) fail("还没有填 Anthropic API 密钥。到「设置 › 排版 Agent」填写后再试。");
+  if (real && !hasKey) fail("还没有填 Anthropic API 密钥。到「设置 › 密钥与费用」填写后再试。");
   busy = true;
   cancelled = false;
   return new Promise<T>((resolve, reject) => {

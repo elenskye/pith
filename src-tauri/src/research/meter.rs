@@ -39,7 +39,7 @@ impl Meter {
         if spent + worst_usd > self.budget_usd {
             return Err(PortError::new(
                 ErrorKind::Budget,
-                format!("{what}最多可能花 ${worst_usd:.2}，加上本月已花的 ${spent:.2} 会超过月度上限 ${:.2}，所以没有发送。可以在「设置 › 事实调查」调高上限后点「继续」。", self.budget_usd),
+                format!("{what}最多可能花 ${worst_usd:.2}，加上本月已花的 ${spent:.2} 会超过月度上限 ${:.2}，所以没有发送。可以在「设置 › 密钥与费用」调高上限后点「继续」。", self.budget_usd),
             ));
         }
         Ok(())

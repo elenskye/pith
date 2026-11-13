@@ -81,6 +81,7 @@ export const PURPOSE: Record<string, string> = {
   research_search: "检索",
   research_extract: "摘证据",
   research_conclude: "写结论",
+  research_fetch: "网页抓取（下载失败的后备）",
 };
 
 export const SOURCE_STATE: Record<string, string> = { ok: "已读", failed: "下载失败", no_text: "取不出文字", pending: "还没下载" };

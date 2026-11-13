@@ -10,9 +10,52 @@ import { WordSettingsSection } from "@/settings/WordSettings";
 import { CiteStylesSection, ZoteroConvertSection } from "@/settings/CiteSettings";
 import { AgentSettingsSection } from "@/settings/AgentSettings";
 import { ResearchSettingsSection } from "@/settings/ResearchSettings";
+import { KeysSettingsSection } from "@/settings/KeysSettings";
+import { NavItem, NavLabel, SideNav } from "@/app/SideNav";
+import { Page } from "@/format/parts";
+
+/** 设置分两组、七页（decisions/0023）：常规的东西和要联网、花钱的模型分开 */
+export type SettingsSection = "general" | "backup" | "library" | "word" | "keys" | "format" | "research";
+
+const GROUPS: { title: string; items: [SettingsSection, string, string][] }[] = [
+  {
+    title: "常规",
+    items: [
+      ["general", "通用", "数据目录、版本、搜索索引"],
+      ["backup", "备份与导出", "自动备份、恢复、整库导出"],
+      ["library", "文献库", "联网补全"],
+      ["word", "Word 与引文", "Word 模板、引文样式、Zotero 转换"],
+    ],
+  },
+  {
+    title: "模型与联网",
+    items: [
+      ["keys", "密钥与费用", "三把密钥、月度上限"],
+      ["format", "排版 Agent", "模型、论文发送方式"],
+      ["research", "事实调查", "模型、搜索、可信度、单价"],
+    ],
+  },
+];
+
+const TITLE = Object.fromEntries(GROUPS.flatMap((g) => g.items.map(([k, label]) => [k, label]))) as Record<SettingsSection, string>;
+
+export function SettingsNav({ section, onSection }: { section: SettingsSection; onSection: (s: SettingsSection) => void }) {
+  return (
+    <SideNav title="设置">
+      {GROUPS.map((g, i) => (
+        <div key={g.title} className={i > 0 ? "mt-1" : ""}>
+          <NavLabel>{g.title}</NavLabel>
+          {g.items.map(([k, label, sub]) => (
+            <NavItem key={k} label={label} sub={sub} active={section === k} onClick={() => onSection(k)} />
+          ))}
+        </div>
+      ))}
+    </SideNav>
+  );
+}
 
 /** onRestored：库被整个换掉（恢复）之后，让外框回到初始状态 */
-export function SettingsPage({ onRestored }: { onRestored: () => void }) {
+export function SettingsPage({ section, onSection, onRestored }: { section: SettingsSection; onSection: (s: SettingsSection) => void; onRestored: () => void }) {
   const qc = useQueryClient();
   const { confirm, notify } = useUi();
   const info = useQuery({ queryKey: ["appInfo"], queryFn: api.appInfo });
@@ -58,11 +101,9 @@ export function SettingsPage({ onRestored }: { onRestored: () => void }) {
   };
 
   return (
-    <section className="min-w-0 flex-1 overflow-y-auto">
-      <header className="flex h-12 items-center border-b px-6">
-        <h1 className="text-sm font-semibold">设置</h1>
-      </header>
-      <div className="max-w-2xl space-y-8 px-6 py-6">
+    <Page crumbs={[{ label: "设置" }, { label: TITLE[section] }]}>
+      {section === "general" && (
+        <>
         <div>
           <h2 className="mb-3 text-xs font-medium text-muted-foreground">数据</h2>
           <dl className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
@@ -104,20 +145,11 @@ export function SettingsPage({ onRestored }: { onRestored: () => void }) {
           {rebuild.error && <p className="mt-1 text-xs text-destructive">{String(rebuild.error)}</p>}
         </div>
 
-        <MetadataSettingsSection />
+        </>
+      )}
 
-        <WordSettingsSection />
-
-        <CiteStylesSection />
-
-        <ZoteroConvertSection />
-
-        <AgentSettingsSection />
-
-        <ResearchSettingsSection />
-
-        <ExportSection exportsDir={i ? `${i.dataDir}/exports` : undefined} onRestored={afterRestore} />
-
+      {section === "backup" && (
+        <>
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xs font-medium text-muted-foreground">备份</h2>
@@ -172,7 +204,24 @@ export function SettingsPage({ onRestored }: { onRestored: () => void }) {
             </table>
           )}
         </div>
-      </div>
-    </section>
+
+          <ExportSection exportsDir={i ? `${i.dataDir}/exports` : undefined} onRestored={afterRestore} />
+        </>
+      )}
+
+      {section === "library" && <MetadataSettingsSection />}
+
+      {section === "word" && (
+        <>
+          <WordSettingsSection />
+          <CiteStylesSection />
+          <ZoteroConvertSection />
+        </>
+      )}
+
+      {section === "keys" && <KeysSettingsSection />}
+      {section === "format" && <AgentSettingsSection onKeys={() => onSection("keys")} />}
+      {section === "research" && <ResearchSettingsSection onKeys={() => onSection("keys")} />}
+    </Page>
   );
 }

@@ -134,7 +134,7 @@ const tagId = (name: string) => {
   return tagIds.get(name)!;
 };
 const backups: BackupInfo[] = [{ fileName: "library-20261108-090000-daily.db", label: "daily", createdAt: "2026-11-08 09:00:00", size: 286720 }];
-const info: AppInfo = { appVersion: "0.3.0", isDev: true, dataDir: "/Users/mock/Pith Dev", schemaVersion: 6, latestSchema: 6, startupError: null };
+const info: AppInfo = { appVersion: "0.3.0", isDev: true, dataDir: "/Users/mock/Pith Dev", schemaVersion: 7, latestSchema: 7, startupError: null };
 
 // ---- 联网补全（模拟：不联网，按条目编一份「查到的记录」；规则的来源是 Rust） ----
 const mSettings: MetadataSettings = { enabled: null, auto: true, email: null };

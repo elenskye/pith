@@ -143,6 +143,20 @@ pub struct Fetched {
     pub title: Option<String>,
     /// 正文；取不出文字时是原因
     pub text: Result<String, String>,
+    /// 不是本机直接下载到的：本机下载失败后改用 Claude 网页抓取（`decisions/0023`）。这一次调用的费用也在这里
+    pub via: Option<Via>,
+}
+
+/// 来源是怎么拿到的（本机下载以外的办法）
+#[derive(Clone, Debug, PartialEq)]
+pub struct Via {
+    /// claude_web_fetch
+    pub how: String,
+    /// 本机下载失败的原因
+    pub download_error: String,
+    pub provider: String,
+    pub model: String,
+    pub usage: Usage,
 }
 
 pub trait Fetch: Send + Sync {

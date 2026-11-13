@@ -182,7 +182,7 @@ fn read_stream(reader: impl Read, req_input_estimate: u64, progress: &dyn Fn(Pro
 fn api_error_message(status: u16, kind: &str, message: &str) -> String {
     let detail = if message.is_empty() { String::new() } else { format!("（{}）", message.chars().take(200).collect::<String>()) };
     match (status, kind) {
-        (401, _) | (_, "authentication_error") => "API 密钥不对或已失效。到「设置 › 排版 Agent」重新填写。".into(),
+        (401, _) | (_, "authentication_error") => "API 密钥不对或已失效。到「设置 › 密钥与费用」重新填写。".into(),
         (402, _) | (_, "billing_error") => "Anthropic 账户余额不足或没有绑定付款方式。到 console.anthropic.com 的 Billing 里处理后再试。".into(),
         (403, _) | (_, "permission_error") => format!("这个密钥没有权限调用这个模型{detail}。"),
         (404, _) | (_, "not_found_error") => format!("找不到模型 {}{detail}。", usage::MODEL),

@@ -223,7 +223,7 @@ pub fn document(r: &Report) -> Doc {
                 "failed" => format!("下载失败：{}", src.fetch_error.clone().unwrap_or_default()),
                 "no_text" => src.text_error.clone().unwrap_or_default(),
                 "pending" => "还没有下载".to_string(),
-                _ => format!("{} 条事实，{} 条核实{}", s.facts, s.verified, if src.truncated { "；正文没读完" } else { "" }),
+                _ => format!("{} 条事实，{} 条核实{}{}", s.facts, s.verified, if src.truncated { "；正文没读完" } else { "" }, if src.fetched_via.is_some() { "；经 Claude 网页抓取" } else { "" }),
             };
             let snapshot = match (&src.fetched_at, &src.sha256) {
                 (Some(at), Some(sha)) => format!("{} · SHA-256 {}…", at.replace('T', " ").chars().take(16).collect::<String>(), sha.chars().take(12).collect::<String>()),

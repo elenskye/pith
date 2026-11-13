@@ -40,7 +40,7 @@ fn name_of(base: &str, model: &str) -> &'static str {
 pub fn error_message(who: &str, status: u16, message: &str) -> String {
     let detail = meter::detail(message);
     match status {
-        401 => format!("{who} 的 API 密钥不对或已失效。到「设置 › 事实调查」重新填写。"),
+        401 => format!("{who} 的 API 密钥不对或已失效。到「设置 › 密钥与费用」重新填写。"),
         402 => format!("{who} 账户余额不足。充值后点「继续」。"),
         403 => format!("这个密钥没有权限调用这个模型{detail}。"),
         404 => format!("找不到这个模型或接口地址{detail}。到「设置 › 事实调查」检查模型名和地址。"),

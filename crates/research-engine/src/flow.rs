@@ -305,6 +305,13 @@ fn download_step(run: &mut Run, ports: &mut Ports) -> Result<(), PortError> {
                     s.fetch_error = Some(format!("和 {other} 是同一份内容，不重复读"));
                     continue;
                 }
+                if let Some(via) = &f.via {
+                    s.fetched_via = Some(via.how.clone());
+                    // 网页抓取花的钱记成一步（本机下载不花钱，不记）
+                    let label = format!("{} 本机下载失败（{}），改用 Claude 网页抓取", s.id, via.download_error);
+                    run.steps.push(Step { provider: via.provider.clone(), model: via.model.clone(), input_tokens: via.usage.input_tokens, output_tokens: via.usage.output_tokens, cost_usd: via.usage.cost_usd, ..step(StepKind::Download, label, (ports.now)()) });
+                }
+                let s = &mut run.sources[i];
                 s.final_url = Some(f.final_url);
                 s.fetched_at = Some(f.fetched_at);
                 s.sha256 = Some(f.sha256);

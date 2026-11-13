@@ -19,6 +19,7 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration { version: 4, name: "reader", sql: include_str!("../migrations/0004_reader.sql") },
     Migration { version: 5, name: "metadata", sql: include_str!("../migrations/0005_metadata.sql") },
     Migration { version: 6, name: "research", sql: include_str!("../migrations/0006_research.sql") },
+    Migration { version: 7, name: "research_fetch", sql: include_str!("../migrations/0007_research_fetch.sql") },
 ];
 
 pub fn latest() -> i64 {

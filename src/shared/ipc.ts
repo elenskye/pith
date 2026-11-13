@@ -747,6 +747,8 @@ export type ResearchSource = {
   bytes: number;
   textChars: number;
   fetchError: string | null;
+  /** 不是本机直接下载到的：claude_web_fetch = 本机下载失败后改用 Claude 网页抓取 */
+  fetchedVia: string | null;
   textError: string | null;
   extracted: boolean;
   readChars: number;
@@ -943,6 +945,10 @@ export type ResearchSettings = {
   planWebSearches: number;
   trust: { tiers: Partial<Record<ResearchProducerKind, ResearchTier>> };
   prices: { models: Record<string, ResearchPrice>; tavilyCreditUsd: number | null; claudeSearchUsd: number | null };
+  /** 本机下载失败时改用 Claude 网页抓取（要 Anthropic 的密钥） */
+  webFetchFallback: boolean;
+  /** 网页抓取用的模型 */
+  fetchModel: string;
 };
 export type ResearchStatus = {
   mock: boolean;

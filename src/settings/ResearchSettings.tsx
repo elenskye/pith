@@ -1,5 +1,6 @@
-// 设置 › 事实调查（decisions/0020）：三把密钥（Anthropic 的和排版 Agent 共用）、计划模型和执行模型、各接口的专用搜索、
-// 可信度等级表、单价、月度上限（和排版 Agent 共用）、最近的调用。密钥只交给 Rust 保存：输入框保存后立即清空，界面上不显示。
+// 设置 › 事实调查（decisions/0020）：计划模型和执行模型、各接口的专用搜索、下载失败时的网页抓取、单价、可信度等级表、最近的调用。
+// 三把密钥和月度上限在「设置 › 密钥与费用」（KeysSettings，decisions/0023）；KeyRow 在这里定义、那边用。
+// 密钥只交给 Rust 保存：输入框保存后立即清空，界面上不显示。
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
@@ -21,7 +22,7 @@ const KEY_HINT: Record<ResearchKeyWhich, { placeholder: string; where: string }>
   tavily: { placeholder: "tvly-…", where: "app.tavily.com（免费额度每月 1000 点）。" },
 };
 
-function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onStatus: (s: ResearchStatus) => void }) {
+export function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onStatus: (s: ResearchStatus) => void }) {
   const { confirm, notify } = useUi();
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -55,7 +56,7 @@ function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onStatus: 
           {k.has ? <CircleCheck size={13} className="shrink-0 text-emerald-600" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed ? "text-amber-600" : "text-muted-foreground"}`} />}
           <span>{k.has ? "已填" : "还没有填"}</span>
           <span className="text-xs text-muted-foreground">（{PLACE[k.place]}）</span>
-          {!k.needed && <Badge>现在的设置用不到</Badge>}
+          {!k.needed && k.which !== "anthropic" && <Badge>现在的调查设置用不到</Badge>}
         </p>
         {k.place !== "file" && (
           <form
@@ -123,7 +124,7 @@ function PriceInput({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-export function ResearchSettingsSection() {
+export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
   const qc = useQueryClient();
   const { notify } = useUi();
   const status = useQuery({ queryKey: ["researchStatus"], queryFn: api.researchStatus, staleTime: 0 });
@@ -131,12 +132,8 @@ export function ResearchSettingsSection() {
   const s = status.data;
   const [draft, setDraft] = useState<ResearchSettings | null>(null);
   const [saving, setSaving] = useState(false);
-  const [budget, setBudget] = useState("");
   useEffect(() => {
-    if (s) {
-      setDraft(structuredClone(s.settings));
-      setBudget(String(s.budgetUsd));
-    }
+    if (s) setDraft(structuredClone(s.settings));
   }, [s]);
   const dirty = !!s && !!draft && JSON.stringify(draft) !== JSON.stringify(s.settings);
 
@@ -152,19 +149,6 @@ export function ResearchSettingsSection() {
       setSaving(false);
     }
   };
-  const saveBudget = async () => {
-    const n = Number(budget);
-    if (!Number.isFinite(n)) return notify("月度上限写一个 1 到 50 之间的数", "error");
-    try {
-      await api.agentBudgetSet(n);
-      qc.invalidateQueries({ queryKey: ["agentStatus"] });
-      await status.refetch();
-      notify("月度上限已保存（和排版 Agent 共用）");
-    } catch (e) {
-      notify(String(e), "error");
-    }
-  };
-
   const setTier = (kind: string, tier: ResearchTier) => draft && setDraft({ ...draft, trust: { tiers: { ...draft.trust.tiers, [kind]: tier } } });
   const tierOf = (kind: string, fallback: ResearchTier) => (draft?.trust.tiers as Record<string, ResearchTier> | undefined)?.[kind] ?? fallback;
   const setPrice = (model: string, which: "input" | "output", v: number, current: { input: number; output: number }) =>
@@ -172,7 +156,6 @@ export function ResearchSettingsSection() {
 
   return (
     <div>
-      <h2 className="mb-3 text-xs font-medium text-muted-foreground">事实调查</h2>
       <p className="mb-3 text-xs text-muted-foreground">
         「调查」里拆问题、写结论用计划模型，读网页、摘证据用执行模型，检索用执行模型绑定的专用搜索（没有就用 Tavily）。网页和文件由 Pith 在这台电脑上下载，摘录和数字由 Pith 核对。每次发送前都会列出要发的内容和预计费用。
       </p>
@@ -184,9 +167,20 @@ export function ResearchSettingsSection() {
           {s.ledgerError && <Notice tone="danger" title="用量账本读不了，为了不超支，现在发不了请求。">{s.ledgerError}</Notice>}
 
           <dl className="grid grid-cols-[110px_minmax(0,1fr)] items-start gap-x-3 gap-y-3 text-sm">
-            {s.keys.map((k) => (
-              <KeyRow key={k.which} k={k} onStatus={put} />
-            ))}
+            <dt className="text-muted-foreground">密钥与上限</dt>
+            <dd className="text-xs">
+              {(() => {
+                const missing = s.keys.filter((k) => k.needed && !k.has).map((k) => k.label);
+                return <span className={missing.length ? "text-amber-700" : ""}>{missing.length ? `还没有填 ${missing.join("、")} 的密钥` : "要用的密钥都填了"}</span>;
+              })()}
+              <span className="text-muted-foreground tabular-nums">
+                {" "}
+                · 本月已花 {money(s.monthSpentUsd)} / 上限 {money(s.budgetUsd)}（所有接口合计，和排版 Agent 共用）
+              </span>
+              <button onClick={onKeys} className="ml-2 text-primary hover:underline">
+                去「密钥与费用」
+              </button>
+            </dd>
 
             <dt className="pt-1 text-muted-foreground">计划和结论</dt>
             <dd>
@@ -238,6 +232,24 @@ export function ResearchSettingsSection() {
               </label>
               <p className="text-muted-foreground">
                 现在检索用：<span className="text-foreground">{ENGINE[s.searchEngine] ?? s.searchEngine}</span>
+              </p>
+            </dd>
+
+            <dt className="pt-0.5 text-muted-foreground">下载失败时</dt>
+            <dd className="space-y-1 text-xs">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={draft.webFetchFallback} onChange={(e) => setDraft({ ...draft, webFetchFallback: e.target.checked })} />
+                <span>改用 Claude 网页抓取</span>
+                <input
+                  value={draft.fetchModel}
+                  disabled={!draft.webFetchFallback}
+                  onChange={(e) => setDraft({ ...draft, fetchModel: e.target.value })}
+                  placeholder="claude-haiku-5-5"
+                  className="selectable w-40 rounded-md border bg-background px-2 py-0.5 font-mono outline-none focus:border-ring disabled:opacity-50"
+                />
+              </label>
+              <p className="text-muted-foreground">
+                网站挡程序、证书太旧这类本机下载不了的网页和 PDF，交给 Claude 抓一次（要 Anthropic 的密钥，没填就不用）。没有按次收费，抓到的正文按输入 token 计，用便宜的模型一页通常不到 1 美分；报告里会注明哪些来源是这样拿到的。
               </p>
             </dd>
 
@@ -308,26 +320,6 @@ export function ResearchSettingsSection() {
               </div>
             </dd>
 
-            <dt className="pt-0.5 text-muted-foreground">月度上限</dt>
-            <dd className="text-xs">
-              <form
-                className="flex items-center gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void saveBudget();
-                }}
-              >
-                <span className="text-muted-foreground">$</span>
-                <input type="number" min={1} max={50} step={1} value={budget} onChange={(e) => setBudget(e.target.value)} className="selectable w-20 rounded-md border bg-background px-2 py-1 tabular-nums outline-none focus:border-ring" />
-                <button type="submit" disabled={Number(budget) === s.budgetUsd} className="rounded-md border px-2.5 py-1 hover:bg-muted disabled:opacity-50">
-                  保存
-                </button>
-                <span className="text-muted-foreground tabular-nums">
-                  本月已花 {money(s.monthSpentUsd)}（{s.month}，所有接口合计，和排版 Agent 共用）
-                </span>
-              </form>
-              <p className="mt-1 text-muted-foreground">不设单次上限；每次调用前按最坏情况估计，加上本月已花的会超过上限就不发，调查停在那一步，调高后可以接着做。</p>
-            </dd>
           </dl>
 
           <div className="flex items-center justify-end gap-2">

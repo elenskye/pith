@@ -602,7 +602,7 @@ fn with_model<T>(app: &AppHandle, state: &AppState, agent: &AgentState, f: impl 
     let _busy = Busy(&agent.busy);
     agent.cancel.store(false, Ordering::SeqCst);
     let real = use_real_model();
-    let key = if real { agent.secret.load()?.ok_or_else(|| "还没有填 Anthropic API 密钥。到「设置 › 排版 Agent」填写后再试。".to_string())? } else { String::new() };
+    let key = if real { agent.secret.load()?.ok_or_else(|| "还没有填 Anthropic API 密钥。到「设置 › 密钥与费用」填写后再试。".to_string())? } else { String::new() };
     let model: Box<dyn Model> = if real { Box::new(claude::Anthropic::default()) } else { Box::new(claude::Mock { fail: None, delay: std::time::Duration::from_millis(1200) }) };
     let progress = |p: Progress| {
         let _ = app.emit(PROGRESS_EVENT, serde_json::json!({ "thinkingChars": p.thinking_chars, "outputChars": p.output_chars }));

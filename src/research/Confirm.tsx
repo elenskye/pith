@@ -44,7 +44,7 @@ function MissingKeys({ keys, onSettings }: { keys: string[]; onSettings: () => v
   if (keys.length === 0) return null;
   return (
     <Notice tone="danger" title={`还没有填 ${keys.join("、")} 的 API 密钥，发不了。`}>
-      到「设置 › 事实调查」填写后再回来。
+      到「设置 › 密钥与费用」填写后再回来。
       <button onClick={onSettings} className="ml-1 text-primary hover:underline">
         去设置
       </button>
@@ -117,7 +117,7 @@ export function PlanSend({ preview, onDone, onClose, onSettings }: { preview: Re
           </div>
           <EstimateBox estimate={preview.estimate} mock={preview.mock} />
           <MissingKeys keys={preview.missingKeys} onSettings={onSettings} />
-          {!preview.mock && !preview.estimate.withinBudget && <Notice tone="danger" title="会超过月度上限，发不了。">可以在「设置 › 排版 Agent」调高上限（两边共用），或下个月再用。</Notice>}
+          {!preview.mock && !preview.estimate.withinBudget && <Notice tone="danger" title="会超过月度上限，发不了。">可以在「设置 › 密钥与费用」调高上限（两边共用），或下个月再用。</Notice>}
           {phase === "sending" ? (
             <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
               <LoaderCircle size={14} className="shrink-0 animate-spin text-muted-foreground" />

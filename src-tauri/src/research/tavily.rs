@@ -52,7 +52,7 @@ pub struct Tavily {
 fn error_message(status: u16, message: &str) -> String {
     let detail = meter::detail(message);
     match status {
-        401 => "Tavily 的 API 密钥不对或已失效。到「设置 › 事实调查」重新填写。".into(),
+        401 => "Tavily 的 API 密钥不对或已失效。到「设置 › 密钥与费用」重新填写。".into(),
         432 | 433 => format!("Tavily 的额度用完了或超出了套餐的限制{detail}。到 app.tavily.com 查看后点「继续」。"),
         429 => "Tavily 说搜索太频繁，被限流了。等一会儿再点「继续」。".into(),
         400 => format!("Tavily 不接受这个搜索词{detail}。"),

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pith v0.4 计划问卷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* 布局：单栏问卷，顶部粘性进度条按部分计数，底部固定操作栏。沿用第二轮的样式。 */
+  :root {
+    --paper: #f3f5f8;
+    --card: #ffffff;
+    --ink: #172030;
+    --muted: #5b6575;
+    --line: #dde2e9;
+    --accent: #1d4f91;
+    --accent-ink: #ffffff;
+    --accent-soft: #e6eef9;
+    --done: #2f7a4d;
+    --note-bg: #eef2f7;
+    --font-display: "Noto Serif SC", "Songti SC", "STSong", serif;
+    --font-body: -apple-system, "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #11151b;
+      --card: #191f28;
+      --ink: #e5e9ef;
+      --muted: #98a2b1;
+      --line: #2a323e;
+      --accent: #84abe8;
+      --accent-ink: #0f1a2b;
+      --accent-soft: #1c2940;
+      --done: #6fc28f;
+      --note-bg: #1a2230;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #11151b;
+    --card: #191f28;
+    --ink: #e5e9ef;
+    --muted: #98a2b1;
+    --line: #2a323e;
+    --accent: #84abe8;
+    --accent-ink: #0f1a2b;
+    --accent-soft: #1c2940;
+    --done: #6fc28f;
+    --note-bg: #1a2230;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 15px/1.7 var(--font-body); }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 36px 18px 140px; }
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--note-bg); padding: 1px 5px; border-radius: 4px; }
+
+  header { display: grid; gap: 10px; }
+  .eyebrow { font-size: 12.5px; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; }
+  h1 { font-family: var(--font-display); font-size: 30px; line-height: 1.3; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+  .lede { color: var(--muted); margin: 0; max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
+  .meta span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--card); }
+
+  .settled { margin: 22px 0 6px; background: var(--note-bg); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; }
+  .settled h2 { font-size: 14px; margin: 0; color: var(--accent); }
+  .settled ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 14px; }
+
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line); padding: 10px 0; margin: 18px 0 8px; display: grid; gap: 8px; }
+  .bar-top { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .chip.full { border-color: var(--done); color: var(--done); }
+  .chip:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section.part { margin: 34px 0 10px; display: grid; gap: 4px; scroll-margin-top: 90px; }
+  section.part h2 { font-family: var(--font-display); font-size: 20px; margin: 0; text-wrap: balance; }
+  section.part h2 b { color: var(--accent); margin-right: 8px; }
+  section.part p { color: var(--muted); margin: 0; font-size: 14px; max-width: 64ch; }
+
+  .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 12px 0; display: grid; gap: 6px; }
+  .q.answered { border-left: 3px solid var(--done); }
+  .q .num { font-size: 12px; color: var(--muted); letter-spacing: .05em; font-variant-numeric: tabular-nums; }
+  .q .num em { font-style: normal; margin-left: 6px; color: var(--accent); }
+  .q h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.55; }
+  .q .hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+  .opts { display: grid; gap: 2px; margin-top: 4px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .opt:hover { background: var(--accent-soft); }
+  .opt input { margin-top: 6px; flex: none; accent-color: var(--accent); }
+  .opt .lab { flex: 1; }
+  .opt .desc { display: block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .rec { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; font-weight: 600; }
+  textarea, input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font: inherit; background: var(--paper); color: var(--ink); }
+  textarea { min-height: 76px; resize: vertical; }
+  .extra { margin: 4px 0 0 30px; }
+
+  #out { display: none; margin-top: 26px; gap: 8px; }
+  #out.show { display: grid; }
+  #out h3 { margin: 0; font-size: 15px; }
+  #md { min-height: 300px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+
+  .footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; }
+  .footer-in { max-width: 780px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  #status { flex: 1 1 220px; font-size: 13px; color: var(--muted); min-width: 0; }
+  #status.ok { color: var(--done); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.act { font: inherit; font-size: 14px; font-weight: 600; border-radius: 9px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.act:disabled { opacity: .55; cursor: default; }
+
+  @media (max-width: 420px) {
+    h1 { font-size: 25px; }
+    .extra { margin-left: 0; }
+    .q { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PITH · 第三轮问卷 · 2026-11-12</div>
+    <h1>v0.4 开发计划问卷</h1>
+    <p class="lede">定 v0.4「概念研究」（Concept Research）读哪个本子、做出什么、放在 Pith 的哪里、怎么和云端分工。驱动材料是《国富论》的分工章节。收到回答后，我拟出 v0.4 的分期，写进 <code>ROADMAP.md</code> 和 <code>decisions/0024</code>，并标出哪几期交给云端。</p>
+    <div class="meta"><span>5 部分</span><span id="qcount">— 题</span><span>约 12 分钟</span><span>草稿自动保存</span></div>
+  </header>
+
+  <div class="settled">
+    <h2>已经定了，不用再答</h2>
+    <ul>
+      <li>v0.3 已验收；事实调查以后的优化不挡 v0.4。视觉设计放到 v0.7 之后，v0.4 照现在的简约界面做。</li>
+      <li>先原文后解释：卡片里引用的每一句原文，都由 Pith 在你给的那份文本里逐字核对（沿用 v0.3 的核对）；对不上的不进卡片。</li>
+      <li>每条内容都标明是「原文说的」「AI 解释的」还是「假设推演的」（Brief 的要求）。</li>
+      <li>只处理你合法持有的版本；书的文件放在本机 <code>local/</code>，不进 Git，也不交给云端。</li>
+      <li>云端不调用真实模型、不碰密钥；花钱的真实验收只在本地做，事先问你上限。</li>
+    </ul>
+  </div>
+
+  <div class="bar" id="bar">
+    <div class="bar-top"><span id="pcount">0 / 0</span><div class="track"><i id="pbar"></i></div></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <form id="form" novalidate></form>
+
+  <div id="out">
+    <h3>回答（Markdown）</h3>
+    <textarea id="md" readonly aria-label="生成的回答"></textarea>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-in">
+    <div id="status" role="status">填完点「提交给 Claude」，再回对话说一声「填好了」。</div>
+    <div class="btns">
+      <button type="button" class="act primary" id="submit">提交给 Claude</button>
+      <button type="button" class="act" id="copy">复制 Markdown</button>
+      <button type="button" class="act" id="reset">清空草稿</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// opts 每项：[选项文字, 说明(可空), 是否建议]
+const Q = [
+ {part:'A', name:'读哪个本子', lead:'版本和格式决定两件事：原文能不能逐字核对得准，卡片里的引文怎么定位。'},
+ {id:'a1', type:'multi', title:'用哪个版本？',
+  hint:'可多选。选一个英文本加一个中译本，Pith 可以把两边按段落对齐，卡片里原文和译文一起给。',
+  opts:[['英文原著：Glasgow 版（Oxford 1976；Liberty Fund 重印）','学界通用的版本，每段有编号（如 I.i.1），引用不依赖页码。',true],
+        ['英文原著：Cannan 版（1904）','公有领域，网上有完整的文字（Online Library of Liberty、Project Gutenberg），能免费、合法地拿到。'],
+        ['中译本：郭大力、王亚南译（商务印书馆）'],
+        ['中译本：杨敬年译（陕西人民出版社）']], other:true},
+ {id:'a2', type:'single', title:'给 Pith 的文件用什么格式？',
+  hint:'你问的「PDF 还是 EPUB」：我建议 EPUB。理由写在各选项下面。',
+  opts:[['EPUB','本来就是带结构的文字：章节、段落、脚注都在，取字准，不用 OCR，中文也不会乱码。缺点是没有纸本页码。',true],
+        ['文字版 PDF（能选中、复制文字的那种）','有纸本页码，适合按页码引用；但中文 PDF 取字可能乱码，页眉页脚和断行也要清理，逐字核对会更容易失败。'],
+        ['扫描版 PDF','要先 OCR，错字多，原文核对会大量失败。不建议。'],
+        ['网页或纯文本（只适用于公有领域的英文本）','Cannan 版可以直接取，最省事。'],
+        ['EPUB 用来读，同一版本的文字版 PDF 只用来查纸本页码','两样都要，引用时既有段落号又有页码；要准备两份文件。']], other:true},
+ {id:'a3', type:'single', title:'卡片里引用原文时，用什么定位？',
+  opts:[['段落编号','英文用 Glasgow 编号（I.i.1）；中译本按「篇.章.段」由 Pith 编号，和英文对齐。不依赖哪一次印刷。',true],
+        ['纸本页码','要文字版 PDF。'],
+        ['两样都给','要同一版本的 EPUB 和 PDF。']]},
+ {id:'a4', type:'single', title:'v0.4 做多大范围？',
+  opts:[['只做分工三章（第一篇第 1–3 章），先做扎实','约 1 万英文词、2 万汉字；费用低，验收看得过来。功能做成通用的，以后换别的章节、别的书照样用。',true],
+        ['整个第一篇（11 章）'],
+        ['全书都能读，用分工三章验收']], other:true},
+
+ {part:'B', name:'概念研究做出什么', lead:'Brief 里写的是：从章节、摘录、论点出发，识别概念、前提、因果、反方，做成概念卡、论证卡和关系图。'},
+ {id:'b1', type:'multi', title:'要做出哪些东西？',
+  opts:[['概念卡','一个概念的定义、原文出处、相关概念、常见误解。',true],
+        ['论证卡','前提 → 推理 → 结论，每一步都挂原文。',true],
+        ['关系图','概念、论证之间的关系：因果、包含、对立、举例。',true],
+        ['反方与后世评论','谁反对、怎么修正，后来的经济学怎么看。',true],
+        ['中英术语对照表'],
+        ['每章提要'],
+        ['复习题（自测用）']], other:true},
+ {id:'b2', type:'single', title:'「AI 解释的」内容，要不要也挂原文？',
+  opts:[['必须挂：每条解释都要指出它依据哪几段原文，挂不上的标出来','和 v0.3「每个数字都能点回原文」一样严。',true],
+        ['尽量挂，挂不上的照样显示，但标明'],
+        ['不必挂，只要标明是 AI 解释']]},
+ {id:'b3', type:'single', title:'「假设推演」（例如「如果市场范围扩大十倍，分工会怎样」）v0.4 要不要做？',
+  opts:[['要，单独一类，标清楚是推演、不是原著观点','也给 v0.5 WonderLab 的交互模型攒素材。',true],
+        ['v0.4 先不做，留到 v0.5']]},
+ {id:'b4', type:'single', title:'反方和后世评论从哪来？',
+  opts:[['先查你的文献库，不够再用 v0.3 的检索找有出处的','每条都带来源；花钱、慢一些。',true],
+        ['只用你文献库里的文献'],
+        ['只用模型自己的知识，统一标「AI 解释」','最快，但没有出处。'],
+        ['v0.4 先不做反方']], other:true},
+ {id:'b5', type:'multi', title:'从哪里开始一次概念研究？',
+  opts:[['选一章，整章分析','',true],
+        ['选一段原文（读的时候划选）','',true],
+        ['问一个问题','例如「为什么分工受市场范围的限制？」'],
+        ['选一个概念，跨章节追踪','例如「分工」在全书里怎么用。']], other:true},
+ {id:'b6', type:'multi', title:'主要拿来做什么？',
+  hint:'用来决定哪些地方做细：复习偏重卡片和自测，写作偏重引文定位，讲给别人听偏重关系图。',
+  opts:[['自己读懂、复习'],['写文章或论文时引用'],['讲给别人听，或做成知识作品（接 v0.5 WonderLab）'],['比较中译本的译法']], other:true},
+
+ {part:'C', name:'放在 Pith 的哪里', lead:'v0.3 改完以后，左边一列是文献库、排版、调查三个主页面。'},
+ {id:'c1', type:'single', title:'页面怎么放？',
+  opts:[['左边一列加第四个主页面「概念」，侧栏是书 → 章 → 卡片','和现在的三个主页面一样。',true],
+        ['放在文献库里：书是一条文献，卡片挂在它下面'],
+        ['放进「调查」，算另一种调查']], other:true},
+ {id:'c2', type:'single', title:'原文怎么看？',
+  opts:[['概念页里直接显示原文段落（带段落号），划选就能生成卡片','不用做完整的电子书阅读器，工作量小。',true],
+        ['做一个完整的 EPUB 阅读器（目录、翻页、标注），和 PDF 阅读器并列','工作量大一截。'],
+        ['只用现有的 PDF 阅读器','要文字版 PDF。']], other:true},
+ {id:'c3', type:'single', title:'书跟文献库的关系？',
+  opts:[['书作为一条文献（带 EPUB / PDF 附件），卡片引原文就是引这条文献','以后在 Word 里能直接插这条引文。',true],
+        ['不进文献库，单独存']]},
+ {id:'c4', type:'multi', title:'要能导出成什么？',
+  opts:[['Markdown'],['Word（用 v0.2 的文档引擎）'],['网页（单个 HTML，关系图能点）'],['Anki 卡组（复习用）'],['不用导出，在 Pith 里看就行']], other:true},
+ {id:'c5', type:'single', title:'在 Word 里写作时，要不要能把卡片里的原文插成引文（带段落号或页码）？',
+  opts:[['要，v0.4 就接上 v0.2 的引用引擎'],
+        ['以后再说，v0.4 先把卡片做好','',true]]},
+
+ {part:'D', name:'模型与费用', lead:'参考：分工三章英文约 1.5 万 token，用 Opus 5.5 整章分析一次估计 $0.2–0.5；找反方另算检索费用。'},
+ {id:'d1', type:'single', title:'用哪个模型？',
+  opts:[['全程 Opus 5.5','读章节、出卡片、找反方都用它。文字量不大，质量优先。',true],
+        ['和 v0.3 一样分工：Opus 定结构和结论，便宜的模型（DeepSeek）逐段摘'],
+        ['全用便宜的模型']], other:true},
+ {id:'d2', type:'single', title:'费用上限？',
+  opts:[['继续和排版、调查共用每月 $30','',true],
+        ['概念研究单独一个上限（写在补充里）']]},
+ {id:'d3', type:'single', title:'每次发给模型之前要不要确认？',
+  opts:[['要，和前两版一样列出要发的内容和预计费用','',true],
+        ['预计费用低于某个数就不问（写在补充里，例如 $0.5）']]},
+
+ {part:'E', name:'分工与验收', lead:'v0.3 的做法：云端一口气做完能做的部分，本地一次性验收。'},
+ {id:'e1', type:'single', title:'怎么和云端分工？',
+  opts:[['同 v0.3：云端做纯逻辑、页面、合成夹具和测试；本地验收，接真实的书和模型','',true],
+        ['都在本地做'],
+        ['云端做得更多（写在补充里）']], other:true},
+ {id:'e2', type:'single', title:'云端测试用什么文字？',
+  opts:[['公有领域的英文原著（Cannan 版）加合成的中文片段','可以进 Git；云端能拿真实原文测段落切分和引用核对，不碰你的版本。',true],
+        ['只用合成的文字']]},
+ {id:'e3', type:'text', title:'v0.4「做完」的标准，你想怎么定？',
+  hint:'我的建议：分工三章（中英对照）做出概念卡 ≥ 15 张、论证卡 ≥ 5 张、一张关系图；每句原文引用逐字核对通过；三类内容标得清楚；你抽查 10 张，觉得准确、对复习有用。可以直接改数字或换说法。',
+  placeholder:'例如：同意建议 / 概念卡 ≥ 20 张 / 加上「中英对照没有错位」'},
+ {id:'e4', type:'text', title:'还有什么要补充？',
+  hint:'例如特别想弄懂的问题、喜欢的卡片样子、想参考的书或工具。',
+  placeholder:'自由填写'},
+];
+
+const KEY = 'pith-q3-draft';
+const DRAFT_DOC = 'drafts/round3';
+const ANSWER_DOC = 'answers/round3';
+const form = document.getElementById('form');
+const statusEl = document.getElementById('status');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const plain = s => String(s).replace(/<[^>]+>/g, '');
+
+// 渲染
+const parts = [];
+let cur = null, total = 0;
+Q.forEach(q => {
+  if (q.part) {
+    cur = {key:q.part, name:q.name, qs:[]}; parts.push(cur);
+    const s = document.createElement('section'); s.className = 'part'; s.id = 'sec-' + q.part.toLowerCase();
+    s.innerHTML = `<h2><b>${q.part}</b>${esc(q.name)}</h2>${q.lead ? `<p>${esc(q.lead)}</p>` : ''}`;
+    form.appendChild(s); return;
+  }
+  total++; cur.qs.push(q); q.label = cur.key + cur.qs.length;
+  const d = document.createElement('div'); d.className = 'q'; d.id = 'q-' + q.id;
+  const kind = q.type === 'multi' ? '可多选' : q.type === 'single' ? '单选' : '';
+  let h = `<div class="num">${q.label}${kind ? `<em>${kind}</em>` : ''}</div><h3 id="${q.id}-t">${esc(q.title)}</h3>`;
+  if (q.hint) h += `<p class="hint">${q.hint}</p>`;
+  if (q.type === 'single' || q.type === 'multi') {
+    const t = q.type === 'single' ? 'radio' : 'checkbox';
+    h += `<div class="opts" role="group" aria-labelledby="${q.id}-t">`;
+    q.opts.forEach((o, i) => {
+      h += `<label class="opt" for="${q.id}-${i}"><input type="${t}" id="${q.id}-${i}" name="${q.id}" value="${i}"><span class="lab">${esc(o[0])}${o[2] ? '<span class="rec">建议</span>' : ''}${o[1] ? `<span class="desc">${esc(o[1])}</span>` : ''}</span></label>`;
+    });
+    if (q.other) h += `<label class="opt" for="${q.id}-o"><input type="${t}" id="${q.id}-o" name="${q.id}" value="other"><span class="lab">其他</span></label>`;
+    h += `</div><div class="extra"><input type="text" id="${q.id}-note" placeholder="${q.other ? '选「其他」时写在这里；也可以补充说明' : '补充说明（可空）'}" aria-label="${esc(q.label)} 补充说明"></div>`;
+  } else {
+    h += `<textarea id="${q.id}-text" placeholder="${esc(q.placeholder || '自由填写')}" aria-labelledby="${q.id}-t"></textarea>`;
+  }
+  d.innerHTML = h; form.appendChild(d);
+});
+document.getElementById('qcount').textContent = total + ' 题';
+const chips = document.getElementById('chips');
+parts.forEach(p => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.id = 'chip-' + p.key;
+  b.addEventListener('click', () => document.getElementById('sec-' + p.key.toLowerCase()).scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}));
+  chips.appendChild(b);
+});
+
+// 状态
+const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+function answered(q) {
+  if (q.type === 'text') return !!val(q.id + '-text').trim();
+  return !!form.querySelector(`input[name="${q.id}"]:checked`);
+}
+function progress() {
+  let a = 0;
+  parts.forEach(p => {
+    const n = p.qs.filter(answered).length; a += n;
+    const c = document.getElementById('chip-' + p.key);
+    c.textContent = `${p.key} ${p.name} ${n}/${p.qs.length}`;
+    c.classList.toggle('full', n === p.qs.length);
+    p.qs.forEach(q => document.getElementById('q-' + q.id).classList.toggle('answered', answered(q)));
+  });
+  document.getElementById('pcount').textContent = `已答 ${a} / ${total}`;
+  document.getElementById('pbar').style.width = (100 * a / total) + '%';
+}
+function snapshot() {
+  const s = {};
+  form.querySelectorAll('input,textarea').forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') { if (el.checked) s[el.name + '=' + el.value] = 1; }
+    else if (el.value) s['#' + el.id] = el.value;
+  });
+  return s;
+}
+function apply(s) {
+  form.querySelectorAll('input,textarea').forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') el.checked = !!s[el.name + '=' + el.value];
+    else el.value = s['#' + el.id] || '';
+  });
+  progress();
+}
+function localLoad() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+function localSave(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+
+// 远端存储（Artifact 的 db）；拿不到就只用本机草稿 + 复制
+let db = null, writing = Promise.resolve(), draftTimer = null, lastDraft = '';
+function queueWrite(path, body) {
+  writing = writing.then(() => db.doc(path).set(body)).catch(e => { setStatus('保存到云端失败：' + (e && e.message || e) + '。可以用「复制 Markdown」粘贴回对话。'); });
+  return writing;
+}
+function scheduleDraft(s) {
+  if (!db) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const json = JSON.stringify(s);
+    if (json === lastDraft) return;
+    lastDraft = json;
+    queueWrite(DRAFT_DOC, {state: json, savedAt: new Date().toISOString()});
+  }, 1500);
+}
+function onChange() { const s = snapshot(); localSave(s); scheduleDraft(s); progress(); }
+form.addEventListener('input', onChange);
+form.addEventListener('change', onChange);
+form.addEventListener('submit', e => e.preventDefault());
+
+function setStatus(t, ok) { statusEl.textContent = t; statusEl.classList.toggle('ok', !!ok); }
+
+const initial = localLoad();
+if (initial) apply(initial); else progress();
+
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('db').then(async d => {
+    if (!d) return;
+    db = d;
+    try {
+      if (!initial) {
+        const snap = await db.doc(DRAFT_DOC).get();
+        if (snap.exists) { const st = snap.data().state; if (typeof st === 'string') { lastDraft = st; apply(JSON.parse(st)); localSave(JSON.parse(st)); } }
+      }
+      const done = await db.doc(ANSWER_DOC).get();
+      if (done.exists && done.data().submittedAt) setStatus('上次提交于 ' + fmt(done.data().submittedAt) + '。改了可以再提交一次，以最后一次为准。', true);
+    } catch (e) {}
+  }).catch(() => {});
+}
+function fmt(iso) { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('zh-CN', {hour12: false}); }
+
+// 生成 Markdown
+function gen() {
+  const now = new Date();
+  let md = `# Pith · 第三轮问卷回答（v0.4 开发计划）\n\n> 生成时间：${now.toLocaleString('zh-CN', {hour12: false})}\n\n`;
+  Q.forEach(q => {
+    if (q.part) { md += `## ${q.part} · ${q.name}\n\n`; return; }
+    md += `**${q.label}. ${plain(q.title)}**\n\n`;
+    if (q.type === 'text') {
+      const t = val(q.id + '-text').trim();
+      md += (t ? t.split('\n').map(l => '> ' + l).join('\n') : '> （未答）') + '\n\n';
+      return;
+    }
+    const note = val(q.id + '-note').trim();
+    const sel = [...form.querySelectorAll(`input[name="${q.id}"]:checked`)].map(el => el.value === 'other' ? `其他：${note || '（未填）'}` : q.opts[+el.value][0]);
+    md += sel.length ? sel.map(s => `- ${s}`).join('\n') + '\n' : '- （未答）\n';
+    const otherPicked = sel.some(s => s.startsWith('其他：'));
+    if (note && !otherPicked) md += `- 补充：${note}\n`;
+    md += '\n';
+  });
+  const out = document.getElementById('out'); document.getElementById('md').value = md; out.classList.add('show');
+  return md;
+}
+
+document.getElementById('submit').addEventListener('click', async () => {
+  const md = gen();
+  const btn = document.getElementById('submit');
+  if (!db) { setStatus('这里没法直接提交。请点「复制 Markdown」，粘贴回对话。'); document.getElementById('out').scrollIntoView(); return; }
+  btn.disabled = true; setStatus('正在提交…');
+  const at = new Date().toISOString();
+  const body = {markdown: md, state: JSON.stringify(snapshot()), submittedAt: at, answered: parts.reduce((n, p) => n + p.qs.filter(answered).length, 0), total};
+  let ok = true;
+  writing = writing.then(() => db.doc(ANSWER_DOC).set(body)).catch(e => { ok = false; setStatus('提交失败：' + (e && e.message || e) + '。请点「复制 Markdown」，粘贴回对话。'); });
+  await writing;
+  btn.disabled = false;
+  if (ok) setStatus('已提交（' + fmt(at) + '）。回到对话说一声「填好了」即可。', true);
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  const md = gen();
+  try { await navigator.clipboard.writeText(md); setStatus('已复制，可以粘贴回对话。', true); }
+  catch (e) { const ta = document.getElementById('md'); ta.focus(); ta.select(); setStatus('浏览器不让自动复制，已选中下方文本，请手动复制。'); }
+});
+
+const resetBtn = document.getElementById('reset');
+let resetArmed = null;
+resetBtn.addEventListener('click', () => {
+  if (!resetArmed) {
+    resetBtn.textContent = '再点一次确认清空';
+    resetArmed = setTimeout(() => { resetArmed = null; resetBtn.textContent = '清空草稿'; }, 3000);
+    return;
+  }
+  clearTimeout(resetArmed); resetArmed = null; resetBtn.textContent = '清空草稿';
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  apply({}); scheduleDraft({});
+  document.getElementById('out').classList.remove('show');
+  setStatus('草稿已清空。已提交过的回答不受影响。');
+});
+</script>
+</body>
+</html>

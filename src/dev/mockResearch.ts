@@ -43,6 +43,8 @@ let settings: ResearchSettings = {
   planWebSearches: 3,
   trust: { tiers: {} },
   prices: { models: {}, tavilyCreditUsd: null, claudeSearchUsd: null },
+  webFetchFallback: true,
+  fetchModel: "claude-haiku-5-5",
 };
 const keys = { anthropic: false, deepseek: false, tavily: false };
 const DEFAULT_TIERS: Record<string, ResearchTier> = {
@@ -330,7 +332,7 @@ export const researchHandlers: Record<string, (a: Args) => unknown> = {
     const url = String(a.url).trim();
     if (!/^https?:\/\//.test(url) && !url.startsWith("/")) fail("要填 http(s) 开头的网址，或者选一个本机文件。");
     if (!v.run.sources.some((s) => s.url === url)) {
-      v.run.sources.push({ id: `S${v.run.sources.length + 1}`, url, origin: "manual", subQuestions: [], title: "", finalUrl: null, fetchedAt: null, sha256: null, kind: null, contentType: null, ext: null, bytes: 0, textChars: 0, fetchError: null, textError: null, extracted: false, readChars: 0, truncated: false, extractError: null, publisher: "", published: "", tier: null, itemId: null });
+      v.run.sources.push({ id: `S${v.run.sources.length + 1}`, url, origin: "manual", subQuestions: [], title: "", finalUrl: null, fetchedAt: null, fetchedVia: null, sha256: null, kind: null, contentType: null, ext: null, bytes: 0, textChars: 0, fetchError: null, textError: null, extracted: false, readChars: 0, truncated: false, extractError: null, publisher: "", published: "", tier: null, itemId: null });
     }
     return toView(v);
   },
@@ -373,7 +375,7 @@ export const researchHandlers: Record<string, (a: Args) => unknown> = {
     tickets.delete(Number(a.ticket));
     if (running) fail("上一次调查还在进行。等它做完，或者先停止。");
     const m = missing();
-    if (m.length) fail(`还没有填 ${m.join("、")} 的 API 密钥。到「设置 › 事实调查」填写后再试。`);
+    if (m.length) fail(`还没有填 ${m.join("、")} 的 API 密钥。到「设置 › 密钥与费用」填写后再试。`);
     const v = findView(a.uid);
     v.planEditable = false;
     void execute(v);

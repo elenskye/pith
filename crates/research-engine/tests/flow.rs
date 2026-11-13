@@ -499,3 +499,48 @@ fn the_user_can_drop_sub_questions_before_running() {
     assert!(run.conclusions[0].issues.is_empty() && run.conclusions[0].text().contains("48200个"));
     assert_eq!(audit::audit(&run, &mut texts(1)), []);
 }
+
+/// 本机下载失败、由别的办法（Claude 网页抓取）拿到的来源：来源上记着、费用记成一步、报告里写明（`decisions/0023`）
+struct Rescue(MockFetch);
+
+impl Fetch for Rescue {
+    fn fetch(&self, url: &str, cancel: &AtomicBool) -> Result<Fetched, String> {
+        match self.0.fetch(url, cancel) {
+            Err(why) if url.ends_with(fixture::MISSING) => Ok(Fetched {
+                final_url: url.into(),
+                fetched_at: "2026-11-12T09:00:01".into(),
+                sha256: "ab".repeat(32),
+                kind: "text".into(),
+                content_type: Some("text/plain".into()),
+                ext: "txt".into(),
+                bytes: 40,
+                title: Some("抓到的旧公报".into()),
+                text: Ok("2023 年示例市旧公报：这一页只有一些说明文字，没有数字。".into()),
+                via: Some(research_engine::ports::Via { how: "claude_web_fetch".into(), download_error: why, provider: "anthropic".into(), model: "claude-haiku-5-5".into(), usage: research_engine::ports::Usage { input_tokens: 3000, output_tokens: 20, searches: 0, cost_usd: 0.0016 } }),
+            }),
+            other => other,
+        }
+    }
+
+    fn text(&self, source: &Source) -> Result<String, String> {
+        if source.url.ends_with(fixture::MISSING) { Ok("2023 年示例市旧公报：这一页只有一些说明文字，没有数字。".into()) } else { self.0.text(source) }
+    }
+}
+
+#[test]
+fn a_source_rescued_by_claude_web_fetch_is_marked_and_charged() {
+    let mut kit = Kit::new(1);
+    kit.fetch = Box::new(Rescue(MockFetch::new(1)));
+    let run = kit.investigate();
+    let s = run.sources.iter().find(|s| s.url.ends_with(fixture::MISSING)).expect("夹具里有这个 404 的来源");
+    assert_eq!((s.fetched_via.as_deref(), s.fetch_error.as_deref()), (Some("claude_web_fetch"), None));
+    assert!(s.usable());
+    let step = run.steps.iter().find(|x| x.label.contains("改用 Claude 网页抓取")).expect("费用记成一步");
+    assert_eq!((step.kind, step.provider.as_str(), step.model.as_str()), (StepKind::Download, "anthropic", "claude-haiku-5-5"));
+    assert!(step.label.contains("404") && (step.cost_usd - 0.0016).abs() < 1e-12);
+    assert!(run.cost_usd() >= 0.0016);
+    let r = report::build(&run, None);
+    assert_eq!(r.totals.fetched_by_claude, 1);
+    assert!(r.notes.iter().any(|n| n.contains("改用 Claude 网页抓取")), "{:?}", r.notes);
+    assert!(render::markdown(&render::document(&r)).contains("经 Claude 网页抓取"));
+}

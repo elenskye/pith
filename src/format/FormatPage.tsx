@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, Plus } from "lucide-react";
 import { api, type FormatExtractPreview } from "@/shared/ipc";
 import { useUi } from "@/shared/ui";
-import { usd, when } from "@/format/labels";
-import { Badge, Notice, Page } from "@/format/parts";
+import { usd } from "@/format/labels";
+import { Notice, Page } from "@/format/parts";
 import { ExtractSend } from "@/format/SendConfirm";
 import { RulesetView } from "@/format/RulesetView";
 import { RunView } from "@/format/RunView";
@@ -47,7 +47,7 @@ function RulesetList({ onOpen, onSettings }: { onOpen: (id: string) => void; onS
   const s = status.data;
   return (
     <Page
-      crumbs={[{ label: "排版" }]}
+      crumbs={[{ label: "排版" }, { label: "新建规范" }]}
       actions={
         <button onClick={create} disabled={preparing} className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground disabled:opacity-50">
           {preparing ? <LoaderCircle size={13} className="animate-spin" /> : <Plus size={13} />}
@@ -75,44 +75,23 @@ function RulesetList({ onOpen, onSettings }: { onOpen: (id: string) => void; onS
         <Notice title="还没有填 Anthropic API 密钥。">
           提炼要求、生成计划要用它。
           <button onClick={onSettings} className="ml-1 text-primary hover:underline">
-            去「设置 › 排版 Agent」填写
+            去「设置 › 密钥与费用」填写
           </button>
         </Notice>
       )}
       {error && <p className="selectable text-xs whitespace-pre-wrap text-destructive">{error}</p>}
       {list.error && <p className="selectable text-xs text-destructive">{String(list.error)}</p>}
 
-      {list.data && list.data.length === 0 ? (
-        <div className="rounded-md border border-dashed px-4 py-8 text-center text-xs text-muted-foreground">
-          <p>还没有规范。</p>
-          <p className="mt-1">点「新建规范」，选学校发的规范文档（.docx、.doc、.rtf、.txt、.md，可多选；PDF 请先另存为 Word 或文本）。</p>
-        </div>
-      ) : (
-        <ul className="divide-y rounded-md border">
-          {(list.data ?? []).map((r) => (
-            <li key={r.id}>
-              <button onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/60">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium" title={r.name}>
-                    {r.name}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground" title={r.docs.join("\n")}>
-                    {r.docs.join("、")}
-                  </p>
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    {when(r.createdAt)} · {r.requirements} 条要求 · {r.runs} 份论文
-                  </p>
-                </div>
-                {r.mock && (
-                  <Badge tone="warn" title="模拟模型给的示例，不是真的提炼结果">
-                    模拟
-                  </Badge>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="rounded-md border border-dashed px-4 py-8 text-center text-xs text-muted-foreground">
+        {list.data && list.data.length > 0 ? (
+          <p>在左边选一套规范，或者点「新建规范」再加一套。</p>
+        ) : (
+          <>
+            <p>还没有规范。</p>
+            <p className="mt-1">点「新建规范」，选学校发的规范文档（.docx、.doc、.rtf、.txt、.md，可多选；PDF 请先另存为 Word 或文本）。</p>
+          </>
+        )}
+      </div>
 
       {preview && (
         <ExtractSend

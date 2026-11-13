@@ -4,19 +4,23 @@ import { TriangleAlert } from "lucide-react";
 import { api } from "@/shared/ipc";
 import { UiProvider } from "@/shared/ui";
 import { Sidebar, type Scope, type View } from "@/library/Sidebar";
+import { Rail, type Module } from "@/app/Rail";
 import { ItemList, type Selection } from "@/library/ItemList";
 import { DetailPane } from "@/library/ItemDetail";
-import { SettingsPage } from "@/settings/SettingsPage";
+import { SettingsNav, SettingsPage, type SettingsSection } from "@/settings/SettingsPage";
 import { ImportPage } from "@/import/ImportPage";
 import { FormatPage, type FormatAt } from "@/format/FormatPage";
+import { FormatSidebar } from "@/format/FormatSidebar";
 import { ResearchPage, type ResearchAt } from "@/research/ResearchPage";
+import { ResearchSidebar } from "@/research/ResearchSidebar";
 import { ReadContext } from "@/reader/useRead";
 import { MetadataProvider } from "@/metadata/MetadataProvider";
 
 // 阅读器连同 pdf.js 单独打包，第一次阅读时才加载
 const Reader = lazy(() => import("@/reader/Reader"));
 
-/** 三栏外框：左侧文献库导航，中间列表，右侧详情；设置页、导入页、排版页、调查页占中右两栏。
+/** 外框：最左一列切换主页面（文献库、排版、调查）和设置，每个主页面有自己的侧栏（decisions/0023）。
+ *  文献库是三栏：导航 / 列表 / 详情；导入页占中右两栏。排版、调查、设置是侧栏 + 一页。
  *  阅读 PDF 时阅读器占满窗口；文献库只是藏起来（搜索词、滚动位置都还在），返回就回到原样。 */
 export function App() {
   return (
@@ -27,7 +31,10 @@ export function App() {
 }
 
 function Shell() {
+  const [module, setModule] = useState<Module>("library");
+  // 文献库里看的是列表还是导入页
   const [view, setView] = useState<View>("library");
+  const [settingsAt, setSettingsAt] = useState<SettingsSection>("general");
   const [scope, setScope] = useState<Scope>({ kind: "all" });
   const [tags, setTags] = useState<string[]>([]);
   const [selection, setSelection] = useState<Selection[]>([]);
@@ -44,6 +51,21 @@ function Shell() {
     setSelection([]);
     setTags([]);
     setView("library");
+    setModule("library");
+  };
+  // 排版、调查里「去填密钥」
+  const toKeys = () => {
+    setSettingsAt("keys");
+    setModule("settings");
+  };
+  // 点最左一列：换主页面；点的就是现在这一页，回到它的起点
+  const pickModule = (m: Module) => {
+    if (m === module) {
+      if (m === "format") setFormatAt({ rulesetId: null, runId: null });
+      if (m === "research") setResearchAt({ uid: null });
+      if (m === "library") setView("library");
+    }
+    setModule(m);
   };
   const scopeKey = scope.kind === "collection" ? `c${scope.id}` : scope.kind;
   // 联网补全一轮结束后「去确认」：打开「待确认的补全」（只用到 setState，引用稳定）
@@ -53,6 +75,7 @@ function Shell() {
     setSelection([]);
     setTags([]);
     setView("library");
+    setModule("library");
   }, []);
 
   // 库被整个换掉（恢复）：选择、筛选、范围回到初始，留在设置页看结果
@@ -82,6 +105,7 @@ function Shell() {
                   onShowItem={(id) => {
                     setReading(null);
                     setView("library");
+                    setModule("library");
                     setSelection([{ kind: "item", id }]);
                   }}
                 />
@@ -89,34 +113,46 @@ function Shell() {
             </ReaderBoundary>
           )}
           <div className={`flex min-h-0 flex-1 ${reading !== null ? "hidden" : ""}`}>
-            <Sidebar
-              view={view}
-              scope={scope}
-              onScope={choose}
-              onView={(v) => {
-                // 已经在排版 / 调查页时再点侧栏的这一项：回到它的列表（从设置回来时仍停在原处）
-                if (v === view && v === "format") setFormatAt({ rulesetId: null, runId: null });
-                if (v === view && v === "research") setResearchAt({ uid: null });
-                setView(v);
-              }}
-              tags={tags}
-              onTags={(t) => {
-                setTags(t);
-                setView("library");
-              }}
-            />
-            {view === "settings" ? (
-              <SettingsPage onRestored={afterRestore} />
-            ) : view === "import" ? (
-              <ImportPage onDone={() => choose({ kind: "all" })} />
-            ) : view === "format" ? (
-              <FormatPage at={formatAt} onAt={setFormatAt} onSettings={() => setView("settings")} />
-            ) : view === "research" ? (
-              <ResearchPage at={researchAt} onAt={setResearchAt} onSettings={() => setView("settings")} />
-            ) : (
+            <Rail module={module} onModule={pickModule} />
+            {module === "library" && (
               <>
-                <ItemList key={scopeKey} scope={scope} tags={tags} selection={selection} onSelection={setSelection} onImport={() => setView("import")} />
-                <DetailPane selection={selection} onSelection={setSelection} scope={scope} />
+                <Sidebar
+                  view={view}
+                  scope={scope}
+                  onScope={choose}
+                  onView={setView}
+                  tags={tags}
+                  onTags={(t) => {
+                    setTags(t);
+                    setView("library");
+                  }}
+                />
+                {view === "import" ? (
+                  <ImportPage onDone={() => choose({ kind: "all" })} />
+                ) : (
+                  <>
+                    <ItemList key={scopeKey} scope={scope} tags={tags} selection={selection} onSelection={setSelection} onImport={() => setView("import")} />
+                    <DetailPane selection={selection} onSelection={setSelection} scope={scope} />
+                  </>
+                )}
+              </>
+            )}
+            {module === "format" && (
+              <>
+                <FormatSidebar at={formatAt} onAt={setFormatAt} />
+                <FormatPage at={formatAt} onAt={setFormatAt} onSettings={toKeys} />
+              </>
+            )}
+            {module === "research" && (
+              <>
+                <ResearchSidebar at={researchAt} onAt={setResearchAt} />
+                <ResearchPage at={researchAt} onAt={setResearchAt} onSettings={toKeys} />
+              </>
+            )}
+            {module === "settings" && (
+              <>
+                <SettingsNav section={settingsAt} onSection={setSettingsAt} />
+                <SettingsPage section={settingsAt} onSection={setSettingsAt} onRestored={afterRestore} />
               </>
             )}
           </div>

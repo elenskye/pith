@@ -8,17 +8,19 @@
 personal-research-lab/
 ├── src/                        前端（React 19 + TypeScript + Tailwind v4）
 │   ├── main.tsx                入口；?mock 时装上浏览器内的假后端；?window=picker 是置顶搜索窗；关掉文本框的系统输入辅助（shared/plainInputs.ts）
-│   ├── app/App.tsx             三栏外框：导航 / 文献列表 / 详情；设置页占右侧两栏；阅读时阅读器占满窗口
+│   ├── app/                    App.tsx（外框：最左一列切换主页面，各主页面有自己的侧栏；阅读时阅读器占满窗口）、
+│   │                           Rail（文献库 / 排版 / 调查 + 设置，`decisions/0023`）、SideNav（排版、调查、设置共用的侧栏外框与条目）
 │   ├── library/                Sidebar（文献库视图、集合树、标签筛选）、ItemList（搜索、筛选、排序、多选、右键菜单）、
 │   │                           ItemDetail（可编辑详情、批量面板、合并）、labels（中文名）
 │   ├── shared/ui.tsx           弹窗（确认 / 输入 / 选集合）、右键菜单、提示条、就地编辑、标签输入（带提示）、useMutate、useStoredState
 │   ├── settings/               SettingsPage（数据目录、数据库版本、备份列表：立即备份 / 恢复）、Transfer（整库导出、从导出恢复、恢复结果）、
 │   │                           WordSettings（安装 / 卸载 Word 模板、服务与排版器状态）、CiteSettings（引文样式与导入 .csl、Word 外转换 Zotero 文档）、
-│   │                           ResearchSettings（事实调查：三把密钥、模型、专用搜索、单价、可信度等级表、月上限）
+│   │                           KeysSettings（密钥与费用：三把密钥、共用的月度上限）、ResearchSettings（事实调查：模型、专用搜索、网页抓取后备、单价、可信度等级表）；
+│   │                           SettingsPage 分两组七页（`decisions/0023`）
 │   ├── picker/Picker.tsx       置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码
 │   ├── shared/ipc.ts           带类型的 api 对象，唯一的 invoke 入口
 │   ├── dev/mockIpc.ts          `pnpm dev` → http://localhost:1430/?mock，合成数据，打包时剔除；mockResearch.ts / .json 是调查页的假后端（数据由引擎生成）
-│   ├── research/               事实调查页（v0.3）：ResearchPage（提问、问题和各次调查）、Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、
+│   ├── research/               事实调查页（v0.3）：ResearchSidebar（问过的问题和各次调查）、ResearchPage（新调查）、Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、
 │   │                           Result（短答、点数字看原文、全过程、导出、加入文献库、重查对比）、labels
 │   ├── cite/                   引文排版（v0.2）：renderer（听 cite-render 事件、交回结果）、engine（citeproc-js；GB/T 页码在方括号外、前后缀）、
 │   │                           runs（HTML → 带格式片段）、resources（内置样式打包、导入样式向 Rust 要）、styles.json（内置样式清单，Rust 也读）、
@@ -28,7 +30,7 @@ personal-research-lab/
 │   └── reader/                 阅读器（单独打包，第一次阅读时加载）：Reader（工具栏、浮动工具条、查找）、
 │                               controller（pdf.js 的 PDFViewer、标注层、选区 → PDF 坐标）、AnnotationList、useRead
 ├── src-tauri/                  Rust 后端（唯一读写 SQLite 的地方）
-│   ├── migrations/             0001_library … 0006_research；顺序编号，用过永不改
+│   ├── migrations/             0001_library … 0007_research_fetch；顺序编号，用过永不改
 │   ├── word/                   Word 一侧的源文件：Pith.bas（宏，ASCII）、customUI.xml（选项卡）、images/（选项卡图标 PNG）、Pith.applescript、pith-bridge.sh
 │   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）；
 │   │                           research/（虚构「示例市」的网页、统计表原件，录制的 Anthropic / DeepSeek / Tavily 回复）
@@ -60,8 +62,8 @@ personal-research-lab/
 │                               secret（密钥：正式版钥匙串，其余内存或文件）、extract（提炼要求、出处核对、数值换算、合成规范）、
 │       │                       planner（论文 → 给模型看的文字、文档计划的核对与预览）、apply（排版、校验、只检查项、报告）、store（成果存档）
 │       └── research/           事实调查（v0.3，`decisions/0020`、`0022`）：commands（`research_*` 命令、设置、组装接口、后台执行）、store（存进 research_* 表）、
-│                               anthropic（流式、网页搜索、pause_turn；ClaudeSearch）、openai（OpenAI 兼容，DeepSeek）、tavily、meter（发送前按最坏情况查月上限、记账）、
-│                               download（本机下载：限速、拒内网、自己跟跳转）、content（HTML / PDF / XLSX / CSV / DOCX 取正文）、snapshot（快照文件）、
+│                               anthropic（流式、网页搜索、pause_turn；ClaudeSearch；ClaudeFetch：下载失败时的网页抓取）、openai（OpenAI 兼容，DeepSeek）、tavily、meter（发送前按最坏情况查月上限、记账）、
+│                               download（本机下载：限速、拒内网、自己跟跳转；WithFallback：失败了改用 Claude 网页抓取）、content（HTML / PDF / XLSX / CSV / DOCX 取正文）、snapshot（快照文件）、
 │                               docx（Word 导出）、library（加入文献库）、fixtures / testing（合成原件、本地假服务器）
 ├── crates/zotero-import/       Zotero 只读读取 + 审计 + 合成夹具（src-tauri 以 path 依赖引用）
 ├── crates/research-engine/     事实调查的纯逻辑（只依赖 serde）：流程、提示词与解析、核对、认数与精确十进制、计算、可信度、结论核对、
@@ -206,10 +208,11 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - 带网页搜索的请求不加结构化输出：网页搜索的引用总是开着，而引用和 `output_config.format` 不能同时用（官方文档）；靠提示词 + 宽容解析。不带搜索的计划、结论用 JSON Schema。
 - 费用：每次调用前按最坏情况（输入估计 ×1.1 + 输出写满 + 搜索用满）查月度上限（和排版 Agent 共用，默认 $30）；记账按接口返回的用量，缓存命中也按原价，宁多勿少；模拟接口记一行「模拟」不算钱。
 - 下载：外来网址不下本机和内网；跳转自己跟、每一跳都检查；类型按内容判断；同一站点间隔 1.5 秒；User-Agent 只有 `Pith/版本`。
+- 下载失败的后备（`decisions/0023`）：本机下载失败、网址是外网的 http(s)、设置开着并且有 Anthropic 密钥时，用 `web_fetch_20250910`（默认 Haiku 5.5）抓一次；拿到的文字或 PDF 照常存快照、取文字。费用按最坏情况查上限、记账，并记成「下载」那一步的一行；来源标 `fetched_via = claude_web_fetch`，报告写明。
 - 快照：`数据目录/research/sources/<sha256 前两位>/<sha256>.<扩展名>` + `.txt`，只读、同内容一份，删调查后清理没人用的。
 - 加入文献库：来源 → 网页 / 报告条目，原件作附件（附件 SHA-256 去重），同一网址已有的连上不重建；先做「导入前」备份。
 - Word 导出不改文档引擎：`research/docx.rs` 用 `docx_engine::package::Package` 拼最小的 .docx（标题、表格、列表、外链、书签与文档内跳转）。
-- 密钥：Anthropic 和排版 Agent 共用一把（`agent.key_saved`）；DeepSeek、Tavily 各一个钥匙串条目（`deepseek-api-key`、`tavily-api-key`）。和排版 Agent 一样，只有正式版用钥匙串和真接口。
+- 密钥：Anthropic 和排版 Agent 共用一把（`agent.key_saved`）；DeepSeek、Tavily 各一个钥匙串条目（`deepseek-api-key`、`tavily-api-key`）。和排版 Agent 一样，只有正式版用钥匙串和真接口。三把密钥和月度上限都在「设置 › 密钥与费用」。
 - 命令（`research_*`，21 个）：status / settings_set / key_set / key_clear；questions_list / question_get；plan_prepare → plan_run；run_get；plan_update / source_add / source_remove；execute_prepare → execute；cancel；rerun；export / reveal；add_to_library；run_delete / question_delete。
 
 ## 联网（`decisions/0004`、`0012`）

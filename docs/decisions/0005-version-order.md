@@ -15,3 +15,5 @@
 
 与 Brief 原顺序的差别：Academic 从 v0.4 后移到 v0.6，Concept / WonderLab 前移。
 视觉设计与 Visual Atelier 联动安排在开发中期（约 v0.3 前后），v0.1 / v0.2 只求简约。
+
+2026-11-12 更新（用户定）：视觉设计与 Visual Atelier 联动改到 v0.7 之后；在那之前各版本只求简约。

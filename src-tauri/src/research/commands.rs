@@ -25,8 +25,8 @@ use research_engine::{flow, prompts, render};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use super::anthropic::{self, Anthropic, ClaudeSearch};
-use super::download::Downloader;
+use super::anthropic::{self, Anthropic, ClaudeFetch, ClaudeSearch};
+use super::download::{Downloader, WithFallback};
 use super::meter::{self, Logged, Meter};
 use super::openai::{self, OpenAiCompatible};
 use super::snapshot::Snapshots;
@@ -76,6 +76,10 @@ pub struct Settings {
     pub trust: TrustTable,
     /// 单价覆盖
     pub prices: Prices,
+    /// 本机下载失败时改用 Claude 网页抓取（要 Anthropic 的密钥；没填就不用，`decisions/0023`）
+    pub web_fetch_fallback: bool,
+    /// 网页抓取用的模型：只是调一次工具，便宜的就行
+    pub fetch_model: String,
 }
 
 impl Default for Settings {
@@ -88,6 +92,8 @@ impl Default for Settings {
             plan_web_searches: 3,
             trust: TrustTable::default(),
             prices: Prices::default(),
+            web_fetch_fallback: true,
+            fetch_model: anthropic::FETCH_MODEL.into(),
         }
     }
 }
@@ -118,6 +124,10 @@ impl Settings {
         }
         if self.plan_web_searches > 10 {
             return Err("计划时的网页搜索最多 10 次。".into());
+        }
+        let fm = self.fetch_model.trim();
+        if self.web_fetch_fallback && (fm.is_empty() || fm.len() > 80 || !fm.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))) {
+            return Err("网页抓取的模型名不对：只能有英文字母、数字和 . - _，不超过 80 个字符。".into());
         }
         self.prices.check()
     }
@@ -274,7 +284,7 @@ fn missing_keys(state: &AppState, agent: &AgentState, research: &ResearchState, 
 }
 
 fn load_key(which: ApiKey, agent: &AgentState, research: &ResearchState) -> Result<String, String> {
-    secret_of(which, agent, research).load()?.ok_or_else(|| format!("还没有填 {} 的 API 密钥。到「设置 › 事实调查」填写后再试。", which.label()))
+    secret_of(which, agent, research).load()?.ok_or_else(|| format!("还没有填 {} 的 API 密钥。到「设置 › 密钥与费用」填写后再试。", which.label()))
 }
 
 // ---------- 接口的组装 ----------
@@ -283,7 +293,7 @@ struct Kit {
     planner: Box<dyn Model>,
     worker: Box<dyn Model>,
     search: Box<dyn Search>,
-    fetch: Downloader,
+    fetch: WithFallback,
 }
 
 fn model_for(e: &Endpoint, key: String, meter: &Arc<Meter>) -> Box<dyn Model> {
@@ -314,7 +324,7 @@ fn kit(state: &AppState, agent: &AgentState, research: &ResearchState, s: &Setti
             planner: Box::new(Logged { inner: planner, ledger: Ledger::new(root), now }),
             worker: Box::new(Logged { inner: worker, ledger: Ledger::new(root), now }),
             search: Box::new(Logged { inner: search, ledger: Ledger::new(root), now }),
-            fetch: Downloader::mock(root, round),
+            fetch: WithFallback { inner: Downloader::mock(root, round), claude: None },
         });
     }
     let meter = Arc::new(Meter::new(root, format_agent::budget(state), s.prices.clone()));
@@ -324,9 +334,16 @@ fn kit(state: &AppState, agent: &AgentState, research: &ResearchState, s: &Setti
     let search: Box<dyn Search> = if s.search_engine() == CLAUDE_WEB_SEARCH {
         Box::new(ClaudeSearch { model: Anthropic::new(s.worker.base_url.as_deref(), worker_key, s.worker.model.trim(), meter.clone()) })
     } else {
-        Box::new(Tavily::new(None, load_key(ApiKey::Tavily, agent, research)?, s.tavily_depth, meter))
+        Box::new(Tavily::new(None, load_key(ApiKey::Tavily, agent, research)?, s.tavily_depth, meter.clone()))
     };
-    Ok(Kit { planner, worker, search, fetch: Downloader::real(root) })
+    // 下载失败的后备：开着、并且填了 Anthropic 的密钥才用（没填不报错，下载失败照旧记原因）
+    let claude = if s.web_fetch_fallback {
+        let base = (s.planner.provider == anthropic::PROVIDER).then_some(s.planner.base_url.as_deref()).flatten();
+        load_key(ApiKey::Anthropic, agent, research).ok().map(|key| ClaudeFetch { model: Anthropic::new(base, key, s.fetch_model.trim(), meter.clone()) })
+    } else {
+        None
+    };
+    Ok(Kit { planner, worker, search, fetch: WithFallback { inner: Downloader::real(root), claude } })
 }
 
 struct DbRecorder<'a> {
@@ -582,6 +599,17 @@ fn execute_estimate(run: &Run, s: &Settings) -> (Vec<EstimateLine>, usize, usize
         let max = meter::worst_case(&s.prices, model, &probe(limits.chunk_chars), 0.0) * (max_sources * limits.chunks_per_source) as f64;
         lines.push(EstimateLine { label: format!("摘证据（{model}）"), count: max_sources, typical_usd: typical, max_usd: max });
     }
+    // 下载失败的改用 Claude 网页抓取：按一成失败估一般情况，最多按四分之一算
+    if s.web_fetch_fallback && run.stage <= Stage::Download && max_sources > 0 {
+        let model = s.fetch_model.trim();
+        let (typical_n, max_n) = (typical_sources.div_ceil(10), max_sources.div_ceil(4));
+        lines.push(EstimateLine {
+            label: format!("下载失败的改用 Claude 网页抓取（{model}，按失败的个数）"),
+            count: max_n,
+            typical_usd: ClaudeFetch::typical_usd(&s.prices, model, "https://example.invalid/") * typical_n as f64,
+            max_usd: ClaudeFetch::worst_usd(&s.prices, model, "https://example.invalid/") * max_n as f64,
+        });
+    }
     if run.stage <= Stage::Conclude {
         let mut req = prompts::conclude_request(&run.question, &run.plan, &[], &[], &run.config.trust, None);
         req.user.push("字".repeat(40 * 120));
@@ -832,7 +860,7 @@ pub fn research_execute(app: AppHandle, state: State<AppState>, agent: State<Age
     // 先把密钥这类问题挡在前面（不在后台线程里才发现）
     let missing = missing_keys(&state, &agent, &research, &settings(&state));
     if !missing.is_empty() {
-        return Err(format!("还没有填 {} 的 API 密钥。到「设置 › 事实调查」填写后再试。", missing.join("、")));
+        return Err(format!("还没有填 {} 的 API 密钥。到「设置 › 密钥与费用」填写后再试。", missing.join("、")));
     }
     research.claim(&uid)?;
     let app = app.clone();
@@ -1066,7 +1094,9 @@ mod tests {
         let (lines, queries, max_sources) = execute_estimate(&run, &s);
         assert_eq!(queries, 7);
         assert_eq!(max_sources, 35);
-        assert_eq!(lines.len(), 3);
+        // 检索、摘证据、下载失败的改用网页抓取（默认开着）、结论
+        assert_eq!(lines.len(), 4);
+        assert!(lines[2].label.contains("Claude 网页抓取") && lines[2].count == 9);
         assert!((lines[0].max_usd - 7.0 * 0.008).abs() < 1e-9);
         assert!(lines.iter().all(|l| l.typical_usd <= l.max_usd && l.typical_usd > 0.0));
         // 做到结论那一步了：只剩结论
@@ -1092,6 +1122,7 @@ mod tests {
     /// 2. 做完：同上，`PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>`：检索 → 下载 → 摘证据 → 核对 → 结论，
     ///    审计、导出三种格式、把用到的来源加入文献库，打印小结（`PITH_STAGE=export` 只重新审计、导出，不联网）；
     /// 3. 重查：`PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按第 2 步做新的这一次。
+    /// 4. 只试下载：`PITH_STAGE=fetch PITH_URLS=<网址,网址>`：本机下载，失败的改用 Claude 网页抓取，打印拿到了什么、花了多少。
     #[test]
     #[ignore]
     fn real_research_run() {
@@ -1188,7 +1219,133 @@ mod tests {
                     println!("加入文献库 {} 条：{}", added.len(), added.iter().map(|a| format!("{}→{}{}", a.key, a.item_id, if a.attachment_id.is_some() { "（带附件）" } else { "" })).collect::<Vec<_>>().join("、"));
                 }
             }
+            "fetch" => {
+                // 只试下载（本机下载失败的改用 Claude 网页抓取），不摘证据：PITH_URLS 用逗号隔开
+                use research_engine::ports::Fetch;
+                let urls = env("PITH_URLS").expect("要设 PITH_URLS");
+                // 只要 Anthropic 的密钥（和 App 里一样的单价、上限、模型）
+                let meter = Arc::new(Meter::new(&root, format_agent::budget(&state), s.prices.clone()));
+                let key = load_key(ApiKey::Anthropic, &agent, &research).unwrap();
+                let fetch = WithFallback { inner: Downloader::real(&root), claude: Some(ClaudeFetch { model: Anthropic::new(None, key, s.fetch_model.trim(), meter) }) };
+                // PITH_CLAUDE_ONLY=1：跳过本机下载，直接让 Claude 抓（核对真实回复的解析）
+                let claude_only = env("PITH_CLAUDE_ONLY").is_some_and(|v| v == "1");
+                for url in urls.split(',').map(str::trim).filter(|u| !u.is_empty()) {
+                    let got = if claude_only {
+                        let c = fetch.claude.as_ref().unwrap();
+                        c.fetch(url, &research.cancel).and_then(|g| {
+                            let usage = g.usage;
+                            let model = g.model.clone();
+                            let mut f = fetch.inner.keep(g.url, Some(g.content_type), &g.body)?;
+                            f.title = f.title.or(g.title);
+                            f.via = Some(research_engine::ports::Via { how: "claude_web_fetch".into(), download_error: "（直接让 Claude 抓）".into(), provider: "anthropic".into(), model, usage });
+                            Ok(f)
+                        })
+                    } else {
+                        fetch.fetch(url, &research.cancel)
+                    };
+                    match got {
+                        Ok(f) => {
+                            let via = f.via.as_ref().map(|v| format!("经 Claude 网页抓取（{}，${:.4}；本机：{}）", v.model, v.usage.cost_usd, v.download_error)).unwrap_or_else(|| "本机下载".into());
+                            let text = match &f.text {
+                                Ok(t) => format!("{} 字：{}", t.chars().count(), t.chars().take(60).collect::<String>().replace('\n', " ")),
+                                Err(e) => format!("取文字失败：{e}"),
+                            };
+                            println!("✓ {url}\n    {via}；{} {} 字节；{text}", f.kind, f.bytes);
+                        }
+                        Err(e) => println!("✗ {url}\n    {e}"),
+                    }
+                }
+                println!("这一步花了 ${:.4}", spent(&started));
+            }
             other => panic!("不认识的 PITH_STAGE：{other}"),
+        }
+    }
+
+    /// 把一个数据目录里的调查导进另一个（默认忽略）。v0.3 验收时用户要把测试目录里的两次真实调查导进正式数据目录（2026-11-12）。
+    /// 走 App 自己的代码：先做「导入前」备份；问题按文字认（已有就接着用），调查按 uid 认（已有就跳过）；
+    /// 快照文件逐个复制并核对 SHA-256；来源和文献的对应不带过去（目标库里没有那些文献，要的话在结论页再加）；
+    /// 账本里的真实调用一并补进目标账本（同一笔不重复），月度合计才对得上实际花的钱。导完对每次调查重新审计。
+    /// `PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> [PITH_DRY_RUN=1] cargo test -p pith import_research_runs -- --ignored --nocapture`
+    /// 目标是正式数据目录时，先退出正式版。
+    #[test]
+    #[ignore]
+    fn import_research_runs() {
+        use crate::paths::DataPaths;
+        let env = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+        let from = PathBuf::from(env("PITH_FROM").expect("要设 PITH_FROM"));
+        let to = PathBuf::from(env("PITH_TO").expect("要设 PITH_TO"));
+        let dry = env("PITH_DRY_RUN").is_some_and(|v| v == "1");
+        assert_ne!(from, to);
+        let src = AppState::init(DataPaths::new(from.clone()));
+        let dst = AppState::init(DataPaths::new(to.clone()));
+        let (src_snap, dst_snap) = (Snapshots::new(&from), Snapshots::new(&to));
+        let questions = src.with_db(|c| store::questions_list(c)).unwrap();
+        println!("源：{} 个问题；目标：{}", questions.len(), to.display());
+        if !dry {
+            let b = dst.with_db(|c| crate::import::backup_before(c, &dst.paths.backups)).unwrap();
+            println!("目标库已做「导入前」备份：{b}");
+        }
+        let mut imported: Vec<String> = Vec::new();
+        for q in &questions {
+            let existing = dst.with_db(|c| store::questions_list(c)).unwrap().into_iter().find(|x| x.text == q.text).map(|x| x.id);
+            let mut runs: Vec<Run> = q.runs.iter().map(|r| src.with_db(|c| store::run_load(c, &r.uid)).unwrap()).collect();
+            runs.sort_by_key(|r| r.seq);
+            for mut run in runs {
+                if dst.with_db(|c| store::run_load(c, &run.uid)).is_ok() {
+                    println!("  第 {} 次（{}）目标里已经有了，跳过", run.seq, run.uid);
+                    continue;
+                }
+                // 快照：原件和正文都复制，核对哈希
+                let mut copied = 0;
+                for s in &mut run.sources {
+                    s.item_id = None;
+                    let Some(sha) = s.sha256.clone() else { continue };
+                    let original = src_snap.original_of(s).unwrap();
+                    let bytes = std::fs::read(&original).unwrap();
+                    if !dry {
+                        let got = dst_snap.put(&bytes, s.ext.as_deref().unwrap_or("bin")).unwrap();
+                        assert_eq!(got, sha, "{} 的快照哈希对不上", s.id);
+                        if let Ok(text) = src_snap.text(&sha) {
+                            dst_snap.put_text(&sha, &text).unwrap();
+                        }
+                    }
+                    copied += 1;
+                }
+                if !dry {
+                    let qid = match existing {
+                        Some(id) => id,
+                        None => dst.with_db(|c| store::question_create(c, &q.text, &q.created_at)).unwrap(),
+                    };
+                    dst.with_db(|c| store::run_save(c, qid, &run)).unwrap();
+                    imported.push(run.uid.clone());
+                }
+                println!("  第 {} 次（{}）：{} 个来源（快照 {copied} 份）、{} 条事实、{} 条结论", run.seq, run.uid, run.sources.len(), run.facts.len(), run.conclusions.len());
+            }
+        }
+        // 账本：源里的真实调用补进目标（按时间、用途、模型、费用认同一笔）
+        let (src_ledger, dst_ledger) = (Ledger::new(&from), Ledger::new(&to));
+        let have = dst_ledger.all().unwrap();
+        let same = |a: &Call, b: &Call| a.at == b.at && a.purpose == b.purpose && a.model == b.model && (a.cost_usd - b.cost_usd).abs() < 1e-12;
+        let add: Vec<Call> = src_ledger.all().unwrap().into_iter().filter(|c| !c.mock && !have.iter().any(|h| same(h, c))).collect();
+        let total: f64 = add.iter().map(|c| c.cost_usd).sum();
+        if !dry {
+            for c in &add {
+                dst_ledger.append(c).unwrap();
+            }
+        }
+        println!("账本：补进 {} 笔真实调用，合计 ${total:.4}", add.len());
+        // 导完重新审计
+        for uid in &imported {
+            let run = dst.with_db(|c| store::run_load(c, uid)).unwrap();
+            let previous = run.previous.as_deref().and_then(|p| dst.with_db(|c| store::run_load(c, p)).ok());
+            let mut findings = audit::audit(&run, &mut |s: &Source| s.sha256.as_deref().ok_or_else(|| "没有快照".to_string()).and_then(|sha| dst_snap.text(sha)));
+            findings.extend(audit::audit_order(&report::build(&run, previous.as_ref())));
+            println!("  审计 {uid}：{} 个问题", findings.len());
+            assert!(findings.is_empty(), "{findings:?}");
+        }
+        if !dry {
+            let month = text::now_iso();
+            println!("目标本月已花 ${:.4}", dst_ledger.month_total(&month[..7]).unwrap());
         }
     }
 

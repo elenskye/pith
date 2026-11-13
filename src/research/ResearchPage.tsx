@@ -3,14 +3,12 @@
 // 规则都在 Rust（crates/research-engine、src-tauri/src/research/）；这里只管界面。
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle, Telescope, Trash2 } from "lucide-react";
+import { LoaderCircle, Telescope } from "lucide-react";
 import { api, type ResearchPlanPreview } from "@/shared/ipc";
-import { useUi } from "@/shared/ui";
-import { Badge, Notice, Page } from "@/format/parts";
-import { when } from "@/format/labels";
+import { Notice, Page } from "@/format/parts";
 import { PlanSend } from "@/research/Confirm";
 import { RunScreen } from "@/research/RunScreen";
-import { STATUS, STATUS_TONE, money } from "@/research/labels";
+import { money } from "@/research/labels";
 
 /** 调查页现在看的是哪一次调查（null = 问题列表） */
 export type ResearchAt = { uid: string | null };
@@ -24,8 +22,6 @@ const EXAMPLE = "2022–2026 年北京、天津年轻人（应届生和非应届
 
 function Questions({ onOpen, onSettings }: { onOpen: (uid: string) => void; onSettings: () => void }) {
   const qc = useQueryClient();
-  const { confirm, notify } = useUi();
-  const list = useQuery({ queryKey: ["researchQuestions"], queryFn: api.researchQuestionsList, staleTime: 0 });
   const status = useQuery({ queryKey: ["researchStatus"], queryFn: api.researchStatus, staleTime: 0 });
   const [question, setQuestion] = useState("");
   const [preparing, setPreparing] = useState(false);
@@ -44,21 +40,10 @@ function Questions({ onOpen, onSettings }: { onOpen: (uid: string) => void; onSe
     }
   };
 
-  const removeQuestion = async (id: number, text: string) => {
-    const ok = await confirm({ title: "删除这个问题和它的所有调查？", message: `「${text.slice(0, 40)}」\n已经加入文献库的来源不受影响。`, confirm: "删除", danger: true });
-    if (!ok) return;
-    try {
-      await api.researchQuestionDelete(id);
-      qc.invalidateQueries({ queryKey: ["researchQuestions"] });
-    } catch (e) {
-      notify(String(e), "error");
-    }
-  };
-
   const s = status.data;
   const missing = s ? s.keys.filter((k) => k.needed && !k.has).map((k) => k.label) : [];
   return (
-    <Page crumbs={[{ label: "调查" }]}>
+    <Page crumbs={[{ label: "调查" }, { label: "新调查" }]}>
       <div className="space-y-2 text-xs text-muted-foreground">
         <p>
           问一个需要查证的问题。模型先把它拆成可以核实的子问题（包括官方统计之外的衡量维度），你确认后，Pith 搜索、在这台电脑上下载网页和文件、请便宜的模型摘出数字，
@@ -79,7 +64,7 @@ function Questions({ onOpen, onSettings }: { onOpen: (uid: string) => void; onSe
       {s && !s.mock && missing.length > 0 && (
         <Notice title={`还没有填 ${missing.join("、")} 的 API 密钥。`}>
           <button onClick={onSettings} className="text-primary hover:underline">
-            去「设置 › 事实调查」填写
+            去「设置 › 密钥与费用」填写
           </button>
         </Notice>
       )}
@@ -110,40 +95,6 @@ function Questions({ onOpen, onSettings }: { onOpen: (uid: string) => void; onSe
         {s?.running && <p className="text-xs text-muted-foreground">有一次调查正在进行，做完或停止以后才能开始新的。</p>}
         {error && <p className="selectable text-xs whitespace-pre-wrap text-destructive">{error}</p>}
       </form>
-
-      {list.error && <p className="selectable text-xs text-destructive">{String(list.error)}</p>}
-      {list.data && list.data.length === 0 ? (
-        <p className="rounded-md border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">还没有调查过。</p>
-      ) : (
-        <ul className="space-y-2">
-          {(list.data ?? []).map((q) => (
-            <li key={q.id} className="rounded-md border">
-              <div className="flex items-start gap-2 px-3 pt-2">
-                <p className="min-w-0 flex-1 text-sm font-medium">{q.text}</p>
-                <button onClick={() => void removeQuestion(q.id, q.text)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive" title="删除这个问题">
-                  <Trash2 size={13} />
-                </button>
-              </div>
-              <ul className="divide-y px-1 pb-1">
-                {q.runs.map((r) => (
-                  <li key={r.uid}>
-                    <button onClick={() => onOpen(r.uid)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/60">
-                      <span className="w-14 shrink-0 text-muted-foreground">第 {r.seq} 次</span>
-                      <Badge tone={STATUS_TONE[r.status]}>{STATUS[r.status]}</Badge>
-                      {r.mock && <Badge tone="warn">模拟</Badge>}
-                      <span className="min-w-0 flex-1 truncate text-muted-foreground tabular-nums">
-                        {when(r.finishedAt ?? r.createdAt)}
-                        {r.status === "done" && ` · ${r.sources} 个来源 · ${r.verifiedFacts} 条核实的事实 · ${r.conclusions} 条结论`}
-                      </span>
-                      {!r.mock && r.costUsd > 0 && <span className="shrink-0 tabular-nums">{money(r.costUsd)}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
 
       {preview && (
         <PlanSend

@@ -20,7 +20,7 @@ type Props<T> = {
   run: () => Promise<T>;
   onDone: (result: T) => void;
   onClose: () => void;
-  /** 去「设置 › 排版 Agent」 */
+  /** 去「设置 › 密钥与费用」 */
   onSettings: () => void;
 };
 
@@ -124,7 +124,7 @@ function SendDialog<T>({ purpose, estimate, mock, hasKey, children, run, onDone,
 
           {noKey && (
             <Notice tone="danger" title="还没有填 Anthropic API 密钥，发不了。">
-              到「设置 › 排版 Agent」填写后再回来。
+              到「设置 › 密钥与费用」填写后再回来。
               <button onClick={onSettings} className="ml-1 text-primary hover:underline">
                 去设置
               </button>
@@ -132,7 +132,7 @@ function SendDialog<T>({ purpose, estimate, mock, hasKey, children, run, onDone,
           )}
           {overBudget && (
             <Notice tone="danger" title="会超过月度上限，发不了。">
-              这次最多可能花 {usd(estimate.maxUsd)}，加上本月已花的 {usd(estimate.monthSpentUsd)} 会超过上限 {usd(estimate.budgetUsd)}。可以在「设置 › 排版 Agent」调高上限，或下个月再用。
+              这次最多可能花 {usd(estimate.maxUsd)}，加上本月已花的 {usd(estimate.monthSpentUsd)} 会超过上限 {usd(estimate.budgetUsd)}。可以在「设置 › 密钥与费用」调高上限，或下个月再用。
               <button onClick={onSettings} className="ml-1 text-primary hover:underline">
                 去设置
               </button>

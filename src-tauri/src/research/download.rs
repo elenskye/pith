@@ -285,7 +285,7 @@ impl Downloader {
         Err(format!("跳转超过 {} 次，放弃了", self.limits.max_redirects))
     }
 
-    fn keep(&self, final_url: String, content_type: Option<String>, body: &[u8]) -> Result<Fetched, String> {
+    pub(crate) fn keep(&self, final_url: String, content_type: Option<String>, body: &[u8]) -> Result<Fetched, String> {
         if body.len() as u64 > self.limits.max_bytes {
             return Err(too_big(self.limits.max_bytes));
         }
@@ -294,7 +294,7 @@ impl Downloader {
         if let Ok(text) = &ex.text {
             self.snapshots.put_text(&sha256, text)?;
         }
-        Ok(Fetched { final_url, fetched_at: (self.now)(), sha256, kind: ex.kind.key().to_string(), content_type, ext: ex.ext.to_string(), bytes: body.len() as u64, title: ex.title, text: ex.text })
+        Ok(Fetched { final_url, fetched_at: (self.now)(), sha256, kind: ex.kind.key().to_string(), content_type, ext: ex.ext.to_string(), bytes: body.len() as u64, title: ex.title, text: ex.text, via: None })
     }
 
     /// 快照文件在哪（测试用；App 里直接用 `Snapshots::original_of`）
@@ -331,6 +331,42 @@ impl Fetch for Downloader {
     fn text(&self, source: &Source) -> Result<String, String> {
         let sha = source.sha256.as_deref().ok_or_else(|| "这个来源没有下载到".to_string())?;
         self.snapshots.text(sha)
+    }
+}
+
+// ---------- 本机下载失败时改用 Claude 网页抓取（`decisions/0023`） ----------
+
+/// 先本机下载；失败了（网站挡程序、只认旧 TLS……）再让 Claude 抓一次。
+/// 本机文件、指向本机或内网的网址、已经停止的，不改用。费用由 `ClaudeFetch` 自己查上限、记账，并随结果交给流程记成一步。
+pub struct WithFallback {
+    pub inner: Downloader,
+    pub claude: Option<super::anthropic::ClaudeFetch>,
+}
+
+impl Fetch for WithFallback {
+    fn fetch(&self, url: &str, cancel: &AtomicBool) -> Result<Fetched, String> {
+        let first = self.inner.fetch(url, cancel);
+        let (Err(why), Some(claude)) = (&first, &self.claude) else { return first };
+        let u = url.trim();
+        let web = u.starts_with("https://") || u.starts_with("http://");
+        if !web || cancel.load(std::sync::atomic::Ordering::SeqCst) || why.contains("本机或内网") || why.contains("已停止") {
+            return first;
+        }
+        match claude.fetch(u, cancel) {
+            Ok(got) => {
+                let mut f = self.inner.keep(got.url, Some(got.content_type), &got.body).map_err(|e| format!("{why}；改用 Claude 网页抓取拿到了内容，但存不下：{e}"))?;
+                if f.title.is_none() {
+                    f.title = got.title;
+                }
+                f.via = Some(research_engine::ports::Via { how: "claude_web_fetch".into(), download_error: why.clone(), provider: super::anthropic::PROVIDER.into(), model: got.model, usage: got.usage });
+                Ok(f)
+            }
+            Err(e) => Err(format!("{why}；改用 Claude 网页抓取也没拿到：{e}")),
+        }
+    }
+
+    fn text(&self, source: &Source) -> Result<String, String> {
+        self.inner.text(source)
     }
 }
 

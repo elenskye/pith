@@ -398,7 +398,7 @@ impl Fetch for MockFetch {
     fn fetch(&self, url: &str, cancel: &AtomicBool) -> Result<Fetched, String> {
         pause(self.delay, cancel).map_err(|e| e.message)?;
         if url.ends_with(SCANNED) {
-            return Ok(Fetched { final_url: url.into(), fetched_at: "2026-11-12T09:00:00".into(), sha256: fake_sha(url), kind: "pdf".into(), content_type: Some("application/pdf".into()), ext: "pdf".into(), bytes: 20_480, title: None, text: Err("PDF 里没有可以提取的文字（可能是扫描件）".into()) });
+            return Ok(Fetched { final_url: url.into(), fetched_at: "2026-11-12T09:00:00".into(), sha256: fake_sha(url), kind: "pdf".into(), content_type: Some("application/pdf".into()), ext: "pdf".into(), bytes: 20_480, title: None, text: Err("PDF 里没有可以提取的文字（可能是扫描件）".into()), via: None });
         }
         let doc = doc_for(url).filter(|d| d.exists_in(self.round)).ok_or_else(|| "服务器说没有这个网页（404）".to_string())?;
         let text = doc.text_in(self.round);
@@ -412,6 +412,7 @@ impl Fetch for MockFetch {
             bytes: text.len() as u64,
             title: Some(doc.title.into()),
             text: Ok(text.to_string()),
+            via: None,
         })
     }
 

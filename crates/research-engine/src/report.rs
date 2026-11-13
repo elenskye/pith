@@ -53,6 +53,8 @@ pub struct Totals {
     pub sources: usize,
     pub readable: usize,
     pub download_failed: usize,
+    /// 本机下载失败、改用 Claude 网页抓取拿到的
+    pub fetched_by_claude: usize,
     pub no_text: usize,
     pub facts: usize,
     pub verified: usize,
@@ -170,6 +172,7 @@ pub fn build(run: &Run, previous: Option<&Run>) -> Report {
         sources: run.sources.len(),
         readable: run.sources.iter().filter(|s| s.usable()).count(),
         download_failed: run.sources.iter().filter(|s| s.fetch_error.is_some()).count(),
+        fetched_by_claude: run.sources.iter().filter(|s| s.fetched_via.is_some() && s.fetch_error.is_none()).count(),
         no_text: run.sources.iter().filter(|s| s.text_error.is_some()).count(),
         facts: run.facts.len(),
         verified: run.verified_facts().count(),
@@ -184,6 +187,9 @@ pub fn build(run: &Run, previous: Option<&Run>) -> Report {
         notes.push("这是模拟接口给的示例：不联网、不花钱，数字是虚构的。".to_string());
     }
     notes.push(format!("可信度按「{}」排：{}。官方数字照样列出，只是按表降权并标明。", trust.name(), if trust.is_default() { "中国政府官方统计和官方媒体的数字列为低".to_string() } else { format!("和默认表不同的有 {} 项", trust.changes().len()) }));
+    if totals.fetched_by_claude > 0 {
+        notes.push(format!("{} 个来源本机下载失败，改用 Claude 网页抓取：读的是 Claude 抓到的正文（网页转成的文字或原 PDF），费用记在「过程与费用」里。", totals.fetched_by_claude));
+    }
     if totals.download_failed > 0 {
         notes.push(format!("{} 个来源下载失败，没有读到。", totals.download_failed));
     }

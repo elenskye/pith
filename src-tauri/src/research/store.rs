@@ -174,8 +174,8 @@ pub fn run_save(c: &Connection, question_id: i64, run: &Run) -> Result<(), Strin
         let tier = s.tier.as_ref().map(word).transpose()?;
         tx.execute(
             "INSERT INTO research_sources (run_id, key, position, url, origin, sub_questions, title, final_url, fetched_at, sha256, kind, content_type, ext, bytes, text_chars,
-                                           fetch_error, text_error, extracted, read_chars, truncated, extract_error, publisher, published, tier, item_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
+                                           fetch_error, text_error, extracted, read_chars, truncated, extract_error, publisher, published, tier, item_id, fetched_via)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
             params![
                 id,
                 s.id,
@@ -202,6 +202,7 @@ pub fn run_save(c: &Connection, question_id: i64, run: &Run) -> Result<(), Strin
                 s.published,
                 tier,
                 s.item_id.or_else(|| linked.get(&s.id).copied()),
+                s.fetched_via,
             ],
         )
         .map_err(|e| format!("存不了来源 {}：{e}", s.id))?;
@@ -304,7 +305,7 @@ pub fn run_load(c: &Connection, uid: &str) -> Result<Run, String> {
     let sources = rows(
         c,
         "SELECT key, url, origin, sub_questions, title, final_url, fetched_at, sha256, kind, content_type, ext, bytes, text_chars, fetch_error, text_error, extracted, read_chars, truncated,
-                extract_error, publisher, published, tier, item_id
+                extract_error, publisher, published, tier, item_id, fetched_via
          FROM research_sources WHERE run_id = ?1 ORDER BY position",
         id,
         |r| -> rusqlite::Result<SourceRow> {
@@ -330,6 +331,7 @@ pub fn run_load(c: &Connection, uid: &str) -> Result<Run, String> {
                     publisher: r.get(19)?,
                     published: r.get(20)?,
                     item_id: r.get(22)?,
+                    fetched_via: r.get(23)?,
                     ..Default::default()
                 },
                 r.get(2)?,

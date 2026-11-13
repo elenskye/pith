@@ -340,6 +340,11 @@ export function Process({ report, selected, onSelect }: { report: ResearchReport
                 <SourceTitle s={s} />
                 {s.itemId !== null && <Badge tone="ok">已在文献库</Badge>}
                 {s.origin === "manual" && <Badge>手动加的</Badge>}
+                {s.fetchedVia === "claude_web_fetch" && (
+                  <Badge tone="accent" title={`本机下载失败，改用 Claude 网页抓取拿到的正文`}>
+                    经 Claude 网页抓取
+                  </Badge>
+                )}
               </td>
               <td className="py-1 pr-3">{s.producers.join("、")}</td>
               <td className="py-1 pr-3">

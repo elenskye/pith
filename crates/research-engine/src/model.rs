@@ -118,6 +118,8 @@ pub struct Source {
     pub text_chars: usize,
     /// 下载失败的原因
     pub fetch_error: Option<String>,
+    /// 不是本机直接下载到的：`claude_web_fetch`（本机下载失败后改用 Claude 网页抓取，`decisions/0023`）
+    pub fetched_via: Option<String>,
     /// 下载到了但取不出文字的原因（「取文字失败」，不静默）
     pub text_error: Option<String>,
     // 摘证据之后

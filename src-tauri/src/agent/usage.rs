@@ -235,7 +235,7 @@ pub fn estimate(input_tokens: u64, typical_output: u64, max_output: u64, budget_
 
 pub fn over_budget_message(e: &Estimate) -> String {
     format!(
-        "这次调用最多可能花 ${:.2}，加上本月已花的 ${:.2} 会超过月度上限 ${:.2}，所以没有发送。可以在「设置 › 排版 Agent」里调高上限（最高 ${MAX_BUDGET_USD:.0}），或下个月再用。",
+        "这次调用最多可能花 ${:.2}，加上本月已花的 ${:.2} 会超过月度上限 ${:.2}，所以没有发送。可以在「设置 › 密钥与费用」里调高上限（最高 ${MAX_BUDGET_USD:.0}），或下个月再用。",
         e.max_usd, e.month_spent_usd, e.budget_usd
     )
 }

@@ -53,6 +53,7 @@ cargo test -p pith freeze_fixture -- --ignored
 
 - **引擎**（`crates/research-engine`，模拟接口）：认数（千分位、万 / 亿、% / ‰ / 百分点、负数、区间，日期和编号不当数）、文字折叠（只容忍空白和全半角）、计算（单位不一致、除数为 0、未核实的都拒绝）、结论核对（含占位符后面又写一遍单位）、可信度、重查对比（含同一格两次写法不同、不同指标 / 年龄段不误对）、渲染；`tests/flow.rs` 整条流程、取消后接着做、超预算、单个来源失败、全都读不了。夹具是虚构的「示例市」，故意带一条摘录写错的事实、一个 404、一个扫描件 PDF、一段注入文字和一段 `hidden` 文字。
 - **改坏**：摘录改一个字、数字改一位、单位错、结论里多一个对不上的数、低可信来源排到前面，流程里拦一次，`audit` 对存下来的结果再查一次（另查：没核实的标成已核实、计算结果被改、可信度被抬高、正文被换）。
+- **下载失败时改用 Claude 网页抓取**（`decisions/0023`）：引擎 `tests/flow.rs` 的来源标记、费用记成一步、报告写明；`anthropic.rs` 用本地假网站（403 / 412）和假 Anthropic 测网页文字、base64 的 PDF、Claude 也打不开、内网地址和关掉时不改用、请求形状与账本。
 - **App 一侧**（`src-tauri/src/research/`）：取正文（类型判断、编码、HTML / CSV / XLSX / PDF / DOCX、扫描件）、快照、本机下载（本地 `TcpListener` 假服务器：字节一致、跳转、各种失败、内网拦截、限速与取消）、三类接口（录制的回复、请求形状、`pause_turn` 原样发回、拒答、错误不回显密钥、重试、预算、流断开按估计记账）、存取（fresh / v5 升级）、Word 导出、加入文献库；`research/tests.rs` 端到端：真实的接口实现连本地假 Anthropic / DeepSeek / Tavily / 网站，每一笔费用对上账本。
 - **浏览器**：`?mock` 里调查页全流程能点通；`?mock&research=real` 假装真接口（确认框里显示缺密钥等）。mock 数据由引擎生成，改了引擎的输出结构就重新生成：
 
@@ -66,7 +67,12 @@ cargo run -q -p research-engine --example mock_data > src/dev/mockResearch.json
 PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=plan cargo test -p pith real_research_run -- --ignored --nocapture
 ```
 
-  打印计划、uid 和下一步的预计费用；接着 `PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>` 做完（审计、导出三种、结论用到的来源加入文献库）；重查是 `PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按 execute 做新的这一次。
+  打印计划、uid 和下一步的预计费用；接着 `PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>` 做完（审计、导出三种、结论用到的来源加入文献库）；重查是 `PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按 execute 做新的这一次；`PITH_STAGE=export PITH_RUN=<uid>` 只重新审计、导出，不联网；`PITH_STAGE=fetch PITH_URLS=<网址,网址>` 只试下载（本机下载失败的改用 Claude 网页抓取，`decisions/0023`）。
+- **把调查导进另一个数据目录**（默认忽略；v0.3 验收时把测试目录的两次真实调查导进了正式数据目录）：先做「导入前」备份，问题按文字认、调查按 uid 认（已有就跳过），快照逐个复制并核对 SHA-256，来源与文献的对应不带过去，账本里的真实调用补进目标账本，导完重新审计。目标是正式数据目录时先退出正式版，先用 `PITH_DRY_RUN=1` 看一遍：
+
+```bash
+PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith import_research_runs -- --ignored --nocapture
+```
 
 ## 真实数据（默认忽略，只读，只打印汇总数字）
 
