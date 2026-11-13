@@ -10,11 +10,13 @@
 2. **日常调查**：现成 Deep Research 漏来源、报告冗长、事实与推测混在一起
 3. **阅读学习**：读书摘抄难以沉淀为有出处、可复习的知识作品
 
-顺序：先做能完全替代 Zotero 的 Library（v0.1），再做 Word 引用与排版（v0.2），再做三种研究模式。
+顺序：Library（v0.1）→ Word 引用与排版（v0.2）→ 事实调查（v0.3）→ 概念研究（v0.4）→ WonderLab（v0.5）→ 学术研究（v0.6）→ Adaptive Agent（v0.7），见 `docs/decisions/0005`。
 
 ## 当前状态
 
-v0.1 已验收（2026-11-10）；v0.2 Word Studio 进行中（当前 0.2.0；W1 Word 入口、W2 引用已完成：Word 顶栏「Pith」选项卡里用 Pith 的搜索窗插入 / 编辑 / 删除引文、插入书目、刷新、切换样式（含导入的 .csl）、把 Zotero 引文转换成 Pith 引文，`ROADMAP.md`）。v0.1 能做的：导入（Zotero 副本、BibTeX / RIS / CSL JSON）、搜索、编辑、集合与标签、批量编辑、去重合并、回收站、PDF 阅读与高亮摘录、DOI / ISBN 联网补全、备份恢复与整库导出都能用。交接见 `HANDOFF.md`，计划见 `ROADMAP.md`。
+- 0.4.0，正在做 v0.4 Concept Research（读书：概念卡、论证卡、关系图，`docs/decisions/0024`）。
+- 已经能用：v0.1 文献库（Zotero 迁移、搜索管理、PDF 阅读标注、联网补全、备份恢复）、v0.2 Word（顶栏「Pith」选项卡里的引用、排版 Agent）、v0.3 事实调查。
+- 交接看 `HANDOFF.md`，计划看 `ROADMAP.md`。
 
 ## 运行
 
@@ -52,25 +54,21 @@ pnpm check
 
 ## 文档
 
+常用：
+
 | 文件 | 用途 |
 | --- | --- |
 | `CLAUDE.md` | Agent 工作规则（必读） |
-| `HANDOFF.md` | 最近一轮交接 |
-| `ROADMAP.md` | 现在 / 下一步 / 以后 / 已完成 |
+| `HANDOFF.md` / `HANDOFF-cloud.md` | 最近一轮交接 / 给云端 Claude 的任务与它的记录 |
+| `ROADMAP.md` | 现在 / 已完成 / 以后 |
 | `docs/requirements.md` | 已定需求 |
-| `docs/architecture.md` | 目录、规则、当前命令 |
-| `docs/schema.md` | v0.1 数据库结构 |
-| `docs/decisions/` | 决策记录（一事一文） |
-| `docs/feasibility.md` | Phase 0 验证记录与复现命令 |
-| `docs/testing.md` | 测试约定 |
-| `docs/zotero-mapping.md` | Zotero 表 → 本项目模型的映射 |
-| `docs/zotero-copy-guide.md` | 导出 Zotero 库副本的步骤 |
-| `docs/open-source-evaluation.md` | 开源组件评估 |
-| `docs/brief-digest.md` | 原始 Brief 压缩版 |
-| `docs/questionnaire/` | 需求问卷与回答 |
+| `docs/decisions/` | 决策记录（一事一文，`0024` 是 v0.4 计划） |
+| `docs/architecture.md` | 目录、规则、各模块的流程 |
+| `docs/schema.md` | 数据库结构 |
+| `docs/testing.md` | 测试约定与真实验收命令 |
 | `THIRD_PARTY.md` | 第三方依赖与许可证 |
-| `crates/docx-engine/README.md` | Word 文档引擎（排版器、校验器、引文、VBA / 模板生成）的命令 |
-| `poc/word-addin/README.md` | Phase 0-B 原型（Office.js 路线保留待用） |
+
+参考（做完的阶段留下的）：`docs/brief-digest.md`（原始 Brief 压缩版）、`docs/questionnaire/`（三轮问卷与回答）、`docs/feasibility.md`（Phase 0 验证）、`docs/open-source-evaluation.md`、`docs/zotero-mapping.md`、`docs/zotero-copy-guide.md`、`crates/*/README.md`、`poc/word-addin/README.md`。
 
 ## 本机环境（2026-11-08）
 

@@ -1,6 +1,6 @@
 # 架构
 
-> 依据 `decisions/0001`–`0003`、`0006`–`0017`，沿用 Pomelo 的工程约定。数据库结构见 `docs/schema.md`。
+> 依据 `decisions/0001`–`0003`、`0006`–`0023`，沿用 Pomelo 的工程约定。只写已经有的；v0.4 概念研究的设计在 `decisions/0024`，做完后并进来。数据库结构见 `docs/schema.md`。
 
 ## 目录
 
@@ -98,51 +98,12 @@ personal-research-lab/
 - 文本框一律关掉 macOS 的自动更正 / 自动大写 / 拼写检查 / 写作建议 / 自动填充（`index.html` + `shared/plainInputs.ts`），作者名、标题、DOI 原样保存。不用 `<datalist>`（macOS 上和输入框一样窄），标签提示用 `TagInput`。
 - 只影响显示的界面偏好（标签栏开合、「含子集合」）用 `useStoredState` 记在 WebView 的 localStorage，不进数据库、不进导出。
 
-## 当前命令（Phase 6）
+## 命令
 
-数据库命令都是 `#[tauri::command(async)]`：在线程池里跑，导入的几秒钟里界面不卡。会改内容的命令在提交后更新搜索索引。
-
-| 命令 | 作用 |
-| --- | --- |
-| `app_info` / `app_reveal_data_dir` | 版本、数据目录、数据库版本、启动错误 / 在访达中显示 |
-| `library_overview` | 文献、回收站、集合、标签、附件、笔记、缺失文件、未分类、可能重复的数量 |
-| `items_list(query)` | 列表：范围（全部 / 未分类 / 集合含子集合 / 回收站 / 文件缺失 / 可能重复）+ 搜索 + 标签 + 类型 + 排序 |
-| `items_get` / `attachments_get` / `notes_get` / `collections_get(id)` | 四种详情（常用字段 + 其他字段） |
-| `items_create` / `items_update(id, patch)` / `items_set_field(ids, field, value)` | 新建、编辑（字段、类型、作者）、批量改字段 |
-| `items_merge(masterId, otherIds)` / `duplicates_dismiss(ids)` | 合并重复 / 标记「不是重复」 |
-| `attachments_add(itemId?, path)` / `attachments_rename` / `attachments_open` | 添加附件（复制进文件库）/ 改名 / 用默认程序打开 |
-| `tags_list` / `tags_add` / `tags_remove(targets, name)` / `tags_rename` / `tags_delete(id)` | 标签 |
-| `collections_list` / `collections_create` / `collections_rename` / `collections_move` / `collections_add` / `collections_remove` | 集合 |
-| `trash_move` / `trash_restore` / `trash_delete(targets)` / `trash_empty` | 回收站（永久删除前自动备份；文件留到没有备份用到时再删） |
-| `search_rebuild` | 重建搜索索引 |
-| `reader_get(id)` / `reader_save_state(id, reading)` | 打开阅读器要的信息（标题、所属文献、是否只读、上次位置）/ 记下读到哪 |
-| `annotations_list(attachmentId)` / `annotations_create(input)` / `annotations_update(id, patch)` / `annotations_delete(ids)` / `annotations_restore(ids)` | 标注：列表、新建（高亮 / 下划线 / 便签）、改颜色评论原文、删除与撤销 |
-| `app_open_url(url)` | PDF 里的网址链接交给系统浏览器（只认 http(s) / mailto） |
-| `metadata_settings_get` / `metadata_settings_set(patch)` | 联网补全的开关、自动、联系邮箱 |
-| `metadata_lookup(ids)` / `metadata_lookup_run(runId)` / `metadata_lookup_all` | 手动 / 某次导入 / 全部，放进后台队列 |
-| `metadata_status` / `metadata_cancel` | 后台队列进度 / 停止 |
-| `metadata_latest(itemId)` / `metadata_resolve(lookupId, field, accept)` / `metadata_undo(lookupId)` | 最近一次结果 / 采用或忽略一处不同 / 撤销自动填的 |
-| `metadata_add(text, collectionId)` | 按 DOI / ISBN 新建文献 |
-| `backups_list` / `backups_create` / `backups_restore(fileName)` | 备份列表 / 手动备份 / 恢复到某份备份（主库打不开时也行） |
-| `export_create(dir)` / `export_reveal(path)` | 整库导出到 `dir` 下的新文件夹（含自检）/ 在访达中显示 |
-| `export_inspect(dir)` / `export_restore(dir)` | 从导出恢复：预览 / 替换整个库 |
-| `import_zotero_preview` / `import_zotero_run` / `import_file_preview` / `import_file_run` / `import_runs_list` / `import_runs_get` | 导入（`decisions/0009`） |
-| `word_status` / `word_install` / `word_install_into(dir)` / `word_uninstall` / `word_reveal(which)` / `word_reveal_file(path)` | Word 集成：状态（模板、脚本、服务、排版器）/ 安装 / 用户在对话框里选中启动文件夹后写入模板 / 卸载 / 在访达中显示 |
-| `cite_renderer_ready` / `cite_render_done(id, result, error)` | 前端排版器：挂好监听 / 交回一次排版结果 |
-| `picker_session` / `picker_search(q)` / `picker_done(session, done)` | 置顶搜索窗：这一次的预填 / 搜文献库 / 选完、取消或删除这处引文 |
-| `cite_styles_list` / `cite_style_import(path)` / `cite_style_remove(id)` / `cite_style_source(id)` | 引文样式：清单（内置 + 导入）/ 导入 .csl（检查、试排）/ 删除 / 前端要导入样式的 CSL |
-| `word_zotero_inspect(path)` / `word_zotero_convert(path)` | Word 外转换 Zotero 文档：预览 / 转换成「原名（Pith）.docx」 |
-| `agent_status` / `agent_key_set(key)` / `agent_key_clear` / `agent_budget_set(usd)` / `agent_send_mode_set(mode)` | 排版 Agent 的设置：是否模拟模型、密钥填没填与存放处、月度上限、论文发送方式、本月已花、最近的调用 |
-| `format_rulesets_list` / `format_ruleset_get(id)` / `format_ruleset_rename` / `format_ruleset_delete` | 规范（要求清单 + 由它合成的规范 + 这套规范下的论文） |
-| `format_extract_prepare(paths)` → `format_extract_run(ticket)` | 提炼要求：先算出要发什么、多少钱（不联网），用户确认后才发送 |
-| `format_requirement_set(rulesetId, requirementId, enabled?, settings?)` | 确认清单时开关一条要求、改它的设置值 |
-| `format_plan_prepare(rulesetId, path, mode?)` → `format_plan_run(ticket)` | 文档计划：同样先准备、确认后发送；发送方式用设置里的（brief 结构和片段 / full 全文） |
-| `format_run_get` / `format_plan_update(rulesetId, runId, draft)` / `format_run_delete` | 一份论文的计划（含预览会改到哪些段落）/ 用户改计划 / 删存档 |
-| `format_apply(rulesetId, runId)` / `format_cancel` | 按确认的规范和计划排一份副本并出报告（不联网）/ 停止进行中的模型调用 |
-
-`targets` 是列表里的行：`{ kind: item | attachment | note | collection, id }`。
-
-选择文件夹 / 文件用 `@tauri-apps/plugin-dialog`（封装在 `ipc.ts` 的 `pickFolder` / `pickFile`，权限 `dialog:allow-open`）。
+- 命令清单以 `src/shared/ipc.ts` 为准（前端唯一的 invoke 入口），Rust 一侧在 `lib.rs` 注册。命名 `模块_动作`：文献库 `items_*` / `attachments_*` / `tags_*` / `collections_*` / `trash_*`，导入 `import_*`，阅读 `reader_*` / `annotations_*`，联网补全 `metadata_*`，备份与导出 `backups_*` / `export_*`，Word `word_*` / `cite_*` / `picker_*`，排版 Agent `agent_*` / `format_*`，事实调查 `research_*`。
+- 数据库命令都是 `#[tauri::command(async)]`，在线程池里跑；会改内容的命令在提交后更新搜索索引。
+- 要花钱的都是两段：`*_prepare` 先算出要发什么、多少钱（不联网），用户确认后再调发送的命令（如 `format_plan_run`、`research_execute`）。
+- 列表里的行用 `targets`：`{ kind: item | attachment | note | collection, id }`。选择文件夹 / 文件用 `@tauri-apps/plugin-dialog`（`ipc.ts` 的 `pickFolder` / `pickFile`）。
 
 ## 恢复的流程（`decisions/0013`）
 

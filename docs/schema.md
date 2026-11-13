@@ -1,6 +1,6 @@
-# v0.1 数据库结构
+# 数据库结构
 
-> 状态：**已定**（用户 2026-11-08 同意下面 4 个取舍）。已落成 `src-tauri/migrations/0001_library.sql`（14 张表）+ `0002_import.sql`（Phase 2 补全，见下文「0002」）+ `0003_manage.sql`（Phase 3，见「0003」），用过永不改；改结构写新编号的 migration。
+> 状态：**已定**（用户 2026-11-08 同意下面 4 个取舍）。以 `src-tauri/migrations/` 为准，用过永不改；改结构写新编号的 migration。本文详写 v0.1 的 0001–0005，之后的见文末「0006 以后」。
 > 依据：`decisions/0002`（Zotero 迁移）、`0003`（数据目录）、`0006`（Word 引文需要稳定 ID）、`docs/zotero-mapping.md` 第 7 节、Phase 0-A 真实库统计。
 > 约定沿用 Pomelo：`INTEGER PRIMARY KEY`、`STRICT` 表、时间为 UTC ISO 字符串（`strftime('%Y-%m-%dT%H:%M:%fZ','now')`）、枚举值在 Rust 校验、版本号在 `PRAGMA user_version`、WAL + `foreign_keys = ON`。
 
@@ -272,6 +272,14 @@ CREATE INDEX metadata_lookups_item ON metadata_lookups(item_id, id);
 `annotations` 表 0001 就按 Zotero 格式建好了，Phase 4 不改结构：App 里新建的标注 `source_key`、`import_run_id`、`author_name` 为空，`is_external = 0`；删除写 `deleted_at`（可撤销）。
 
 时间戳从 Phase 3 起精确到毫秒（`YYYY-MM-DDTHH:MM:SS.mmmZ`，即本文开头约定的格式）；Zotero 导入的时间保留 Zotero 原值（`.000Z`）。
+
+## 0006 以后
+
+| migration | 版本 | 内容 | 说明 |
+| --- | --- | --- | --- |
+| `0006_research.sql` | v0.3 | `research_questions`、`research_runs`、`research_searches`、`research_sources`、`research_facts`、`research_calcs`、`research_conclusions`、`research_conclusion_facts`、`research_steps` | 事实调查（`decisions/0020`）；快照文件在 `数据目录/research/sources/` |
+| `0007_research_fetch.sql` | v0.3 | `research_sources.fetched_via` | 下载失败时改用 Claude 网页抓取（`0023`） |
+| `0008_concept.sql`（计划） | v0.4 | 文本、章节、段落、对齐、技能运行、卡片、句、锚点、关系、评论来源 | 概念研究（`0024`），由云端 C1 / C2 建 |
 
 ## 不在主库里的
 

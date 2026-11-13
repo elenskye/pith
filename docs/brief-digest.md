@@ -72,7 +72,7 @@ Home / Library（三栏）/ Research Workspace / Academic Workspace / Word Studi
 
 ## 6. 阶段与验收
 
-Phase 0（Zotero 迁移 / Word 动态引用 / Word 排版保真三项验证）→ v0.1 Library → v0.2 Word Studio → v0.3 Fact Research → v0.4 Academic Research → v0.5 WonderLab → v0.6 Adaptive Agent。详见 `ROADMAP.md`。
+原 Brief 的顺序：Phase 0（Zotero 迁移 / Word 动态引用 / Word 排版保真三项验证）→ v0.1 Library → v0.2 Word Studio → v0.3 Fact Research → v0.4 Academic Research → v0.5 WonderLab → v0.6 Adaptive Agent。现行顺序按用户排名改过（Concept Research 插到 v0.4，Academic 后移到 v0.6），见 `decisions/0005` 与 `ROADMAP.md`。
 
 首批端到端验收场景：真实毕业论文重排；事实研究（如"津京就业指标可否直接比较"）；学术研究（政治效能感）；阅读复习（《国富论》分工章节）；自我改进（两次删长背景段 → Skill patch → 可撤销）。
 
