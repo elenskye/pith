@@ -20,6 +20,7 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration { version: 5, name: "metadata", sql: include_str!("../migrations/0005_metadata.sql") },
     Migration { version: 6, name: "research", sql: include_str!("../migrations/0006_research.sql") },
     Migration { version: 7, name: "research_fetch", sql: include_str!("../migrations/0007_research_fetch.sql") },
+    Migration { version: 8, name: "concept", sql: include_str!("../migrations/0008_concept.sql") },
 ];
 
 pub fn latest() -> i64 {
@@ -144,10 +145,13 @@ pub mod tests {
             "annotations", "import_runs", "settings", "attachment_tags", "note_tags", "annotation_tags", "collection_attachments", "collection_notes",
             "duplicate_dismissals", "reader_states", "metadata_lookups", "research_questions", "research_runs", "research_searches", "research_sources", "research_facts",
             "research_calcs", "research_conclusions", "research_conclusion_facts", "research_steps",
+            // v0.4 概念研究（0008）
+            "concept_texts", "concept_units", "concept_paragraphs", "concept_alignments", "concept_aligned", "concept_runs", "concept_steps", "concept_cards",
+            "concept_sentences", "concept_anchors", "concept_relations", "concept_sources", "concept_rejected",
         ] {
             assert!(names.contains(&t), "缺表 {t}");
         }
-        assert_eq!(names.len(), 31);
+        assert_eq!(names.len(), 44);
         assert!(tables.iter().all(|(_, sql)| sql.trim_end().ends_with("STRICT")), "全部是 STRICT 表");
         // 外键生效：不存在的条目不能挂作者
         let bad = c.execute("INSERT INTO creators (item_id, role, position) VALUES (999, 'author', 0)", []);

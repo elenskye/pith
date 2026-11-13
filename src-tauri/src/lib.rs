@@ -6,6 +6,7 @@
 mod agent;
 mod backup;
 mod common;
+mod concept;
 mod db;
 mod dedup;
 mod edit;
@@ -59,6 +60,8 @@ impl AppState {
             db::migrate(&mut conn, db::MIGRATIONS, &paths.backups)?;
             research::commands::on_startup(&conn);
             attach_search(&conn, &paths);
+            // v0.4 概念研究：进行中的标成已停止；段落检索对上主库（要在搜索索引挂上之后）
+            concept::commands::on_startup(&conn);
             if existed {
                 // 尽力而为：自动备份失败不挡启动，设置页能看到备份列表
                 match backup::daily(&conn, &paths.backups) {
@@ -678,6 +681,8 @@ pub fn run() {
             agent::manage(app);
             // 事实调查：DeepSeek、Tavily 的密钥，后台进行中的调查
             research::commands::manage(app);
+            // 概念研究：后台进行中的研究、待确认的解析
+            concept::commands::manage(app);
             word::start_service(app.handle());
             Ok(())
         })
@@ -802,7 +807,33 @@ pub fn run() {
             research::commands::research_question_delete,
             research::commands::research_export,
             research::commands::research_reveal,
-            research::commands::research_add_to_library
+            research::commands::research_add_to_library,
+            concept::commands::concept_status,
+            concept::commands::concept_settings_set,
+            concept::commands::concept_key_set,
+            concept::commands::concept_key_clear,
+            concept::commands::concept_skills_reveal,
+            concept::commands::concept_text_prepare,
+            concept::commands::concept_pdf_convert,
+            concept::commands::concept_text_renumber,
+            concept::commands::concept_text_save,
+            concept::commands::concept_text_link,
+            concept::commands::concept_text_delete,
+            concept::commands::concept_texts_list,
+            concept::commands::concept_attachment_text,
+            concept::commands::concept_text_get,
+            concept::commands::concept_unit_get,
+            concept::commands::concept_search,
+            concept::commands::concept_run_prepare,
+            concept::commands::concept_rerun_prepare,
+            concept::commands::concept_run_execute,
+            concept::commands::concept_cancel,
+            concept::commands::concept_runs_list,
+            concept::commands::concept_run_get,
+            concept::commands::concept_run_delete,
+            concept::commands::concept_export,
+            concept::commands::concept_add_to_library,
+            concept::commands::concept_quotes
         ])
         .build(tauri::generate_context!())
         .expect("Pith 启动失败")

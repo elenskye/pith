@@ -23,6 +23,7 @@ tauri-plugin-dialog = "2"
 zotero-import = { path = "../crates/zotero-import" }
 docx-engine = { path = "../crates/docx-engine" }
 research-engine = { path = "../crates/research-engine" }
+concept-engine = { path = "../crates/concept-engine" }
 sha2 = "0.11"
 md-5 = "0.11"
 biblatex = "0.12"

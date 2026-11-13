@@ -19,13 +19,16 @@ pub enum Place {
     File,
 }
 
-/// 哪一把密钥。v0.2 排版 Agent 只用 Anthropic；v0.3 事实调查加 DeepSeek（便宜的执行模型）和 Tavily（搜索）
+/// 哪一把密钥。v0.2 排版 Agent 只用 Anthropic；v0.3 事实调查加 DeepSeek（便宜的执行模型）和 Tavily（搜索）；
+/// v0.4 概念研究加 OpenAI（GPT-6.1 Sol）和 Mathpix（PDF 转文字，`app_id:app_key` 一对存在一个条目里）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiKey {
     Anthropic,
     Deepseek,
     Tavily,
+    Openai,
+    Mathpix,
 }
 
 impl ApiKey {
@@ -35,6 +38,8 @@ impl ApiKey {
             ApiKey::Anthropic => "anthropic-api-key",
             ApiKey::Deepseek => "deepseek-api-key",
             ApiKey::Tavily => "tavily-api-key",
+            ApiKey::Openai => "openai-api-key",
+            ApiKey::Mathpix => "mathpix-api-key",
         }
     }
 
@@ -43,11 +48,33 @@ impl ApiKey {
             ApiKey::Anthropic => "Anthropic",
             ApiKey::Deepseek => "DeepSeek",
             ApiKey::Tavily => "Tavily",
+            ApiKey::Openai => "OpenAI",
+            ApiKey::Mathpix => "Mathpix",
         }
     }
 
-    /// 形状对不对（不联网）。DeepSeek 的也以 sk- 开头，所以要排除 Anthropic 的 sk-ant-
+    /// 密钥文件里「名字=密钥」的名字（不分大小写，含这个词就算：OPENAI_API_KEY=…、openai=…）
+    fn names(self) -> &'static [&'static str] {
+        match self {
+            ApiKey::Anthropic => &["anthropic", "claude"],
+            ApiKey::Deepseek => &["deepseek"],
+            ApiKey::Tavily => &["tavily"],
+            ApiKey::Openai => &["openai"],
+            ApiKey::Mathpix => &["mathpix"],
+        }
+    }
+
+    pub const ALL: [ApiKey; 5] = [ApiKey::Anthropic, ApiKey::Deepseek, ApiKey::Tavily, ApiKey::Openai, ApiKey::Mathpix];
+
+    /// 形状对不对（不联网）。DeepSeek 的也以 sk- 开头，所以要排除 Anthropic 的 sk-ant-；
+    /// OpenAI 的也是 sk- 开头（sk-proj-…），和 DeepSeek 按形状分不开，密钥文件里要写名字
     fn shape_ok(self, k: &str) -> bool {
+        if self == ApiKey::Mathpix {
+            // app_id:app_key
+            let Some((id, key)) = k.split_once(':') else { return false };
+            let ok = |s: &str, min: usize, max: usize| (min..=max).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+            return ok(id, 3, 120) && ok(key, 16, 200);
+        }
         let chars_ok = k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
         let len = k.len();
         chars_ok
@@ -55,6 +82,8 @@ impl ApiKey {
                 ApiKey::Anthropic => k.starts_with("sk-ant-") && (40..=300).contains(&len),
                 ApiKey::Deepseek => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=200).contains(&len),
                 ApiKey::Tavily => k.starts_with("tvly-") && (20..=200).contains(&len),
+                ApiKey::Openai => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=400).contains(&len),
+                ApiKey::Mathpix => false,
             }
     }
 
@@ -68,16 +97,41 @@ impl ApiKey {
             ApiKey::Anthropic => "这看起来不是 Anthropic 的 API 密钥（应以 sk-ant- 开头）。到 console.anthropic.com 的 API Keys 里复制完整的一串。",
             ApiKey::Deepseek => "这看起来不是 DeepSeek 的 API 密钥（应以 sk- 开头）。到 platform.deepseek.com 的 API keys 里复制完整的一串。",
             ApiKey::Tavily => "这看起来不是 Tavily 的 API 密钥（应以 tvly- 开头）。到 app.tavily.com 复制完整的一串。",
+            ApiKey::Openai => "这看起来不是 OpenAI 的 API 密钥（应以 sk- 开头）。到 platform.openai.com 的 API keys 里复制完整的一串。",
+            ApiKey::Mathpix => "这看起来不是 Mathpix 的 app_id 和 app_key。到 console.mathpix.com 复制两项，分别填进两个框。",
         }
         .into())
     }
 
-    /// 从密钥文件的文字里找这把密钥：每行可以只有密钥，也可以是「名字=密钥」
+    /// 从密钥文件的文字里找这把密钥。每行写「名字=密钥」（`openai=sk-…`、`OPENAI_API_KEY="sk-…"`、`mathpix=app_id:app_key`）；
+    /// 写了名字的只给那一把。旧写法（一行只有密钥，按形状认）照认，但 OpenAI 和 Mathpix 必须写名字：
+    /// OpenAI 和 DeepSeek 都是 sk- 开头，分不开（没写名字的 sk- 照旧当成 DeepSeek 的）
     pub fn find_in(self, text: &str) -> Option<String> {
-        text.lines()
-            .map(|l| l.rsplit(['=', ' ', '"', '\'']).find(|p| !p.is_empty()).unwrap_or("").trim())
-            .find(|k| self.shape_ok(k))
-            .map(str::to_string)
+        for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+            let (name, value) = match line.split_once('=') {
+                Some((n, v)) => (Some(n.trim().trim_start_matches("export ").trim().to_ascii_lowercase()), v.trim()),
+                None => (None, line),
+            };
+            let value = value.trim_matches(['"', '\'']).trim();
+            // 名字不是哪一家的（「KEY=…」）：当成没写名字，照旧按形状认
+            let name = name.filter(|n| ApiKey::ALL.iter().any(|k| k.names().iter().any(|w| n.contains(w))));
+            match name {
+                Some(n) => {
+                    let mine = self.names().iter().any(|w| n.contains(w));
+                    if mine && self.shape_ok(value) {
+                        return Some(value.to_string());
+                    }
+                }
+                None if !matches!(self, ApiKey::Openai | ApiKey::Mathpix) => {
+                    let k = value.rsplit([' ', '"', '\'']).find(|p| !p.is_empty()).unwrap_or("").trim();
+                    if self.shape_ok(k) {
+                        return Some(k.to_string());
+                    }
+                }
+                None => {}
+            }
+        }
+        None
     }
 }
 
@@ -277,6 +331,42 @@ mod tests {
         assert_eq!(ApiKey::Deepseek.find_in(&text).as_deref(), Some(DEEPSEEK));
         assert_eq!(ApiKey::Tavily.find_in(&text).as_deref(), Some(TAVILY));
         assert_eq!(ApiKey::Deepseek.find_in(&format!("x={FAKE}")), None);
+    }
+
+    const OPENAI: &str = "sk-proj-0123456789abcdefABCDEF0123456789";
+    const MATHPIX: &str = "pith_test_app:0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn named_lines_tell_openai_and_deepseek_apart() {
+        // 新写法：每行「名字=密钥」
+        let text = format!("anthropic={FAKE}\nopenai={OPENAI}\ndeepseek={DEEPSEEK}\nTAVILY_API_KEY=\"{TAVILY}\"\nmathpix={MATHPIX}\n");
+        assert_eq!(ApiKey::Openai.find_in(&text).as_deref(), Some(OPENAI));
+        assert_eq!(ApiKey::Deepseek.find_in(&text).as_deref(), Some(DEEPSEEK));
+        assert_eq!(ApiKey::Anthropic.find_in(&text).as_deref(), Some(FAKE));
+        assert_eq!(ApiKey::Tavily.find_in(&text).as_deref(), Some(TAVILY));
+        assert_eq!(ApiKey::Mathpix.find_in(&text).as_deref(), Some(MATHPIX));
+        // 名字是 openai 的那一行不会被当成 DeepSeek 的
+        let only_openai = format!("OPENAI_API_KEY={OPENAI}\n");
+        assert_eq!(ApiKey::Deepseek.find_in(&only_openai), None);
+        // 旧写法照认；没写名字的 sk- 不当成 OpenAI 的
+        let old = format!("{FAKE}\n{DEEPSEEK}\n{TAVILY}\n");
+        assert_eq!(ApiKey::Deepseek.find_in(&old).as_deref(), Some(DEEPSEEK));
+        assert_eq!(ApiKey::Openai.find_in(&old), None);
+        assert_eq!(ApiKey::Openai.find_in(&format!("export OPENAI_API_KEY='{OPENAI}'")).as_deref(), Some(OPENAI));
+        assert_eq!(ApiKey::Anthropic.find_in(&format!("MY_KEY={FAKE}")).as_deref(), Some(FAKE));
+    }
+
+    #[test]
+    fn new_keys_have_their_own_shape_and_entry() {
+        assert_eq!(ApiKey::Openai.check(&format!(" {OPENAI} ")).unwrap(), OPENAI);
+        assert!(ApiKey::Openai.check(FAKE).is_err());
+        assert_eq!(ApiKey::Mathpix.check(MATHPIX).unwrap(), MATHPIX);
+        assert!(ApiKey::Mathpix.check("no-colon-here-0123456789").is_err());
+        assert!(ApiKey::Mathpix.check("ab:short").is_err());
+        assert!(!ApiKey::Mathpix.check("app:secret value!").unwrap_err().contains("secret"));
+        let accounts: std::collections::HashSet<_> = ApiKey::ALL.iter().map(|k| k.account()).collect();
+        assert_eq!(accounts.len(), ApiKey::ALL.len());
+        assert_eq!((ApiKey::Openai.account(), ApiKey::Mathpix.account()), ("openai-api-key", "mathpix-api-key"));
     }
 
     #[test]

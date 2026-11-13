@@ -49,6 +49,11 @@ impl Snapshots {
         Snapshots { root: data_dir.join("research").join("sources") }
     }
 
+    /// 放在别的目录下的一套快照（v0.4 概念研究用 `数据目录/concept/sources`，和事实调查的分开清理）
+    pub fn at(root: PathBuf) -> Self {
+        Snapshots { root }
+    }
+
     fn dir(&self, sha: &str) -> Result<PathBuf, String> {
         if !is_sha(sha) {
             return Err("快照的编号不对".into());

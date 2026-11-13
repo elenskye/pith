@@ -315,7 +315,7 @@ fn library_step(run: &mut Run, i: usize, skill: &Skill, ports: &mut Ports) -> Re
         }
         let sha = ports.shelf.keep(&h.text).map_err(|e| PortError::new(ErrorKind::Failed, e))?;
         let id = run.next_source_id();
-        run.sources.push(CommentSource { id, origin: SourceOrigin::Library, title: h.title, item_id: Some(h.item_id), attachment_id: h.attachment_id, url: None, final_url: None, sha256: Some(sha), fetched_at: Some((ports.now)()), text_chars: h.text.chars().count(), error: None, added_item: None });
+        run.sources.push(CommentSource { id, origin: SourceOrigin::Library, title: h.title, item_id: Some(h.item_id), attachment_id: h.attachment_id, url: None, final_url: None, sha256: Some(sha), ext: None, fetched_at: Some((ports.now)()), text_chars: h.text.chars().count(), error: None, added_item: None });
         added += 1;
     }
     rec.note = Some(if added == 0 { "文献库里没找到相关的文献".into() } else { format!("找到 {added} 条") });
@@ -363,11 +363,12 @@ fn web_step(run: &mut Run, i: usize, skill: &Skill, books: &Books, ports: &mut P
         }
         report(ports, &step.id, fetched, wanted, format!("下载：{url}"));
         let id = run.next_source_id();
-        let mut src = CommentSource { id, origin: SourceOrigin::Web, title: hit.title.trim().to_string(), item_id: None, attachment_id: None, url: Some(url.clone()), final_url: None, sha256: None, fetched_at: None, text_chars: 0, error: None, added_item: None };
+        let mut src = CommentSource { id, origin: SourceOrigin::Web, title: hit.title.trim().to_string(), item_id: None, attachment_id: None, url: Some(url.clone()), final_url: None, sha256: None, ext: None, fetched_at: None, text_chars: 0, error: None, added_item: None };
         match ports.fetch.fetch(&url, ports.cancel) {
             Ok(f) => {
                 src.final_url = Some(f.final_url);
                 src.fetched_at = Some(f.fetched_at);
+                src.ext = Some(f.ext);
                 if src.title.is_empty() {
                     src.title = f.title.unwrap_or_default();
                 }

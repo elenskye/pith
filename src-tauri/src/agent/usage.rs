@@ -36,6 +36,8 @@ pub fn price(model: &str) -> Price {
         "claude-haiku-5-5" => Price { input: 0.5, output: 2.5 },
         // DeepSeek 高峰价（闲时半价也按这个记，宁可多记）
         "deepseek-flash" => Price { input: 0.30, output: 1.20 },
+        // v0.4 概念研究（缓存命中 $0.10、单次输入超 272K 的加价在 `concept::responses` 里算）
+        "gpt-6.1-sol" => Price { input: 2.0, output: 10.0 },
         _ => UNKNOWN_PRICE,
     }
 }

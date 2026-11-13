@@ -261,6 +261,8 @@ fn key_saved_setting(which: ApiKey) -> &'static str {
         ApiKey::Anthropic => format_agent::KEY_SAVED,
         ApiKey::Deepseek => "research.key_saved.deepseek",
         ApiKey::Tavily => "research.key_saved.tavily",
+        // v0.4 概念研究的两把（`concept::keys`）
+        ApiKey::Openai | ApiKey::Mathpix => crate::concept::keys::saved_setting(which),
     }
 }
 
@@ -269,6 +271,7 @@ fn secret_of<'a>(which: ApiKey, agent: &'a AgentState, research: &'a ResearchSta
         ApiKey::Anthropic => agent.secret(),
         ApiKey::Deepseek => &research.deepseek,
         ApiKey::Tavily => &research.tavily,
+        ApiKey::Openai | ApiKey::Mathpix => crate::concept::keys::secret(which),
     }
 }
 
@@ -281,6 +284,15 @@ fn missing_keys(state: &AppState, agent: &AgentState, research: &ResearchState, 
         return Vec::new();
     }
     s.keys_needed().into_iter().filter(|k| !has_key(state, agent, research, *k)).map(|k| k.label().to_string()).collect()
+}
+
+/// v0.4 概念研究也用这里的密钥（Tavily；OpenAI、Mathpix 经 `secret_of` 找到 `concept::keys`）
+pub(crate) fn key_known(state: &AppState, agent: &AgentState, research: &ResearchState, which: ApiKey) -> bool {
+    has_key(state, agent, research, which)
+}
+
+pub(crate) fn key_load(which: ApiKey, agent: &AgentState, research: &ResearchState) -> Result<String, String> {
+    load_key(which, agent, research)
 }
 
 fn load_key(which: ApiKey, agent: &AgentState, research: &ResearchState) -> Result<String, String> {

@@ -59,6 +59,19 @@ const LABELS: &[(&str, &str)] = &[
     ("research_conclusions", "调查的结论"),
     ("research_conclusion_facts", "结论与事实的对应"),
     ("research_steps", "调查的步骤与费用"),
+    ("concept_texts", "概念研究的文本"),
+    ("concept_units", "文本的单元"),
+    ("concept_paragraphs", "文本的段落"),
+    ("concept_alignments", "中英对齐"),
+    ("concept_aligned", "对齐的段落"),
+    ("concept_runs", "概念研究"),
+    ("concept_steps", "概念研究的步骤与费用"),
+    ("concept_cards", "卡片"),
+    ("concept_sentences", "卡片的句"),
+    ("concept_anchors", "句的锚点"),
+    ("concept_relations", "卡片的关系"),
+    ("concept_sources", "评论的来源"),
+    ("concept_rejected", "核对拦下的句子"),
 ];
 
 fn label(table: &str) -> String {

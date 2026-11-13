@@ -235,6 +235,9 @@ pub struct CommentSource {
     pub url: Option<String>,
     pub final_url: Option<String>,
     pub sha256: Option<String>,
+    /// 网页快照原件的扩展名（加入文献库时作附件）
+    #[serde(default)]
+    pub ext: Option<String>,
     pub fetched_at: Option<String>,
     pub text_chars: usize,
     pub error: Option<String>,

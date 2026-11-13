@@ -651,7 +651,8 @@ fn is_word_char(c: char) -> bool {
 
 /// 建索引前的文本变换：全角转半角；中日韩连续文字改写成「重叠二元组 + 末字单字」，前后用空格与别的文字隔开。
 /// 其余文字原样交给 unicode61（它负责西文分词、大小写与重音）。
-fn index_text(s: &str) -> String {
+/// （v0.4 概念研究的段落检索也用：`concept::search`）
+pub(crate) fn index_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 2);
     let mut run: Vec<char> = Vec::new();
     let flush = |out: &mut String, run: &mut Vec<char>| {
@@ -682,9 +683,9 @@ fn index_text(s: &str) -> String {
 
 /// 查询解析的结果：FTS5 表达式（各短语之间隐式 AND），和没有文字、只能按原文找的符号词
 #[derive(Debug, PartialEq)]
-struct Parsed {
-    fts: Vec<String>,
-    literals: Vec<String>,
+pub(crate) struct Parsed {
+    pub(crate) fts: Vec<String>,
+    pub(crate) literals: Vec<String>,
 }
 
 fn quote(s: &str) -> String {
@@ -695,7 +696,7 @@ fn quote(s: &str) -> String {
 /// NEAR / AND / OR / NOT）一律当普通文字（它们不是字母数字，本来就只起分隔作用）。按空白分词，词与词之间 AND；
 /// 一个词里：连着的西文（被标点隔开的部分，如 `10.1000/abc`、`Müller-Lüdenscheidt`）组成一个短语、末词前缀匹配；
 /// 中日韩文字单字前缀、多字二元组短语。
-fn parse_query(q: &str) -> Parsed {
+pub(crate) fn parse_query(q: &str) -> Parsed {
     let mut fts: Vec<String> = Vec::new();
     let mut literals: Vec<String> = Vec::new();
     for word in q.split_whitespace() {
