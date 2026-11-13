@@ -279,7 +279,7 @@ CREATE INDEX metadata_lookups_item ON metadata_lookups(item_id, id);
 | --- | --- | --- | --- |
 | `0006_research.sql` | v0.3 | `research_questions`、`research_runs`、`research_searches`、`research_sources`、`research_facts`、`research_calcs`、`research_conclusions`、`research_conclusion_facts`、`research_steps` | 事实调查（`decisions/0020`）；快照文件在 `数据目录/research/sources/` |
 | `0007_research_fetch.sql` | v0.3 | `research_sources.fetched_via` | 下载失败时改用 Claude 网页抓取（`0023`） |
-| `0008_concept.sql`（计划） | v0.4 | 文本、章节、段落、对齐、技能运行、卡片、句、锚点、关系、评论来源 | 概念研究（`0024`），由云端 C1 / C2 建 |
+| `0008_concept.sql` | v0.4 | `concept_texts`（一份解析好的文本：附件 SHA-256、解析器版本、关联的原著）、`concept_units`（篇章节、导读、注释、前后附）、`concept_paragraphs`（角色、引用名、页码与段内分页点、注释引用）、`concept_alignments` + `concept_aligned`（中英对齐）、`concept_runs`、`concept_steps`（含模型原始输出）、`concept_cards`、`concept_sentences`、`concept_anchors`（一句一行：段落号、核对状态、位置、页码、中译核对）、`concept_relations`、`concept_sources`、`concept_rejected` | 概念研究（`0024`、`0025`）；保存一次研究 = 一个事务里整份换掉子表；评论来源的快照在 `数据目录/concept/sources/` |
 
 ## 不在主库里的
 

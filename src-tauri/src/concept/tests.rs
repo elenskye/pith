@@ -144,6 +144,42 @@ impl Recorder for Rec<'_> {
     }
 }
 
+/// 给「什么都有」的测试库（`transfer::tests::rich_library`，也是冻结样本库的来源）加上概念研究的数据：
+/// 两份夹具文本（英文连到 `item`、中文连上原著并对齐）、一次整章分析（模拟模型）和一次反方（文献库 + 上网，有来源）。
+pub(crate) fn sample(c: &Connection, backups: &std::path::Path, item: i64) {
+    let (et, em) = commands::parse_epub(&fixture::english_epub(Flavor::Epub3)).unwrap();
+    let en = commands::save_text(c, backups, &et, &em, None, Some(item), "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9", None).unwrap();
+    let (zt, zm) = commands::parse_epub(&fixture::chinese_epub()).unwrap();
+    let zh = commands::save_text(c, backups, &zt, &zm, None, None, "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0", Some(&en)).unwrap();
+    let (et, zt) = (store::text_load(c, &en).unwrap(), store::text_load(c, &zh).unwrap());
+    let al = store::alignment_load(c, &en, &zh).unwrap().unwrap();
+    let books = Books { original: &et, translation: Some(&zt), alignment: Some(&al) };
+    let skills = skill::builtin();
+    let store_ = concept_engine::mock::Store::default();
+    // 模拟文献库里的那条书评是别的库里的条目编号（外键对不上），这里只上网找
+    let shelf = concept_engine::mock::MockShelf { store: store_.clone(), has_review: false };
+    let fetch = concept_engine::mock::MockFetch { store: store_ };
+    let model = MockModel::default();
+    let run_skill = |name: &str, uid: &str, scope: Scope, targets: Vec<concept_engine::model::Card>| -> Run {
+        let sk = skills.iter().find(|s| s.name == name).unwrap();
+        let mut run = flow::new_run(uid, sk, scope, targets, ModelRef { provider: "mock".into(), model: "模拟模型".into() }, "medium", true, "2026-11-13T10:00:00.000Z".into()).unwrap();
+        let mut rec = Rec { c, text: en.clone() };
+        let now = || "2026-11-13T10:00:05.000Z".to_string();
+        let progress = |_| {};
+        let cancel = AtomicBool::new(false);
+        let mut ports = Ports { model: &model, search: &concept_engine::mock::MockSearch, fetch: &fetch, shelf: &shelf, recorder: &mut rec, now: &now, progress: &progress, cancel: &cancel };
+        flow::execute(&mut run, sk, &books, &mut ports).unwrap();
+        assert_eq!(run.status, RunStatus::Done, "{:?}", run.error);
+        run
+    };
+    let chapter = run_skill("chapter", "01JCONCEPTRUN0000000000001", chapter_scope(&et, "I.i", &zh, &en), Vec::new());
+    let target = chapter.cards[0].clone();
+    let mut sc = Scope { entry: Entry::Card, cards: vec![(chapter.uid.clone(), target.id.clone())], paragraphs: Vec::new(), unit: None, ..chapter_scope(&et, "I.i", &zh, &en) };
+    sc.with = vec!["web".into()];
+    let critics = run_skill("critics", "01JCONCEPTRUN0000000000002", sc, vec![target]);
+    assert!(!critics.sources.is_empty());
+}
+
 fn chapter_scope(t: &text::Text, unit: &str, translation: &str, text_uid: &str) -> Scope {
     let u = t.chapters().into_iter().find(|u| u.key == unit).unwrap().index;
     Scope { entry: Entry::Chapter, text: text_uid.into(), translation: Some(translation.into()), paragraphs: t.body_of(u).map(|p| p.key.clone()).collect(), unit: Some(unit.into()), question: None, terms: Vec::new(), cards: Vec::new(), instruction: None, skip: Vec::new(), with: Vec::new() }

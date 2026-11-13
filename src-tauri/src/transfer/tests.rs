@@ -61,6 +61,8 @@ pub(crate) fn rich_library(name: &str) -> Lib {
     let first = crate::research::store::tests::investigate(&c, q, "01JRESEARCHRUN000000000001", 1, None);
     crate::research::store::tests::investigate(&c, q, "01JRESEARCHRUN000000000002", 2, Some(&first));
     crate::research::store::source_set_item(&c, &first.uid, "S1", id).unwrap();
+    // v0.4：两份文本（英文连到这本书、中文对齐）、一次整章分析、一次反方（有来源）
+    crate::concept::tests::sample(&c, &paths.backups, id);
     crate::search::rebuild(&c).unwrap();
     Lib { _dir: dir, paths, c }
 }
@@ -106,6 +108,12 @@ fn exercise(c: &Connection) {
         crate::import::runs_get(c, r.id).unwrap();
     }
     crate::metadata::settings_get(c).unwrap();
+    for t in crate::concept::store::texts_list(c).unwrap() {
+        crate::concept::store::text_load(c, &t.uid).unwrap();
+        for r in crate::concept::store::runs_list(c, &t.uid).unwrap() {
+            crate::concept::store::run_load(c, &r.uid).unwrap();
+        }
+    }
     for q in crate::research::store::questions_list(c).unwrap() {
         for r in &q.runs {
             let run = crate::research::store::run_load(c, &r.uid).unwrap();

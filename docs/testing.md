@@ -29,6 +29,7 @@ pnpm check
 | Word 集成（v0.2） | `word/*.rs` | 本机服务：没令牌 / 令牌错 401、带 Origin 403、分块 411、超大 413、`Expect: 100-continue`、service.json 0600、停止时只删自己那份；宏协议：新文档第一处引文、旧名换新、复制粘贴重复、缺数据、切换样式、比 App 新的数据、搜索窗（新插入 / 编辑预填 / 删除 / 取消）、编辑保留 ID 与创建时间、Style 菜单清单、Word 里的 Zotero 转换；搜索窗：搜索、预填（库里 / 文档快照 / 找不到 / 回收站）、一次只有一个会话；样式：内置清单与 CSL 文件一致、导入 / 替换 / 依赖样式 / 删除；Zotero 条目 key 对应；CSL 映射（含印刷品文章不出网址、「额外」字段换算）；模板含全部按钮的回调与图片；装进临时「家目录」再卸载（真跑 osacompile）、写不进时由用户选中的文件夹写入 |
 | 排版 Agent（v0.2 W3） | `agent/*.rs`、`agent/tests.rs` | 整条流程用模拟模型和合成文档（提炼 → 合成规范 → 计划 → 排版 → 报告，原文件不变、不覆盖）；预算按最坏情况拦、上月不算；截断 / 拒答 / 格式不对照样记账且不存结果；中途停止按估计记账；流（SSE）解析用录好的文本；出处摘录核对、数值换算表、冲突取确定度高的；计划里不存在的样式 / 编不过的正则 / 越界的分节被丢掉；存档编号防路径穿越；测试不碰钥匙串、不联网 |
 | 事实调查（v0.3） | `crates/research-engine`（各模块单元测试、`tests/flow.rs`）、`src-tauri/src/research/*.rs`、`research/tests.rs` | 见下「事实调查」 |
+| 概念研究（v0.4） | `crates/concept-engine`（单元测试、`tests/text.rs`、`tests/flow.rs`）、`src-tauri/src/concept/tests.rs`、`src/cite/concept-locator.test.ts` | 见下「概念研究」 |
 | W5 版面（文档引擎） | `crates/docx-engine/tests/w5_layout.rs` | 已经另起一页的段落不再加段前分页（分节符后隔空段落、上一段以分页符结尾、一个标题分两段写）；新一节第一段、前面是正文的照样分页；受保护分节不动；表格里参考文献样式的段落换成表格文字；自带悬挂缩进的样式和列表段落写明 0 字符，参考文献保持原对齐；**改坏**（去掉段前不分页、去掉 0 字符）核对都查得出 |
 | 结构类排版（文档引擎，W4） | `crates/docx-engine/tests/structure.rs` | 「像论文」的合成文档上六类结构（分区与分节、页眉、页码、奇数页起、三线表、脚注编号、标题紧跟）；单面 / 双面；已有分节符后隔着空段落不多切一节；重复执行不重复加；表格可跳过、受保护分节不动；没给正文起点时如实标出；过期的分界点被拒绝；**把排好的文档逐项改坏，校验器都查得出**（含多一个部件、多一条关系、子元素顺序挪乱） |
 | 结构摘要与检查（文档引擎） | `crates/docx-engine/tests/outline.rs`、`src/checks.rs` | 分节的数法与排版器一致；计划预览的命中数 = 排版器实际改的段落数；页面设置缺省的项不动；摘要字数（Word 的算法）、关键词、参考文献条数与外文占比、题注是否按章编号 |
@@ -72,6 +73,40 @@ PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录
 
 ```bash
 PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith import_research_runs -- --ignored --nocapture
+```
+
+## 概念研究（v0.4，`decisions/0024`、`0025`）
+
+- **引擎**（`crates/concept-engine`）：EPUB 2 / 3 夹具（现拼，不放二进制；英文是 Project Gutenberg #3300 的第一篇第 1–3 章，中文是合成的）上的单元、角色、段落号、页码、对齐；`SKILL.md` 的格式检查；录制回复跑四种入口、反方（文献库 / 上网）、推演、自由；**改坏**：引文改一个字、挂错段落、不存在的段落号、标成原文却没有锚点、推演混进原文类、旁注或导读被标成原文、他人观点没有来源，都拦下；`audit` 查出存下的结果被改。
+- **App 一侧**（`src-tauri/src/concept/tests.rs`）：附件 → 解析 → 存（导入前备份）→ 对齐；段落检索（中文词映射回原著）、检索表自动重建；从 v7 升级；OpenAI Responses 与网页搜索、Mathpix（本地假服务器）；端到端整章分析 + 反方，费用合计 = 账本；Word 搜索窗的原文。
+- **Word**：`word/bridge.rs` 的 `pick_card_quote_adds_a_quote_line`（选了卡片原文时多一行 `Q`）；`src/cite/concept-locator.test.ts`（页码 + 段落号、只有段落号在 GB/T 与 APA 下的写法）。
+- **两本真实 EPUB**（默认忽略，只打印聚合数字）：
+
+```bash
+PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p concept-engine --test real_books -- --ignored --nocapture
+```
+
+- **mock 数据**由引擎生成，改了输出结构就重新生成：
+
+```bash
+cargo run -q -p concept-engine --example mock_data > src/dev/mockConcept.json
+```
+
+- **真实验收**（默认忽略；会联网花钱，事先问用户上限）：和 App 走同一条路（确认框的内容 → 建研究 → 执行），结果存进 `PITH_ACCEPT_DIR`，打包版用 `PITH_DATA_DIR` 指过去就能看。密钥文件每行 `名字=密钥`（`openai=…`、`mathpix=app_id:app_key`）。分几步：
+  - `PITH_STAGE=books`（不联网）：`PITH_BOOK_EN`、`PITH_BOOK_ZH` 两本 EPUB 进文献库、解析、存、对齐；
+  - `PITH_STAGE=pdf`：`PITH_PDF` 经 Mathpix 转文字后存（`PITH_EXPORT_DIR` 里留下 `lines.json` 和 `.mmd`）；
+  - `PITH_STAGE=run`：`PITH_TEXT=en|zh|pdf`，`PITH_REQUEST` 是页面发的请求（如 `{"skill":"chapter","entry":"chapter","unit":"I.i"}`；问题和概念不给段落时先本地检索，`PITH_SEARCH` 换检索词、`PITH_LIMIT` 取几段）。先打印确认框，加 `PITH_GO=1` 才发送；做完打印卡片、核对、审计，导出到 `PITH_EXPORT_DIR`；
+  - `PITH_STAGE=search PITH_SEARCH=<词>`：只看本地检索的结果（不联网）；`PITH_STAGE=export PITH_RUN=<uid>`：只重新审计、导出；`PITH_STAGE=quotes`：Word 搜索窗里的「卡片里的原文」。
+- **把概念研究导进另一个数据目录**（默认忽略；v0.4 验收时把测试目录的结果导进了正式数据目录）：书和附件在目标里新建（附件按 SHA-256 核对），文本和研究的 uid 不变、已有的跳过，评论来源的快照逐个核对 SHA-256，文献库里的编号不带过去，账本里的真实调用补进目标，导完重新审计；先做「导入前」备份。目标是正式数据目录时先退出正式版。`PITH_DRY_RUN=1` 只列出要导的东西、不打开目标（打开会把目标库升到最新版本），想完整演练就先把目标目录复制一份导进副本：
+
+```bash
+PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith import_concept_runs -- --ignored --nocapture
+```
+
+- **在 Word 里试原文插入**：同上面「Word 端到端」，数据目录换成 `PITH_ACCEPT_DIR` 那个（里面有做好的研究）；Word 里 Add/Edit Citation → 选书 → 「卡片里的原文」选一句。
+
+```bash
+PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=run PITH_REQUEST='<请求>' PITH_GO=1 cargo test -p pith real_concept_run -- --ignored --nocapture
 ```
 
 ## 真实数据（默认忽略，只读，只打印汇总数字）

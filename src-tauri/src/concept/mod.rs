@@ -10,4 +10,4 @@ pub mod responses;
 pub mod search;
 pub mod store;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

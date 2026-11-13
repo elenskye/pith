@@ -132,7 +132,7 @@ fn generate(req: &ModelRequest) -> Value {
             for (i, (k, t)) in paragraphs.iter().enumerate().take(3) {
                 let q = first_sentence(t);
                 out_cards.push(json!({ "key": format!("c{}", i + 1), "kind": kind, "title": format!("（模拟）{k} 的要点"), "about": [],
-                    "sentences": [ { "category": "original", "text": q, "paragraph": k, "quote": q, "zh": null, "source": null }, { "category": "explanation", "text": format!("（模拟）这一段的意思。"), "paragraph": k, "quote": null, "zh": null, "source": null } ] }));
+                    "sentences": [ { "category": "original", "text": q, "paragraph": k, "quote": q, "zh": null, "source": null }, { "category": "explanation", "text": "（模拟）这一段的意思。", "paragraph": k, "quote": null, "zh": null, "source": null } ] }));
             }
         }
     }

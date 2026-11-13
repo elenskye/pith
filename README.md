@@ -14,7 +14,7 @@
 
 ## 当前状态
 
-- 0.4.0，正在做 v0.4 Concept Research（读书：概念卡、论证卡、关系图，`docs/decisions/0024`）。
+- 0.4.0：v0.4 Concept Research 做完、本地验收过，等用户抽查（`docs/decisions/0024`、`0025`）。文献库里的 EPUB / PDF 解析成带段落号和页码的文本，用技能做出概念卡、论证卡、关系图、反方与推演，每句原文逐字核对；Word 里能把卡片原文插成引文。
 - 已经能用：v0.1 文献库（Zotero 迁移、搜索管理、PDF 阅读标注、联网补全、备份恢复）、v0.2 Word（顶栏「Pith」选项卡里的引用、排版 Agent）、v0.3 事实调查。
 - 交接看 `HANDOFF.md`，计划看 `ROADMAP.md`。
 
@@ -62,7 +62,7 @@ pnpm check
 | `HANDOFF.md` / `HANDOFF-cloud.md` | 最近一轮交接 / 给云端 Claude 的任务与它的记录 |
 | `ROADMAP.md` | 现在 / 已完成 / 以后 |
 | `docs/requirements.md` | 已定需求 |
-| `docs/decisions/` | 决策记录（一事一文，`0024` 是 v0.4 计划） |
+| `docs/decisions/` | 决策记录（一事一文；v0.4 计划 `0024`、验收 `0025`） |
 | `docs/architecture.md` | 目录、规则、各模块的流程 |
 | `docs/schema.md` | 数据库结构 |
 | `docs/testing.md` | 测试约定与真实验收命令 |

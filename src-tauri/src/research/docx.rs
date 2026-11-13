@@ -191,16 +191,23 @@ fn numbering(lists: u32) -> String {
     )
 }
 
-/// 报告 → .docx 的字节
+/// 报告 → .docx 的字节（事实调查：「短答」「全过程」两个一级标题）
 pub fn write(doc: &Doc) -> Result<Vec<u8>, String> {
+    write_with(doc, "短答", Some("全过程"))
+}
+
+/// 同 `write`，开头一段和后面各节用自己的一级标题（概念研究：「概要」、各节直接用二级标题，`rest` 为空）
+pub fn write_with(doc: &Doc, lead: &str, rest: Option<&str>) -> Result<Vec<u8>, String> {
     let mut b = Builder { body: String::new(), links: Vec::new(), bookmark: 0, numbered: 0 };
     b.para(Some("Title"), "", &run(&doc.title, ""));
     b.para(Some("Subtitle"), "", &run(&doc.byline, ""));
-    b.para(Some("Heading1"), "", &run("短答", ""));
+    b.para(Some("Heading1"), "", &run(lead, ""));
     b.blocks(&doc.lead);
-    b.para(Some("Heading1"), "", &run("全过程", ""));
+    if let Some(r) = rest {
+        b.para(Some("Heading1"), "", &run(r, ""));
+    }
     for s in &doc.sections {
-        b.para(Some("Heading2"), "", &run(&s.title, ""));
+        b.para(Some(if rest.is_some() { "Heading2" } else { "Heading1" }), "", &run(&s.title, ""));
         b.blocks(&s.blocks);
     }
     let sect = r#"<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1200" w:bottom="1440" w:left="1200" w:header="851" w:footer="992" w:gutter="0"/></w:sectPr>"#;
@@ -251,6 +258,16 @@ mod tests {
                 }],
             }],
         }
+    }
+
+    /// 概念研究用自己的标题：「概要」，各节直接是一级标题，没有「短答」「全过程」
+    #[test]
+    fn concept_headings() {
+        let pkg = Package::read(&write_with(&sample(), "概要", None).unwrap()).unwrap();
+        let text = docx_engine::outline::doc_text(&pkg).unwrap();
+        assert!(text.contains("概要") && !text.contains("短答") && !text.contains("全过程"), "{text}");
+        let doc = pkg.get_str("word/document.xml").unwrap();
+        assert!(!doc.contains(r#"w:val="Heading2""#));
     }
 
     #[test]

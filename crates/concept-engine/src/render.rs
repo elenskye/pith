@@ -116,12 +116,20 @@ fn counts(run: &Run) -> String {
     )
 }
 
+/// 时间戳（UTC 的 ISO）→「2026-11-13 09:22 UTC」
+fn when(t: &str) -> String {
+    match t.get(..16) {
+        Some(m) if t.ends_with('Z') => format!("{} UTC", m.replace('T', " ")),
+        _ => t.replace('T', " "),
+    }
+}
+
 /// 一次研究 → Doc（Markdown、Word 共用）
 pub fn document(run: &Run, books: &Books, findings: &[Finding]) -> Doc {
     let byline = format!(
         "{} · {} · {}{}",
         if books.original.title.is_empty() { "原著" } else { &books.original.title },
-        run.finished_at.as_deref().unwrap_or(&run.created_at).replace('T', " "),
+        when(run.finished_at.as_deref().unwrap_or(&run.created_at)),
         if run.mock { "模拟模型".to_string() } else { run.model.model.clone() },
         if run.mock { "（示例数据）" } else { "" }
     );

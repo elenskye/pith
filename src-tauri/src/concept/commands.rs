@@ -869,14 +869,16 @@ pub fn search_hits(c: &rusqlite::Connection, uid: &str, query: &str, limit: usiz
         let l = load_books(c, &uid)?;
         let id = store::text_id(c, &uid)?;
         let mut hits: Vec<(usize, f64, bool)> = Vec::new();
+        // 多取一些候选：中译的命中有不少在导读、注释或没对齐的章里，映射不回原著；先按相关度取前 limit 条，再按书里的顺序排
+        let pool = (limit * 8).min(800);
         let terms: Vec<&str> = query.split(['；', ';', '\n', '，', ',']).map(str::trim).filter(|t| !t.is_empty()).collect();
         let terms = if terms.is_empty() { vec![query.trim()] } else { terms };
         for term in terms.iter().filter(|t| !t.is_empty()) {
-            let direct = search::query(c, id, term, limit)?;
+            let direct = search::query(c, id, term, pool)?;
             let mapped: Vec<(usize, f64)> = match (&l.translation, &l.alignment) {
                 (Some((tu, zh)), Some(al)) if direct.is_empty() || term.chars().any(text::is_cjk) => {
                     let zid = store::text_id(c, tu)?;
-                    search::query(c, zid, term, limit)?
+                    search::query(c, zid, term, pool)?
                         .into_iter()
                         .filter_map(|(zseq, score)| {
                             // 正文映射回原著；旁注、注释映射到它挂的正文段
@@ -899,9 +901,10 @@ pub fn search_hits(c: &rusqlite::Connection, uid: &str, query: &str, limit: usiz
                 }
             }
         }
-        // 按书里的顺序（追踪概念要按章看）
-        hits.sort_by_key(|h| h.0);
+        // bm25 越小越相关：先按相关度留前 limit 条，再按书里的顺序（追踪概念要按章看）
+        hits.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
         hits.truncate(limit);
+        hits.sort_by_key(|h| h.0);
         let t = &l.original;
         Ok(hits
             .into_iter()
@@ -1086,24 +1089,28 @@ fn preview_run(state: &AppState, agent: &AgentState, research: &ResearchState, c
 /// 新的一次研究（`resume` 为空）或接着做一次没做完的：算出每步发什么、最坏多少钱（不联网）
 #[tauri::command(async)]
 pub fn concept_run_prepare(state: State<AppState>, agent: State<AgentState>, research: State<ResearchState>, concept: State<ConceptState>, request: Option<RunRequest>, resume: Option<String>) -> Result<RunPreview, String> {
+    run_prepare(&state, &agent, &research, &concept, request, resume)
+}
+
+fn run_prepare(state: &AppState, agent: &AgentState, research: &ResearchState, concept: &ConceptState, request: Option<RunRequest>, resume: Option<String>) -> Result<RunPreview, String> {
     if let Some(uid) = resume {
         let (text_uid, run) = state.with_db(|c| Ok((store::run_text(c, &uid)?, store::run_load(c, &uid)?)))?;
         if run.status == RunStatus::Done {
             return Err("这次研究已经做完了。".into());
         }
-        let sk = find_skill(&state, &run.skill)?;
+        let sk = find_skill(state, &run.skill)?;
         let scope = run.scope.clone().ok_or("这次研究没有范围")?;
         let ticket = Ticket::Run { text_uid, skill: sk.name.clone(), scope: Box::new(scope), targets: run.targets.clone(), previous: run.previous.clone(), resume: Some(uid) };
-        return preview_run(&state, &agent, &research, &concept, &sk, &run, ticket);
+        return preview_run(state, agent, research, concept, &sk, &run, ticket);
     }
     let r = request.ok_or("没有给要研究的范围")?;
-    let sk = find_skill(&state, &r.skill)?;
+    let sk = find_skill(state, &r.skill)?;
     let (translation, targets) = state.with_db(|c| Ok((store::partner(c, &r.text_uid)?.filter(|(_, is_translation)| *is_translation).map(|(u, _)| u), targets_of(c, &r.cards)?)))?;
     let scope = Scope { entry: r.entry, text: r.text_uid.clone(), translation, paragraphs: r.paragraphs, unit: r.unit, question: r.question.filter(|q| !q.trim().is_empty()), terms: r.terms.into_iter().filter(|t| !t.trim().is_empty()).collect(), cards: r.cards, instruction: r.instruction.filter(|q| !q.trim().is_empty()), skip: r.skip, with: r.with };
-    let s = settings(&state);
+    let s = settings(state);
     let run = flow::new_run("preview", &sk, scope.clone(), targets.clone(), ModelRef { provider: s.provider().into(), model: s.model.clone() }, &s.effort, mock_mode(), apptext::now_iso())?;
     let ticket = Ticket::Run { text_uid: r.text_uid, skill: sk.name.clone(), scope: Box::new(scope), targets, previous: None, resume: None };
-    preview_run(&state, &agent, &research, &concept, &sk, &run, ticket)
+    preview_run(state, agent, research, concept, &sk, &run, ticket)
 }
 
 /// 用同一技能对同一范围重跑（旧结果保留）
@@ -1156,25 +1163,7 @@ pub fn execute_now(state: &AppState, agent: &AgentState, research: &ResearchStat
 /// 用户确认后：建这次研究（或接着做），在后台跑。马上返回 uid；进度看 `concept-progress`，做完看 `concept-done`
 #[tauri::command(async)]
 pub fn concept_run_execute(app: AppHandle, state: State<AppState>, agent: State<AgentState>, research: State<ResearchState>, concept: State<ConceptState>, ticket: u64) -> Result<String, String> {
-    let Ticket::Run { text_uid, skill, scope, targets, previous, resume } = concept.take(ticket)? else { return Err("这次确认已经过期，请重新确认。".into()) };
-    let sk = find_skill(&state, &skill)?;
-    let s = settings(&state);
-    let probe = flow::new_run("probe", &sk, (*scope).clone(), targets.clone(), ModelRef::default(), &s.effort, mock_mode(), String::new())?;
-    let with_web = flow::active_steps(&sk, &probe).iter().any(|i| sk.steps[*i].kind == StepKind::Web);
-    let missing = missing_keys(&state, &agent, &research, &s, with_web);
-    if !missing.is_empty() {
-        return Err(format!("还没有填 {} 的密钥。到「设置 › 密钥与费用」填写后再试。", missing.join("、")));
-    }
-    let uid = match resume {
-        Some(u) => u,
-        None => {
-            let uid = new_uid()?;
-            let mut run = flow::new_run(&uid, &sk, *scope, targets, ModelRef { provider: if mock_mode() { "mock".into() } else { s.provider().into() }, model: if mock_mode() { "模拟模型".into() } else { s.model.clone() } }, &s.effort, mock_mode(), apptext::now_iso())?;
-            run.previous = previous;
-            state.with_db(|c| store::run_save(c, &text_uid, &run))?;
-            uid
-        }
-    };
+    let uid = run_create(&state, &agent, &research, &concept, ticket)?;
     concept.claim(&uid)?;
     let app = app.clone();
     let id = uid.clone();
@@ -1194,6 +1183,30 @@ pub fn concept_run_execute(app: AppHandle, state: State<AppState>, agent: State<
         };
         let _ = app.emit(DONE_EVENT, serde_json::json!({ "uid": id, "status": status, "error": error }));
     });
+    Ok(uid)
+}
+
+/// 确认后建这次研究（或接着做的那次），返回 uid；查密钥
+fn run_create(state: &AppState, agent: &AgentState, research: &ResearchState, concept: &ConceptState, ticket: u64) -> Result<String, String> {
+    let Ticket::Run { text_uid, skill, scope, targets, previous, resume } = concept.take(ticket)? else { return Err("这次确认已经过期，请重新确认。".into()) };
+    let sk = find_skill(state, &skill)?;
+    let s = settings(state);
+    let probe = flow::new_run("probe", &sk, (*scope).clone(), targets.clone(), ModelRef::default(), &s.effort, mock_mode(), String::new())?;
+    let with_web = flow::active_steps(&sk, &probe).iter().any(|i| sk.steps[*i].kind == StepKind::Web);
+    let missing = missing_keys(state, agent, research, &s, with_web);
+    if !missing.is_empty() {
+        return Err(format!("还没有填 {} 的密钥。到「设置 › 密钥与费用」填写后再试。", missing.join("、")));
+    }
+    let uid = match resume {
+        Some(u) => u,
+        None => {
+            let uid = new_uid()?;
+            let mut run = flow::new_run(&uid, &sk, *scope, targets, ModelRef { provider: if mock_mode() { "mock".into() } else { s.provider().into() }, model: if mock_mode() { "模拟模型".into() } else { s.model.clone() } }, &s.effort, mock_mode(), apptext::now_iso())?;
+            run.previous = previous;
+            state.with_db(|c| store::run_save(c, &text_uid, &run))?;
+            uid
+        }
+    };
     Ok(uid)
 }
 
@@ -1312,7 +1325,7 @@ pub fn export_bytes(run: &Run, books: &Books, findings: &[Finding], format: Form
         Format::Markdown => render::markdown(run, books, findings).into_bytes(),
         Format::Html => render::html(run, books, findings).into_bytes(),
         // Word：和事实调查一样，用文档引擎拼最小的 .docx（`research/docx.rs`，同一份 Doc）
-        Format::Docx => crate::research::docx::write(&render::document(run, books, findings))?,
+        Format::Docx => crate::research::docx::write_with(&render::document(run, books, findings), "概要", None)?,
     })
 }
 
@@ -1435,4 +1448,396 @@ pub fn quotes_for_item(c: &rusqlite::Connection, item_uid: &str) -> Result<Vec<Q
         }
     }
     Ok(out)
+}
+
+// ---------- C4 真实验收（默认忽略；会联网花钱，事先问用户上限） ----------
+
+#[cfg(test)]
+mod real_acceptance {
+    //! 和 App 的命令走同一条路：`run_prepare`（确认框里的内容）→ `run_create` → `execute_now`，结果存进 `PITH_ACCEPT_DIR`，
+    //! 打包版用 `PITH_DATA_DIR` 指过去就能在 App 里看。命令见 `docs/testing.md`「概念研究」。
+    use super::*;
+    use crate::edit::{self, CreatorInput, ItemPatch};
+    use crate::paths::DataPaths;
+    use concept_engine::model::{Category, Status};
+    use std::collections::BTreeMap;
+
+    fn env(k: &str) -> Option<String> {
+        std::env::var(k).ok().filter(|v| !v.trim().is_empty())
+    }
+
+    fn person(role: &str, family: &str, given: &str) -> CreatorInput {
+        CreatorInput { role: role.into(), family: Some(family.into()), given: Some(given.into()), literal: None }
+    }
+
+    fn literal(role: &str, name: &str) -> CreatorInput {
+        CreatorInput { role: role.into(), family: None, given: None, literal: Some(name.into()) }
+    }
+
+    /// 文献库里建一条书目、附上文件，返回（条目 id, 附件 id）
+    fn item_with(state: &AppState, c: &rusqlite::Connection, kind: &str, fields: &[(&str, &str)], creators: Vec<CreatorInput>, file: &Path) -> Result<(i64, i64), String> {
+        let id = edit::item_create(c, kind, None)?;
+        let fields: BTreeMap<String, String> = fields.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        edit::item_update(c, id, &ItemPatch { fields, creators: Some(creators), ..Default::default() })?;
+        let (aid, mut docs) = edit::attachment_add(c, &state.paths.attachments, Some(id), file)?;
+        docs.push(crate::search::DocRef::item(id));
+        crate::search::update(c, &docs)?;
+        Ok((id, aid))
+    }
+
+    fn print_text(t: &Text) {
+        let body = t.paragraphs.iter().filter(|p| p.role == Role::Body).count();
+        println!("  段落 {}（正文 {body}），单元 {}，页码来源 {:?}，段落号 {:?}", t.paragraphs.len(), t.units.len(), t.page_source, t.numbering);
+        for u in t.chapters().into_iter().take(3) {
+            let n = t.body_of(u.index).count();
+            let pages: Vec<String> = t.body_of(u.index).filter_map(|p| t.paragraph_pages(p.seq)).collect();
+            println!("  {} {}：正文 {n} 段，页码 {}–{}", u.key, u.label, pages.first().map(String::as_str).unwrap_or("-"), pages.last().map(String::as_str).unwrap_or("-"));
+        }
+    }
+
+    fn summarize(state: &AppState, concept: &ConceptState, uid: &str) {
+        let v = view(state, concept, uid).unwrap();
+        let run = &v.run;
+        println!("\n研究 {uid}：{:?}，错误 {:?}，费用 ${:.4}", run.status, run.error, v.cost_usd);
+        let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
+        let mut cats: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+        let mut unanchored = 0;
+        for card in &run.cards {
+            *kinds.entry(format!("{:?}", card.kind)).or_default() += 1;
+            for s in &card.sentences {
+                let e = cats.entry(format!("{:?}", s.category)).or_default();
+                e.0 += 1;
+                if s.check.status == Status::Verified {
+                    e.1 += 1;
+                }
+                if s.category == Category::Explanation && s.paragraph.is_none() {
+                    unanchored += 1;
+                }
+            }
+        }
+        println!("卡片 {kinds:?}；关系 {}；句子（共, 核对通过）{cats:?}；没挂上原文的解释 {unanchored}", run.relations.len());
+        let zh_ok = run.cards.iter().flat_map(|c| &c.sentences).filter(|s| s.check.zh_status == Some(concept_engine::model::ZhStatus::Verified)).count();
+        println!("中译句核对通过 {zh_ok}；来源 {}；拦下的句子 {}；审计问题 {}", run.sources.len(), run.rejected.len(), v.findings.len());
+        for r in &run.rejected {
+            println!("  拦下：{} {} — {}", r.card, r.sentence.paragraph.as_deref().unwrap_or("-"), r.reason);
+        }
+        for f in &v.findings {
+            println!("  审计：{f:?}");
+        }
+        for card in &run.cards {
+            println!("  {} [{:?}] {}（{} 句）", card.id, card.kind, card.title, card.sentences.len());
+        }
+        if let Some(dir) = env("PITH_EXPORT_DIR") {
+            let l = state.with_db(|c| load_books(c, &v.text_uid)).unwrap();
+            for (format, ext) in [(Format::Markdown, "md"), (Format::Html, "html"), (Format::Docx, "docx")] {
+                let path = export_path(Path::new(&dir), &render::title(run), ext);
+                std::fs::write(&path, export_bytes(run, &l.books(), &v.findings, format).unwrap()).unwrap();
+                println!("导出 {}", path.display());
+            }
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn real_concept_run() {
+        let root = PathBuf::from(env("PITH_ACCEPT_DIR").expect("要设 PITH_ACCEPT_DIR（数据目录）"));
+        let state = AppState::init(DataPaths::new(root.clone()));
+        let (agent, research, concept) = (AgentState::default(), ResearchState::default(), ConceptState::default());
+        if let Some(b) = env("PITH_BUDGET") {
+            let b: f64 = b.parse().expect("PITH_BUDGET 要是数");
+            state.with_db(|c| crate::metadata::put_setting(c, format_agent::BUDGET_KEY, Some(&b.to_string()))).unwrap();
+        }
+        if let Some(e) = env("PITH_EFFORT") {
+            let s = Settings { effort: e, ..settings(&state) };
+            s.check().unwrap();
+            state.with_db(|c| crate::metadata::put_setting(c, SETTINGS_KEY, Some(&serde_json::to_string(&s).unwrap()))).unwrap();
+        }
+        let ledger = Ledger::new(&root);
+        let started = apptext::now_iso();
+        let spent = |at: &str| ledger.all().unwrap().iter().filter(|c| !c.mock && c.at.as_str() >= at).map(|c| c.cost_usd).sum::<f64>();
+        println!("模拟模式 {}；月上限 ${:.2}，本月已花 ${:.4}", mock_mode(), format_agent::budget(&state), ledger.month_total(&started[..7]).unwrap());
+        let texts = state.with_db(|c| store::texts_list(c)).unwrap();
+        let find = |lang: &str| texts.iter().find(|t| t.language == lang).map(|t| t.uid.clone());
+        match env("PITH_STAGE").as_deref().unwrap_or("books") {
+            // 两本书进文献库、解析、存、对齐（不联网）
+            "books" => {
+                if !texts.is_empty() {
+                    println!("已经有 {} 份文本，跳过", texts.len());
+                    return;
+                }
+                let en = PathBuf::from(env("PITH_BOOK_EN").expect("要设 PITH_BOOK_EN"));
+                let zh = PathBuf::from(env("PITH_BOOK_ZH").expect("要设 PITH_BOOK_ZH"));
+                let saved = state
+                    .with_db(|c| {
+                        crate::import::backup_before(c, &state.paths.backups)?;
+                        let (ei, ea) = item_with(&state, c, "book", &[("title", "The Wealth of Nations"), ("publisher", "Penguin Books"), ("place", "London"), ("date", "1999"), ("series", "Penguin Classics"), ("language", "en")], vec![person("author", "Smith", "Adam"), person("editor", "Skinner", "Andrew")], &en)?;
+                        let f = shelf::attachment_file(c, &state.paths.attachments, ea)?;
+                        let (t, meta) = parse_epub(&std::fs::read(&f.path).map_err(|e| e.to_string())?)?;
+                        println!("英文：");
+                        print_text(&t);
+                        let en_uid = save_text(c, &state.paths.backups, &t, &meta, Some(ea), Some(ei), &f.sha256, None)?;
+                        let (zi, za) = item_with(&state, c, "book", &[("title", "国富论"), ("publisher", "陕西人民出版社"), ("place", "西安"), ("date", "2011"), ("ISBN", "9787224094282"), ("language", "zh")], vec![literal("author", "亚当·斯密"), literal("translator", "杨敬年")], &zh)?;
+                        let f = shelf::attachment_file(c, &state.paths.attachments, za)?;
+                        let (t, meta) = parse_epub(&std::fs::read(&f.path).map_err(|e| e.to_string())?)?;
+                        println!("中文：");
+                        print_text(&t);
+                        let zh_uid = save_text(c, &state.paths.backups, &t, &meta, Some(za), Some(zi), &f.sha256, Some(&en_uid))?;
+                        Ok((en_uid, zh_uid))
+                    })
+                    .unwrap();
+                let al = state.with_db(|c| store::alignment_load(c, &saved.0, &saved.1)).unwrap().unwrap();
+                println!("存好：英文 {}，中文 {}；对齐的章 {:?}", saved.0, saved.1, al.units.iter().filter(|u| u.aligned).map(|u| u.key.clone()).take(5).collect::<Vec<_>>());
+            }
+            // 一份短 PDF 经 Mathpix 转文字（花钱：每页 $0.005）
+            "pdf" => {
+                let path = PathBuf::from(env("PITH_PDF").expect("要设 PITH_PDF"));
+                let bytes = std::fs::read(&path).unwrap();
+                let pages = mathpix::local_pages(&bytes).unwrap().len() as u32;
+                let s = settings(&state);
+                println!("{pages} 页，预计 ${:.3}", pages as f64 * mathpix::PAGE_USD);
+                let meter = Arc::new(Meter::new(&root, format_agent::budget(&state), s.prices.clone()));
+                let client = Mathpix::new(s.mathpix_base.as_deref(), &load_key(&agent, &research, ApiKey::Mathpix).unwrap(), meter).unwrap();
+                let done = client.convert(&bytes, &path.file_name().unwrap().to_string_lossy(), pages, &concept.cancel, &|p| println!("  … {p}")).map_err(|e| e.message).unwrap();
+                println!("Mathpix {}：{} 页，${:.4}，删掉副本 {}", done.pdf_id, done.pages, done.cost_usd, done.deleted);
+                if let Some(dir) = env("PITH_EXPORT_DIR") {
+                    std::fs::write(Path::new(&dir).join("mathpix-lines.json"), serde_json::to_string_pretty(&done.lines).unwrap()).unwrap();
+                    std::fs::write(Path::new(&dir).join("mathpix.mmd"), done.mmd.clone().unwrap_or_default()).unwrap();
+                }
+                let title = env("PITH_PDF_TITLE").unwrap_or_else(|| path.file_stem().unwrap().to_string_lossy().into_owned());
+                let t = text_mathpix::from_lines(&done.lines, done.mmd.as_deref(), &title, None).unwrap();
+                for p in &t.paragraphs {
+                    println!("  {:?} {} 页{:?}：{}", p.role, p.key, t.paragraph_pages(p.seq), p.text.chars().take(30).collect::<String>());
+                }
+                let uid = state
+                    .with_db(|c| {
+                        crate::import::backup_before(c, &state.paths.backups)?;
+                        let (i, a) = item_with(&state, c, "magazineArticle", &[("title", &title), ("publicationTitle", "示例周刊"), ("date", "2026"), ("language", "zh")], vec![literal("author", "林舟")], &path)?;
+                        let f = shelf::attachment_file(c, &state.paths.attachments, a)?;
+                        let meta = store::Meta { converter: Some("mathpix".into()), pages: Some(pages), warnings: t.warnings.clone(), ..Default::default() };
+                        save_text(c, &state.paths.backups, &t, &meta, Some(a), Some(i), &f.sha256, None)
+                    })
+                    .unwrap();
+                println!("存好：{uid}");
+            }
+            // 一次研究：PITH_TEXT=en|zh|pdf|<uid>，PITH_REQUEST 是确认框之前的请求（不含 textUid），PITH_GO=1 才真的发
+            "run" => {
+                let text_uid = match env("PITH_TEXT").as_deref().unwrap_or("en") {
+                    "en" => find("en").expect("先跑 books"),
+                    "zh" => find("zh").expect("先跑 books"),
+                    "pdf" => texts.iter().find(|t| t.format == "pdf").map(|t| t.uid.clone()).expect("先跑 pdf"),
+                    other => other.to_string(),
+                };
+                let mut req: serde_json::Value = serde_json::from_str(&env("PITH_REQUEST").expect("要设 PITH_REQUEST")).unwrap();
+                req["textUid"] = text_uid.clone().into();
+                // 和页面一样：整章给出正文段；问题、概念先在本地检索，取前几条
+                if req["paragraphs"].as_array().is_none_or(|a| a.is_empty()) {
+                    let l = state.with_db(|c| load_books(c, &text_uid)).unwrap();
+                    let t = &l.original;
+                    let keys: Vec<String> = if let Some(unit) = req["unit"].as_str() {
+                        let u = t.chapters().into_iter().find(|u| u.key == unit).expect("没有这一章").index;
+                        t.body_of(u).map(|p| p.key.clone()).collect()
+                    } else {
+                        let limit: usize = env("PITH_LIMIT").and_then(|v| v.parse().ok()).unwrap_or(8);
+                        let mut queries: Vec<String> = req["terms"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default();
+                        if let Some(q) = env("PITH_SEARCH").or_else(|| req["question"].as_str().map(String::from)) {
+                            queries.insert(0, q);
+                        }
+                        let mut keys = Vec::new();
+                        for q in &queries {
+                            for h in state.with_db(|c| search_hits(c, &text_uid, q, limit)).unwrap() {
+                                println!("  检索「{q}」：{} {}（经中译 {}）", h.key, h.unit_key, h.via_translation);
+                                if h.role == Role::Body && !keys.contains(&h.key) {
+                                    keys.push(h.key);
+                                }
+                            }
+                        }
+                        keys.truncate(limit);
+                        keys
+                    };
+                    req["paragraphs"] = keys.into();
+                }
+                let request: RunRequest = serde_json::from_value(req).unwrap();
+                let preview = run_prepare(&state, &agent, &research, &concept, Some(request), None).unwrap();
+                let mut shown = serde_json::to_value(&preview).unwrap();
+                shown.as_object_mut().unwrap().remove("ticket");
+                println!("确认框：{}", serde_json::to_string_pretty(&shown).unwrap());
+                if env("PITH_GO").as_deref() != Some("1") {
+                    println!("（没有 PITH_GO=1，只看确认框，不发送）");
+                    return;
+                }
+                assert!(preview.within_budget && preview.missing_keys.is_empty(), "超上限或缺密钥");
+                let uid = run_create(&state, &agent, &research, &concept, preview.ticket).unwrap();
+                let progress = |p: Progress| println!("  … {}", serde_json::to_string(&p).unwrap_or_default());
+                let status = execute_now(&state, &agent, &research, &concept, &uid, &progress);
+                println!("结束：{status:?}；这次花了 ${:.4}", spent(&started));
+                summarize(&state, &concept, &uid);
+            }
+            // 本地检索（不联网）：PITH_TEXT、PITH_SEARCH、PITH_LIMIT
+            "search" => {
+                let text_uid = find(env("PITH_TEXT").as_deref().unwrap_or("en")).expect("先跑 books");
+                let limit: usize = env("PITH_LIMIT").and_then(|v| v.parse().ok()).unwrap_or(8);
+                for h in state.with_db(|c| search_hits(c, &text_uid, &env("PITH_SEARCH").expect("要设 PITH_SEARCH"), limit)).unwrap() {
+                    println!("  {} {:?}（经中译 {}）", h.key, h.role, h.via_translation);
+                }
+            }
+            // 只重新审计、导出（不联网）
+            "export" => summarize(&state, &concept, &env("PITH_RUN").expect("要设 PITH_RUN")),
+            // Word 搜索窗里「卡片里的原文」
+            "quotes" => {
+                let items: Vec<String> = state.with_db(|c| texts_list_items(c)).unwrap();
+                for item in items {
+                    let q = state.with_db(|c| quotes_for_item(c, &item)).unwrap();
+                    println!("文献 {item}：{} 句", q.len());
+                    for x in q.iter().take(4) {
+                        println!("  {} {} 页 {:?}：{}", x.language, x.paragraph, x.pages, x.text.chars().take(50).collect::<String>());
+                    }
+                }
+            }
+            other => panic!("不认识的 PITH_STAGE：{other}"),
+        }
+    }
+
+    /// 把一个数据目录里的概念研究（书、文本、研究、评论来源的快照、账本里的真实调用）导进另一个数据目录。
+    /// 用户要求把 C4 的真实验收结果导进正式版（同 v0.3 的 `import_research_runs`，规则 4 的一次性例外）。
+    /// 文本和研究的 uid 不变，已有的跳过；文献和附件在目标里新建（附件按 SHA-256 核对）；先做「导入前」备份，导完重新审计。
+    /// 目标是正式数据目录时先退出正式版；`PITH_DRY_RUN=1` 只列出要导的东西，不打开目标（打开会把它升到最新版本）。
+    #[test]
+    #[ignore]
+    fn import_concept_runs() {
+        use std::collections::HashMap;
+        let from = PathBuf::from(env("PITH_FROM").expect("要设 PITH_FROM"));
+        let to = PathBuf::from(env("PITH_TO").expect("要设 PITH_TO"));
+        assert_ne!(from, to);
+        let dry = env("PITH_DRY_RUN").as_deref() == Some("1");
+        let src = AppState::init(DataPaths::new(from.clone()));
+        let mut texts = src.with_db(|c| store::texts_list(c)).unwrap();
+        // 原著先导，译本要连上它
+        texts.sort_by_key(|t| t.original_uid.is_some());
+        let runs: Vec<(String, Vec<String>)> = texts.iter().map(|t| (t.uid.clone(), src.with_db(|c| store::runs_list(c, &t.uid)).unwrap().into_iter().map(|r| r.uid).collect())).collect();
+        let src_ledger = Ledger::new(&from);
+        let real: Vec<_> = src_ledger.all().unwrap().into_iter().filter(|c| !c.mock).collect();
+        println!("源 {}：{} 份文本、{} 次研究、账本里 {} 笔真实调用（${:.4}）", from.display(), texts.len(), runs.iter().map(|r| r.1.len()).sum::<usize>(), real.len(), real.iter().map(|c| c.cost_usd).sum::<f64>());
+        for t in &texts {
+            println!("  {} {}（{}，{}）", t.uid, t.title, t.language, t.format);
+        }
+        if dry {
+            println!("（PITH_DRY_RUN=1：只列出来，不打开目标）");
+            return;
+        }
+        let dst = AppState::init(DataPaths::new(to.clone()));
+        let b = dst.with_db(|c| crate::import::backup_before(c, &dst.paths.backups)).unwrap();
+        println!("目标 {}：已做「导入前」备份 {b}", to.display());
+        // 文献和附件
+        let mut items: HashMap<i64, i64> = HashMap::new();
+        let tmp = std::env::temp_dir().join(format!("pith-import-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let copy_item = |si: i64| -> i64 {
+            let (kind, fields, creators) = src
+                .with_db(|c| {
+                    let kind: String = c.query_row("SELECT item_type FROM items WHERE id = ?1", [si], |r| r.get(0)).map_err(crate::common::err)?;
+                    let mut st = c.prepare("SELECT field, value FROM item_fields WHERE item_id = ?1").map_err(crate::common::err)?;
+                    let fields: Vec<(String, String)> = st.query_map([si], |r| Ok((r.get(0)?, r.get(1)?))).map_err(crate::common::err)?.collect::<Result<_, _>>().map_err(crate::common::err)?;
+                    let mut st = c.prepare("SELECT role, family, given, literal FROM creators WHERE item_id = ?1 ORDER BY position").map_err(crate::common::err)?;
+                    let creators: Vec<CreatorInput> = st.query_map([si], |r| Ok(CreatorInput { role: r.get(0)?, family: r.get(1)?, given: r.get(2)?, literal: r.get(3)? })).map_err(crate::common::err)?.collect::<Result<_, _>>().map_err(crate::common::err)?;
+                    Ok((kind, fields, creators))
+                })
+                .unwrap();
+            // 日期存的是 Zotero 两段式（「1999-00-00 1999」），编辑接口要的是后一段
+            let fields: BTreeMap<String, String> = fields.into_iter().map(|(k, v)| if k == "date" { let d = v.split_once(' ').map(|(_, b)| b.to_string()).unwrap_or(v); (k, d) } else { (k, v) }).collect();
+            dst.with_db(|c| {
+                let id = edit::item_create(c, &kind, None)?;
+                edit::item_update(c, id, &ItemPatch { fields, creators: Some(creators), ..Default::default() })?;
+                crate::search::update(c, &[crate::search::DocRef::item(id)])?;
+                Ok(id)
+            })
+            .unwrap()
+        };
+        let mut imported_texts = 0;
+        for t in &texts {
+            if dst.with_db(|c| store::text_id(c, &t.uid)).is_ok() {
+                println!("  文本 {} 目标里已经有了，跳过", t.uid);
+                continue;
+            }
+            let item = t.item_id.map(|si| *items.entry(si).or_insert_with(|| copy_item(si)));
+            let att = t.attachment_id.map(|sa| {
+                let f = src.with_db(|c| shelf::attachment_file(c, &src.paths.attachments, sa)).unwrap();
+                let named = tmp.join(&f.name);
+                std::fs::copy(&f.path, &named).unwrap();
+                let aid = dst
+                    .with_db(|c| {
+                        let (aid, docs) = edit::attachment_add(c, &dst.paths.attachments, item, &named)?;
+                        crate::search::update(c, &docs)?;
+                        Ok(aid)
+                    })
+                    .unwrap();
+                let got = dst.with_db(|c| shelf::attachment_file(c, &dst.paths.attachments, aid)).unwrap();
+                assert_eq!(got.sha256, t.source_sha256, "{} 的附件哈希对不上", f.name);
+                aid
+            });
+            let text = src.with_db(|c| store::text_load(c, &t.uid)).unwrap();
+            dst.with_db(|c| {
+                let now = apptext::now_iso();
+                let id = store::text_save(c, &store::NewText { uid: &t.uid, item_id: item, attachment_id: att, source_sha256: &t.source_sha256, text: &text, meta: t.meta.clone(), original_uid: t.original_uid.as_deref(), now: &now })?;
+                if let Some(o) = &t.original_uid {
+                    let original = store::text_load(c, o)?;
+                    store::alignment_save(c, o, &t.uid, &align::align(&original, &text), &now)?;
+                }
+                search::add_text(c, id)
+            })
+            .unwrap();
+            // 读回来逐段一致
+            assert_eq!(dst.with_db(|c| store::text_load(c, &t.uid)).unwrap().paragraphs, text.paragraphs);
+            imported_texts += 1;
+            println!("  文本 {}：{} 段，文献 {:?}、附件 {:?}", t.title, text.paragraphs.len(), item, att);
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+        // 研究和评论来源的快照
+        let (src_snap, dst_snap) = (shelf::snapshots(&from), shelf::snapshots(&to));
+        let mut imported_runs = Vec::new();
+        for (text_uid, uids) in &runs {
+            for uid in uids {
+                if dst.with_db(|c| store::run_load(c, uid)).is_ok() {
+                    println!("  研究 {uid} 目标里已经有了，跳过");
+                    continue;
+                }
+                let mut run = src.with_db(|c| store::run_load(c, uid)).unwrap();
+                for s in &mut run.sources {
+                    // 文献库里的编号在目标里对不上
+                    (s.item_id, s.attachment_id, s.added_item) = (None, None, None);
+                    let Some(sha) = s.sha256.clone() else { continue };
+                    let original = src_snap.original(&sha, s.ext.as_deref().unwrap_or("")).unwrap();
+                    if original.is_file() {
+                        let got = dst_snap.put(&std::fs::read(&original).unwrap(), s.ext.as_deref().unwrap_or("")).unwrap();
+                        assert_eq!(got, sha, "{} 的快照哈希对不上", s.id);
+                    }
+                    dst_snap.put_text(&sha, &src_snap.text(&sha).unwrap()).unwrap();
+                }
+                dst.with_db(|c| store::run_save(c, text_uid, &run)).unwrap();
+                println!("  研究 {uid}（{}）：{} 张卡片、{} 个来源", run.skill, run.cards.len(), run.sources.len());
+                imported_runs.push(uid.clone());
+            }
+        }
+        // 账本：真实调用补进目标（按时间、用途、模型、费用认同一笔）
+        let dst_ledger = Ledger::new(&to);
+        let have = dst_ledger.all().unwrap();
+        let add: Vec<_> = real.into_iter().filter(|c| !have.iter().any(|h| h.at == c.at && h.purpose == c.purpose && h.model == c.model && (h.cost_usd - c.cost_usd).abs() < 1e-12)).collect();
+        for c in &add {
+            dst_ledger.append(c).unwrap();
+        }
+        println!("账本：补进 {} 笔，${:.4}；目标本月已花 ${:.4}", add.len(), add.iter().map(|c| c.cost_usd).sum::<f64>(), dst_ledger.month_total(&apptext::now_iso()[..7]).unwrap());
+        // 导完重新审计（和 App 打开研究时一样）
+        let concept = ConceptState::default();
+        for uid in &imported_runs {
+            let v = view(&dst, &concept, uid).unwrap();
+            println!("  审计 {uid}：{} 个问题", v.findings.len());
+            assert!(v.findings.is_empty(), "{:?}", v.findings);
+        }
+        println!("导入：文本 {imported_texts} 份、研究 {} 次", imported_runs.len());
+    }
+
+    fn texts_list_items(c: &rusqlite::Connection) -> Result<Vec<String>, String> {
+        let mut st = c.prepare("SELECT DISTINCT i.uid FROM concept_texts t JOIN items i ON i.id = t.item_id").map_err(crate::common::err)?;
+        let rows = st.query_map([], |r| r.get(0)).map_err(crate::common::err)?.collect::<Result<Vec<String>, _>>().map_err(crate::common::err)?;
+        Ok(rows)
+    }
 }

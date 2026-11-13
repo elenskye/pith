@@ -41,7 +41,7 @@
 - 报告短答在前；导出 Markdown、Word、单文件 HTML；来源可一键加入文献库；同一问题可重查对比。
 - 模型：计划与结论 Opus 5.5，摘证据 DeepSeek `deepseek-flash`。
 
-## v0.4 Concept Research（2026-11-13 第三轮问卷，`decisions/0024`）
+## v0.4 Concept Research（2026-11-13 第三轮问卷，`decisions/0024`；本地验收 `0025`）
 
 | # | 功能 | 备注 |
 | --- | --- | --- |
@@ -56,7 +56,7 @@
 | C9 | 导出与引用 | Markdown、Word、单文件 HTML（关系图能点）；Word 里能把卡片原文插成引文（带页码或段落号） |
 | C10 | 模型与费用 | GPT-6.1 Sol（OpenAI Responses API）；共用月上限 $30；每次发送前确认 |
 
-**材料**：英文 Penguin 版（Skinner 编）、中文杨敬年译本（陕西人民 2011），用户提供的 EPUB，副本在 `local/wealth-of-nations/`；云端测试另用 Cannan 版（公有领域）+ 合成中文。
+**材料**：英文 Penguin 版（Skinner 编）、中文杨敬年译本（陕西人民 2011），用户提供的 EPUB，副本在 `local/wealth-of-nations/`；云端测试用 Project Gutenberg #3300（公有领域，网上找不到 Cannan 版）+ 合成中文。
 
 **验收**：分工三章（中英对照）概念卡 ≥ 15、论证卡 ≥ 5、一张关系图；每句原文引用逐字核对通过；三类内容标得清楚；用户抽查 10 张，觉得准确、对复习有用。其余标准见 `0024`。
 

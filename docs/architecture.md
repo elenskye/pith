@@ -1,6 +1,6 @@
 # 架构
 
-> 依据 `decisions/0001`–`0003`、`0006`–`0023`，沿用 Pomelo 的工程约定。只写已经有的；v0.4 概念研究的设计在 `decisions/0024`，做完后并进来。数据库结构见 `docs/schema.md`。
+> 依据 `decisions/0001`–`0003`、`0006`–`0025`，沿用 Pomelo 的工程约定。数据库结构见 `docs/schema.md`。
 
 ## 目录
 
@@ -9,7 +9,7 @@ personal-research-lab/
 ├── src/                        前端（React 19 + TypeScript + Tailwind v4）
 │   ├── main.tsx                入口；?mock 时装上浏览器内的假后端；?window=picker 是置顶搜索窗；关掉文本框的系统输入辅助（shared/plainInputs.ts）
 │   ├── app/                    App.tsx（外框：最左一列切换主页面，各主页面有自己的侧栏；阅读时阅读器占满窗口）、
-│   │                           Rail（文献库 / 排版 / 调查 + 设置，`decisions/0023`）、SideNav（排版、调查、设置共用的侧栏外框与条目）
+│   │                           Rail（文献库 / 排版 / 调查 / 概念 + 设置，`decisions/0023`）、SideNav（各主页面和设置共用的侧栏外框与条目）
 │   ├── library/                Sidebar（文献库视图、集合树、标签筛选）、ItemList（搜索、筛选、排序、多选、右键菜单）、
 │   │                           ItemDetail（可编辑详情、批量面板、合并）、labels（中文名）
 │   ├── shared/ui.tsx           弹窗（确认 / 输入 / 选集合）、右键菜单、提示条、就地编辑、标签输入（带提示）、useMutate、useStoredState
@@ -17,9 +17,11 @@ personal-research-lab/
 │   │                           WordSettings（安装 / 卸载 Word 模板、服务与排版器状态）、CiteSettings（引文样式与导入 .csl、Word 外转换 Zotero 文档）、
 │   │                           KeysSettings（密钥与费用：三把密钥、共用的月度上限）、ResearchSettings（事实调查：模型、专用搜索、网页抓取后备、单价、可信度等级表）；
 │   │                           SettingsPage 分两组七页（`decisions/0023`）
-│   ├── picker/Picker.tsx       置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码
+│   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
 │   ├── shared/ipc.ts           带类型的 api 对象，唯一的 invoke 入口
 │   ├── dev/mockIpc.ts          `pnpm dev` → http://localhost:1430/?mock，合成数据，打包时剔除；mockResearch.ts / .json 是调查页的假后端（数据由引擎生成）
+│   ├── concept/                概念页（v0.4）：ConceptSidebar（书 → 章 → 研究）、Reader（原文段落、中英并排、划选）、Entries（问这本书、追踪概念）、
+│   │                           Confirm、RunView（卡片、关系图、锚点跳原文、导出）、ParseDialog（附件解析成文本）
 │   ├── research/               事实调查页（v0.3）：ResearchSidebar（问过的问题和各次调查）、ResearchPage（新调查）、Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、
 │   │                           Result（短答、点数字看原文、全过程、导出、加入文献库、重查对比）、labels
 │   ├── cite/                   引文排版（v0.2）：renderer（听 cite-render 事件、交回结果）、engine（citeproc-js；GB/T 页码在方括号外、前后缀）、
@@ -61,6 +63,8 @@ personal-research-lab/
 │       ├── agent/              排版 Agent（v0.2 W3，`decisions/0018`）：claude（调用 Anthropic Messages API、模拟模型）、usage（用量账本、月度预算）、
 │                               secret（密钥：正式版钥匙串，其余内存或文件）、extract（提炼要求、出处核对、数值换算、合成规范）、
 │       │                       planner（论文 → 给模型看的文字、文档计划的核对与预览）、apply（排版、校验、只检查项、报告）、store（成果存档）
+│       ├── concept/            概念研究（v0.4，`decisions/0024`、`0025`）：commands（`concept_*` 命令、设置、组装接口、后台执行）、store（concept_* 表）、
+│       │                       search（段落进 search.db）、responses（OpenAI Responses + 网页搜索）、mathpix、library（文献库作反方来源、加入文献库）、keys
 │       └── research/           事实调查（v0.3，`decisions/0020`、`0022`）：commands（`research_*` 命令、设置、组装接口、后台执行）、store（存进 research_* 表）、
 │                               anthropic（流式、网页搜索、pause_turn；ClaudeSearch；ClaudeFetch：下载失败时的网页抓取）、openai（OpenAI 兼容，DeepSeek）、tavily、meter（发送前按最坏情况查月上限、记账）、
 │                               download（本机下载：限速、拒内网、自己跟跳转；WithFallback：失败了改用 Claude 网页抓取）、content（HTML / PDF / XLSX / CSV / DOCX 取正文）、snapshot（快照文件）、
@@ -68,6 +72,9 @@ personal-research-lab/
 ├── crates/zotero-import/       Zotero 只读读取 + 审计 + 合成夹具（src-tauri 以 path 依赖引用）
 ├── crates/research-engine/     事实调查的纯逻辑（只依赖 serde）：流程、提示词与解析、核对、认数与精确十进制、计算、可信度、结论核对、
 │                               重查对比、报告与渲染（Markdown / 单文件 HTML）、审计；合成夹具与模拟接口（README 有模块表）
+├── crates/concept-engine/      概念研究的纯逻辑：EPUB 与 Mathpix 行 → 文本（角色、段落号、页码）、对齐、技能（SKILL.md）、流程、提示词与 Schema、
+│                               核对与审计、关系图布局与 SVG、渲染；夹具与模拟接口（README 有模块表、角色规则和 SKILL.md 格式）
+├── skills/                     内置技能（v0.4）：chapter、passage、ask、trace、critics、counterfactual、free，各一个 SKILL.md
 ├── crates/docx-engine/         Word 文档引擎（src-tauri 引用）：排版器 + 独立校验器 + 文档计划（0-C）、structure / verify_structure（结构类排版与它的独立核对，W4）、
 │                               outline（结构摘要、表格清单、计划预览、要求文档转文字）、
 │                               checks（只检查项的统计）、cite（引文写入与核对、Zotero 引文识别与转换、.csl 检查、Node 里排版）、
@@ -80,7 +87,7 @@ personal-research-lab/
 └── docs/
 ```
 
-根目录是 Cargo 工作区（`src-tauri`、`crates/zotero-import`、`crates/docx-engine`、`crates/research-engine`），编译输出在根 `target/`。
+根目录是 Cargo 工作区（`src-tauri`、`crates/zotero-import`、`crates/docx-engine`、`crates/research-engine`、`crates/concept-engine`），编译输出在根 `target/`。
 
 ## 规则
 
@@ -100,7 +107,7 @@ personal-research-lab/
 
 ## 命令
 
-- 命令清单以 `src/shared/ipc.ts` 为准（前端唯一的 invoke 入口），Rust 一侧在 `lib.rs` 注册。命名 `模块_动作`：文献库 `items_*` / `attachments_*` / `tags_*` / `collections_*` / `trash_*`，导入 `import_*`，阅读 `reader_*` / `annotations_*`，联网补全 `metadata_*`，备份与导出 `backups_*` / `export_*`，Word `word_*` / `cite_*` / `picker_*`，排版 Agent `agent_*` / `format_*`，事实调查 `research_*`。
+- 命令清单以 `src/shared/ipc.ts` 为准（前端唯一的 invoke 入口），Rust 一侧在 `lib.rs` 注册。命名 `模块_动作`：文献库 `items_*` / `attachments_*` / `tags_*` / `collections_*` / `trash_*`，导入 `import_*`，阅读 `reader_*` / `annotations_*`，联网补全 `metadata_*`，备份与导出 `backups_*` / `export_*`，Word `word_*` / `cite_*` / `picker_*`，排版 Agent `agent_*` / `format_*`，事实调查 `research_*`，概念研究 `concept_*`。
 - 数据库命令都是 `#[tauri::command(async)]`，在线程池里跑；会改内容的命令在提交后更新搜索索引。
 - 要花钱的都是两段：`*_prepare` 先算出要发什么、多少钱（不联网），用户确认后再调发送的命令（如 `format_plan_run`、`research_execute`）。
 - 列表里的行用 `targets`：`{ kind: item | attachment | note | collection, id }`。选择文件夹 / 文件用 `@tauri-apps/plugin-dialog`（`ipc.ts` 的 `pickFolder` / `pickFile`）。
@@ -176,10 +183,30 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - 密钥：Anthropic 和排版 Agent 共用一把（`agent.key_saved`）；DeepSeek、Tavily 各一个钥匙串条目（`deepseek-api-key`、`tavily-api-key`）。和排版 Agent 一样，只有正式版用钥匙串和真接口。三把密钥和月度上限都在「设置 › 密钥与费用」。
 - 命令（`research_*`，21 个）：status / settings_set / key_set / key_clear；questions_list / question_get；plan_prepare → plan_run；run_get；plan_update / source_add / source_remove；execute_prepare → execute；cancel；rerun；export / reveal；add_to_library；run_delete / question_delete。
 
+## v0.4 概念研究（`decisions/0024`、`0025`）
+
+```
+文献库里一本书的 EPUB 附件 ─concept_text_prepare─▶ 解析（目录分单元 → 逐块认角色 → 段落号 → 页码）─▶ 结构预览 ─concept_text_save─▶ 存（导入前备份）
+   译本：连上原著，按章对齐（正文段数相同才一段对一段）；段落进 search.db
+   PDF：concept_text_prepare 算页数和费用 ─concept_pdf_convert─▶ Mathpix v3/pdf（lines.json → 段落，页码 = 页序；用完 DELETE）或本机取文字
+入口（一章 / 划选的段落 / 问题 → 本地检索勾选 / 概念 → 中英检索词勾选 / 已有卡片）+ 技能 ─concept_run_prepare（不联网）─▶ 确认框（每步发什么、最坏费用）
+   ─concept_run_execute（后台，事件 concept-progress / concept-done）─▶ 按技能的步骤：模型 / 查文献库 / 网页检索（v0.3 的下载器）
+   ─▶ 每步的输出核对后才进研究（核不上的拦下）─▶ 卡片 + 关系 ─▶ 关系图、导出 Markdown / HTML / Word、Word 搜索窗里的「卡片里的原文」
+```
+
+- 分层同 v0.3：`crates/concept-engine` 不碰数据库和网络，接口沿用 `research_engine::ports`；App 一侧实现 OpenAI Responses、Mathpix、文献库、快照并存库。打开一次研究就从存下的文本重新审计一遍（`audit`），有问题页面顶上标红。
+- **技能**：`SKILL.md`（YAML 小子集：名字、标题、入口、产出、步骤）；内置的在仓库 `skills/` 编进 App，用户的在 `数据目录/skills/`，同名覆盖内置的。步骤只有模型、查文献库、网页检索三种，不让模型自己反复调工具，所以发送前算得出每步发什么、最多花多少。
+- **文本**：XHTML 用自己写的容错读取（`markup`）；角色不看 class 名，先按目录文字分单元、再逐块认（规则在 concept-engine 的 README）。引用名全书唯一：`I.i.3`、`I.i.3 旁注`、`I.i 注 1`、`Intro.5`、PDF 只有段 `5`；锚到译本的写 `译:I.i 注 1`。页码来源依次是 EPUB 3 page-list、ncx pageList、`page-map.xml`、正文里的分页锚点。
+- **四类句子与核对**：原文（只能挂原著正文段，文字就是引文，逐字核对）、他人（有来源，或挂译本的旁注 / 注释 / 导读）、解释（挂的段落要存在、带的引文要核得上，否则去掉锚点、标「没挂上原文」）、推演（前提按原文核对）。折叠在 v0.3 的基础上再容忍弯直引号、撇号样式和拉丁字母大小写。原文句的中译在对齐的中文段落里核对。一句不剩的卡片不要，关系两头都要在。
+- **模型**：默认 GPT-6.1 Sol，走 OpenAI Responses API（JSON Schema 严格模式、`reasoning.effort`、`store: false`、`max_output_tokens`）；可在设置里换 Opus 5.5（走 v0.3 的 `research/anthropic.rs`）。专用搜索是 Responses 的 `web_search`，关掉就用 Tavily。费用和排版、调查共用月上限，账本用途记 `concept`。
+- **Word**：搜索窗把原文放进引文数据的 `pithQuote`（原样存进文档的数据部件）；有页码的写 `110 (I.i.3)`（label page），没有的写 `I.i.3`（label paragraph）。桥接回复里多一行 `Q`，宏在新插入的引文前面加上「“原文”」（编辑已有引文时不加）。
+- **快照**：评论来源的正文在 `数据目录/concept/sources/`，和事实调查的分开，不会被调查的清理删掉。
+
 ## 联网（`decisions/0004`、`0012`）
 
 - v0.1 唯一的联网功能是联网补全；只在 Rust 里联网（`metadata::net`），界面不直接发请求。没打开时 Rust 拒绝联网。v0.2 W3 多了排版 Agent 调用 Claude（`agent::claude`，见上；每次发送前确认、有月度上限）。
 - v0.3 事实调查（见上）：连 `api.anthropic.com`、`api.deepseek.com`（地址可改）、`api.tavily.com`，以及检索到的网页（本机下载，只取单页）。每次发送模型和搜索前界面确认、查月度上限。
+- v0.4 概念研究（见上）：连 `api.openai.com`（或选 Opus 时的 `api.anthropic.com`）、`api.mathpix.com`（上传前确认页数和费用，用完删除），网页检索同 v0.3。
 - 导入完成、改了 DOI / ISBN 后，命令层把文献放进 `AppState.lookups` 队列，后台线程一次一条地查：读库（拿锁）→ 联网（不拿锁）→ 写库（拿锁）并更新搜索索引。
 
 ## 资源约束

@@ -344,7 +344,7 @@ End Sub
 ' Cursor outside a citation: insert a new one. Inside: change its references and pages, or remove it.
 Public Sub PithAddEditCitation()
     Dim lines As Variant, ok As Boolean, i As Long, f() As String, items As String, action As String
-    Dim cc As ContentControl, cid As String
+    Dim cc As ContentControl, cid As String, quote As String
 
     If Not HasDocument() Then Exit Sub
     Set cc = CurrentCitation()
@@ -357,6 +357,8 @@ Public Sub PithAddEditCitation()
             Case "P"
                 items = U(f(1))
                 action = "P"
+            Case "Q"
+                quote = U(f(1))
             Case "D", "X"
                 action = f(0)
         End Select
@@ -364,7 +366,7 @@ Public Sub PithAddEditCitation()
     Select Case action
         Case "P"
             If cc Is Nothing Then
-                InsertCitation items
+                InsertCitation items, quote
             Else
                 DoRefresh "", "{""citationID"":" & J(cid) & ",""items"":" & items & "}"
             End If
@@ -377,17 +379,24 @@ Public Sub PithAddEditCitation()
     End Select
 End Sub
 
-Private Sub InsertCitation(ByVal items As String)
-    Dim cid As String, rng As Range, cc As ContentControl
+' A quote from a Pith concept card goes in front of the new citation, in curly quotation marks.
+Private Sub InsertCitation(ByVal items As String, ByVal quote As String)
+    Dim cid As String, rng As Range, cc As ContentControl, qr As Range
     cid = NewId()
     Set rng = Selection.Range
     rng.Collapse wdCollapseEnd
+    If quote <> "" Then
+        rng.InsertAfter ChrW$(&H201C) & quote & ChrW$(&H201D)
+        Set qr = ActiveDocument.Range(rng.Start, rng.End)
+        rng.Collapse wdCollapseEnd
+    End If
     Set cc = ActiveDocument.ContentControls.Add(wdContentControlRichText, rng)
     cc.Tag = CITE_PREFIX & cid
     cc.Title = APP_TITLE
     cc.Range.Text = ChrW$(&H2026)
     If Not DoRefresh("", "{""citationID"":" & J(cid) & ",""items"":" & items & "}") Then
         cc.Delete True
+        If Not qr Is Nothing Then qr.Delete
         Exit Sub
     End If
     Selection.SetRange cc.Range.End + 1, cc.Range.End + 1

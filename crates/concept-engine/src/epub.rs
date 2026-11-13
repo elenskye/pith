@@ -90,7 +90,7 @@ fn decode_text(buf: &[u8]) -> String {
     }
     if buf.starts_with(&[0xFF, 0xFE]) || buf.starts_with(&[0xFE, 0xFF]) {
         let le = buf[0] == 0xFF;
-        let units: Vec<u16> = buf[2..].chunks_exact(2).map(|c| if le { u16::from_le_bytes([c[0], c[1]]) } else { u16::from_be_bytes([c[0], c[1]]) }).collect();
+        let units: Vec<u16> = buf[2..].as_chunks::<2>().0.iter().map(|c| if le { u16::from_le_bytes(*c) } else { u16::from_be_bytes(*c) }).collect();
         return String::from_utf16_lossy(&units);
     }
     String::from_utf8_lossy(buf).into_owned()

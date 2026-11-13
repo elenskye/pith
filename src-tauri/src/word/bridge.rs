@@ -4,6 +4,7 @@
 //! 请求：一段 JSON，`cmd` 为 ping / pick / refresh / styles / zotero / show。
 //! 回复：按行的制表符分隔文本（VBA 好解析）。第一行 `OK` 或 `ERR\t<原因>`。Word 里的文字一律英文（`decisions/0006`）。
 //!   P\t<文献 JSON>                      pick：选好的文献（[{id, locator?, label?, …}]）
+//!   Q\t<原文>                           pick：选的是概念研究卡片里的原文（`pithQuote`）时，宏在新引文前面插入这句（v0.4，`decisions/0024`）
 //!   X                                   pick：取消了
 //!   D                                   pick：要删除正在编辑的这处引文
 //!   C\t<序号>\t<新tag或空>\t<文字>\t<格式>  refresh：每处引文
@@ -168,8 +169,19 @@ fn pick(host: &dyn Host, edit: &str, store_xml: &str) -> Result<String, String> 
         PickOutcome::Cancel => "OK\nX".into(),
         PickOutcome::Remove => "OK\nD".into(),
         PickOutcome::Items(items) if items.is_empty() => "OK\nX".into(),
-        PickOutcome::Items(items) => format!("OK\nP\t{}", esc(&serde_json::to_string(&items).map_err(|e| e.to_string())?)),
+        PickOutcome::Items(items) => {
+            let mut out = format!("OK\nP\t{}", esc(&serde_json::to_string(&items).map_err(|e| e.to_string())?));
+            if let Some(q) = quote_of(&items) {
+                out.push_str(&format!("\nQ\t{}", esc(&q)));
+            }
+            out
+        }
     })
+}
+
+/// 概念研究卡片里的原文（搜索窗放在 `pithQuote.text` 里）；一处引文里有几条时取第一条
+fn quote_of(items: &[CiteItemRef]) -> Option<String> {
+    items.iter().filter_map(|i| i.extra.get("pithQuote")?.get("text")?.as_str()).map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")).find(|t| !t.is_empty())
 }
 
 fn style_menu(host: &dyn Host, store_xml: &str) -> Result<String, String> {
@@ -353,6 +365,23 @@ mod tests {
         assert_eq!(handle(&cancel, br#"{"cmd":"pick"}"#), "OK\nX");
         let none = Fake { outcome: PickOutcome::Items(vec![]), ..host() };
         assert_eq!(handle(&none, br#"{"cmd":"pick"}"#), "OK\nX", "什么都没选等于取消");
+    }
+
+    /// 卡片里的原文：引文数据照样带着 pithQuote（存进数据部件），另起一行 Q 交给宏插在引文前面
+    #[test]
+    fn pick_card_quote_adds_a_quote_line() {
+        let mut item = CiteItemRef::new("rl-item-0003");
+        item.locator = Some("110 (I.i.3)".into());
+        item.label = Some("page".into());
+        item.extra.insert("pithQuote".into(), serde_json::json!({ "text": "To take an example,\ttherefore,\n from a very trifling manufacture", "lang": "en", "paragraph": "I.i.3", "pages": "110", "card": "R/K1" }));
+        let h = Fake { outcome: PickOutcome::Items(vec![item]), ..host() };
+        let out = lines(&handle(&h, br#"{"cmd":"pick","edit":"","store":""}"#));
+        assert_eq!(out[1][0], "P");
+        assert!(out[1][1].contains("pithQuote") && out[1][1].contains("I.i.3"));
+        assert_eq!(out[2], ["Q", "To take an example, therefore, from a very trifling manufacture"], "空白合成一个空格，不带制表符和换行");
+        assert_eq!(out.len(), 3);
+        // 普通文献没有 Q 行
+        assert_eq!(lines(&handle(&host(), br#"{"cmd":"pick"}"#)).len(), 2);
     }
 
     /// 编辑：搜索窗预填这处引文现在的文献与文档快照；可以删除
