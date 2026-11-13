@@ -284,6 +284,8 @@ impl Anthropic {
             // 计划和结论要准确；摘证据（用 Anthropic 当执行模型时）用 medium 省钱
             Purpose::Plan | Purpose::Conclude => "high",
             Purpose::Extract => "medium",
+            // v0.4 概念研究选了 Opus 5.5 时（推理深浅照概念研究的默认 medium）
+            Purpose::Concept => "medium",
         }
     }
 

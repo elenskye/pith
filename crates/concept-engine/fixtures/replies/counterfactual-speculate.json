@@ -1,0 +1,53 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "counterfactual",
+   "title": "如果市场很小，三种情况还会提高产量吗？",
+   "about": [
+    "K5"
+   ],
+   "sentences": [
+    {
+     "category": "speculation",
+     "text": "假设市场只有一个村子那么大。",
+     "paragraph": "I.iii.1",
+     "quote": "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.",
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "speculation",
+     "text": "那么熟练、省时、机械三条依据都还在，但多做出来的产品换不出去，分工就停在很浅的地方。",
+     "paragraph": null,
+     "quote": null,
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "这一步依据的是第三章：市场的大小限制分工的程度。",
+     "paragraph": "I.iii.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "from": "c1",
+   "to": "K5",
+   "kind": "revises",
+   "note": {
+    "category": "speculation",
+    "text": "推演说明三种情况的论证要以足够大的市场为前提。",
+    "paragraph": null,
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  }
+ ]
+}

@@ -1,0 +1,109 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "concept",
+   "title": "division of labour / 分工",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "The greatest improvements in the productive powers of labour, and the greater part of the skill, dexterity, and judgment, with which it is anywhere directed, or applied, seem to have been the effects of the division of labour.",
+     "paragraph": "I.i.1",
+     "quote": "The greatest improvements in the productive powers of labour, and the greater part of the skill, dexterity, and judgment, with which it is anywhere directed, or applied, seem to have been the effects of the division of labour.",
+     "zh": "分工看来是劳动生产力得到最大改进的主要来由",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "斯密开篇就把分工当成劳动生产力提高的首要原因，后面三章都围绕它展开。",
+     "paragraph": "I.i.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "others",
+     "text": "分工是生产力提高的主要原因",
+     "paragraph": "译:I.i.1 旁注",
+     "quote": "分工是生产力提高的主要原因",
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c2",
+   "kind": "concept",
+   "title": "dexterity / 熟练",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "First, the improvement of the dexterity of the workmen, necessarily increases the quantity of the work he can perform;",
+     "paragraph": "I.i.6",
+     "quote": "First, the improvement of the dexterity of the workmen, necessarily increases the quantity of the work he can perform;",
+     "zh": "第一，工人熟练程度的提高，必然增加他能完成的工作量。",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "熟练来自把一个人的工作化简成一种简单操作，并让它成为终身的职业。",
+     "paragraph": "I.i.6",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c3",
+   "kind": "concept",
+   "title": "machinery / 机械",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "Thirdly, and lastly, everybody must be sensible how much labour is facilitated and abridged by the application of proper machinery.",
+     "paragraph": "I.i.8",
+     "quote": "Thirdly, and lastly, everybody must be sensible how much labour is facilitated and abridged by the application of proper machinery.",
+     "zh": "第三，每个人都会感到，使用适当的机械能大大便利和节省劳动。",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "机械的发明者往往就是专做这件事的工人。",
+     "paragraph": null,
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c4",
+   "kind": "concept",
+   "title": "universal opulence / 普遍富裕",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "It is the great multiplication of the productions of all the different arts, in consequence of the division of labour, which occasions, in a well-governed society, that universal opulence which extends itself to the lowest ranks of the people.",
+     "paragraph": "I.i.10",
+     "quote": "It is the great multiplication of the productions of all the different arts, in consequence of the division of labour, which occasions, in a well-governed society, that universal opulence which extends itself to the lowest ranks of the people.",
+     "zh": "正是由于分工，各种工艺的产品成倍增加，一个治理良好的社会才会出现普遍的富裕",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "普遍富裕不是平均分配的结果，而是各种产品成倍增加、彼此交换的结果。",
+     "paragraph": "I.i.10",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

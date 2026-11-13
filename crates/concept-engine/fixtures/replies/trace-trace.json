@@ -1,0 +1,93 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "concept",
+   "title": "division of labour / 分工",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "The greatest improvements in the productive powers of labour, and the greater part of the skill, dexterity, and judgment, with which it is anywhere directed, or applied, seem to have been the effects of the division of labour.",
+     "paragraph": "I.i.1",
+     "quote": "The greatest improvements in the productive powers of labour, and the greater part of the skill, dexterity, and judgment, with which it is anywhere directed, or applied, seem to have been the effects of the division of labour.",
+     "zh": "分工看来是劳动生产力得到最大改进的主要来由",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "三章里「分工」的意思一致：一件工作拆成许多道工序、由不同的人专做；变化的是讨论的角度——效果、原因、限度。",
+     "paragraph": null,
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c2",
+   "kind": "note",
+   "title": "I.i：分工的效果",
+   "about": [],
+   "sentences": [
+    {
+     "category": "explanation",
+     "text": "第一章讲分工带来什么：熟练、省时、机械，最后是普遍富裕。",
+     "paragraph": "I.i.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c3",
+   "kind": "note",
+   "title": "I.ii：分工的原因",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "This division of labour, from which so many advantages are derived, is not originally the effect of any human wisdom, which foresees and intends that general opulence to which it gives occasion.",
+     "paragraph": "I.ii.1",
+     "quote": "This division of labour, from which so many advantages are derived, is not originally the effect of any human wisdom, which foresees and intends that general opulence to which it gives occasion.",
+     "zh": "带来这许多好处的分工，原本并不是人类智慧的结果",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "第二章把分工的来源从「智慧」移到「交换的倾向」。",
+     "paragraph": "I.ii.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c4",
+   "kind": "note",
+   "title": "I.iii：分工的限度",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.",
+     "paragraph": "I.iii.1",
+     "quote": "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.",
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "第三章说分工受市场大小的限制。",
+     "paragraph": "I.iii.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

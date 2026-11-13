@@ -508,11 +508,11 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
     let targets = epub::note_targets(book);
     let target_blocks: std::collections::HashSet<usize> = {
         let mut s = std::collections::HashSet::new();
-        for ((file, id), _) in &targets {
-            if let (Some(doc), Some(start)) = (book.docs.iter().find(|d| &d.file == file), doc_start.get(file.as_str())) {
-                if let Some(b) = epub::block_with_id(doc, id) {
-                    s.insert(start + b);
-                }
+        for (file, id) in targets.keys() {
+            if let (Some(doc), Some(start)) = (book.docs.iter().find(|d| &d.file == file), doc_start.get(file.as_str()))
+                && let Some(b) = epub::block_with_id(doc, id)
+            {
+                s.insert(start + b);
             }
         }
         s
@@ -549,7 +549,7 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
             }
             continue;
         }
-        let start_page = marks.iter().filter(|(at, _)| *at == 0).last().map(|(_, p)| p.clone()).or_else(|| page.clone());
+        let start_page = marks.iter().rfind(|(at, _)| *at == 0).map(|(_, p)| p.clone()).or_else(|| page.clone());
         let breaks: Vec<PageBreak> = marks.iter().filter(|(at, _)| *at > 0 && *at < text_len).map(|(at, p)| PageBreak { at: *at, page: p.clone() }).collect();
         if let Some((_, p)) = marks.last() {
             page = Some(p.clone());
@@ -582,9 +582,8 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
                 }
             }
             _ => {
-                if ow.in_notes {
-                    Role::Note
-                } else if semantics("footnote") || semantics("endnote") || semantics("footnotes") || semantics("endnotes") || semantics("rearnote") || semantics("rearnotes") {
+                let semantic_note = ["footnote", "endnote", "footnotes", "endnotes", "rearnote", "rearnotes"].iter().any(|w| semantics(w));
+                if ow.in_notes || semantic_note {
                     Role::Note
                 } else if headingish {
                     Role::Heading

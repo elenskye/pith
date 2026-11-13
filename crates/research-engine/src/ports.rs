@@ -13,6 +13,8 @@ pub enum Purpose {
     Plan,
     Extract,
     Conclude,
+    /// v0.4 概念研究的一步（哪个技能、哪一步在 `tag` 里：「chapter/concepts」）
+    Concept,
 }
 
 impl Purpose {
@@ -22,6 +24,7 @@ impl Purpose {
             Purpose::Plan => "research_plan",
             Purpose::Extract => "research_extract",
             Purpose::Conclude => "research_conclude",
+            Purpose::Concept => "concept",
         }
     }
 }

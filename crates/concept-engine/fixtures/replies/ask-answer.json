@@ -1,0 +1,45 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "note",
+   "title": "分工为什么受市场范围的限制？",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.",
+     "paragraph": "I.iii.1",
+     "quote": "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.",
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "分工的前提是能把自己多余的产品换出去；市场小，换不出去，就没有人肯只做一种活。",
+     "paragraph": "I.iii.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "original",
+     "text": "There are some sorts of industry, even of the lowest kind, which can be carried on nowhere but in a great town.",
+     "paragraph": "I.iii.2",
+     "quote": "There are some sorts of industry, even of the lowest kind, which can be carried on nowhere but in a great town.",
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "所以像搬运工这样的职业只能在大城市里存在。",
+     "paragraph": "I.iii.2",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

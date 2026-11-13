@@ -72,8 +72,7 @@ pub fn en_chapters() -> (String, Vec<EnChapter>) {
     let mut section: Option<&str> = None;
     let mut pending_title = false;
     for block in EN_SOURCE.split("\n\n") {
-        let mut lines = block.lines().filter(|l| !l.trim().is_empty()).peekable();
-        while let Some(line) = lines.next() {
+        for line in block.lines().filter(|l| !l.trim().is_empty()) {
             if let Some(h) = line.strip_prefix("# ") {
                 section = Some(if h.starts_with("BOOK") { "book" } else { "chapter" });
                 if h.starts_with("CHAPTER") {

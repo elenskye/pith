@@ -249,6 +249,8 @@ impl Model for MockModel {
                 }
             }
             Purpose::Conclude => conclude_reply(&req.user.join("\n")),
+            // 事实调查的模拟模型不答概念研究（概念研究有自己的模拟模型，`concept_engine::fixture`）
+            Purpose::Concept => return Err(PortError::new(ErrorKind::Failed, "事实调查的模拟模型不答概念研究。")),
         };
         let text = match &self.tamper {
             Some(f) => f(req, text),
