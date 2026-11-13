@@ -1,12 +1,13 @@
-// 最左边一列：三个主页面（文献库、排版、调查）和设置。每个主页面有自己的侧栏（decisions/0023）。
-import { Library, PencilRuler, Settings, Telescope } from "lucide-react";
+// 最左边一列：四个主页面（文献库、排版、调查、概念）和设置。每个主页面有自己的侧栏（decisions/0023、0024）。
+import { Library, Lightbulb, PencilRuler, Settings, Telescope } from "lucide-react";
 
-export type Module = "library" | "format" | "research" | "settings";
+export type Module = "library" | "format" | "research" | "concept" | "settings";
 
 const MAIN: { m: Module; label: string; Icon: typeof Library }[] = [
   { m: "library", label: "文献库", Icon: Library },
   { m: "format", label: "排版", Icon: PencilRuler },
   { m: "research", label: "调查", Icon: Telescope },
+  { m: "concept", label: "概念", Icon: Lightbulb },
 ];
 
 /** onModule：点的是现在这一页时，各页自己回到它的起点（列表 / 新建） */

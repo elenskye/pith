@@ -10,12 +10,13 @@ import { WordSettingsSection } from "@/settings/WordSettings";
 import { CiteStylesSection, ZoteroConvertSection } from "@/settings/CiteSettings";
 import { AgentSettingsSection } from "@/settings/AgentSettings";
 import { ResearchSettingsSection } from "@/settings/ResearchSettings";
+import { ConceptSettingsSection } from "@/settings/ConceptSettings";
 import { KeysSettingsSection } from "@/settings/KeysSettings";
 import { NavItem, NavLabel, SideNav } from "@/app/SideNav";
 import { Page } from "@/format/parts";
 
 /** 设置分两组、七页（decisions/0023）：常规的东西和要联网、花钱的模型分开 */
-export type SettingsSection = "general" | "backup" | "library" | "word" | "keys" | "format" | "research";
+export type SettingsSection = "general" | "backup" | "library" | "word" | "keys" | "format" | "research" | "concept";
 
 const GROUPS: { title: string; items: [SettingsSection, string, string][] }[] = [
   {
@@ -30,9 +31,10 @@ const GROUPS: { title: string; items: [SettingsSection, string, string][] }[] = 
   {
     title: "模型与联网",
     items: [
-      ["keys", "密钥与费用", "三把密钥、月度上限"],
+      ["keys", "密钥与费用", "五把密钥、月度上限"],
       ["format", "排版 Agent", "模型、论文发送方式"],
       ["research", "事实调查", "模型、搜索、可信度、单价"],
+      ["concept", "概念研究", "模型、推理深浅、搜索、PDF、技能"],
     ],
   },
 ];
@@ -222,6 +224,7 @@ export function SettingsPage({ section, onSection, onRestored }: { section: Sett
       {section === "keys" && <KeysSettingsSection />}
       {section === "format" && <AgentSettingsSection onKeys={() => onSection("keys")} />}
       {section === "research" && <ResearchSettingsSection onKeys={() => onSection("keys")} />}
+      {section === "concept" && <ConceptSettingsSection onKeys={() => onSection("keys")} />}
     </Page>
   );
 }

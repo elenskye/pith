@@ -16,6 +16,7 @@ import {
 import { EditableText, TagInput, useMutate, useUi } from "@/shared/ui";
 import { useRead } from "@/reader/useRead";
 import { MetadataBox } from "@/metadata/MetadataBox";
+import { ParseDialog } from "@/concept/ParseDialog";
 import { useMetadata } from "@/metadata/MetadataProvider";
 import { targetsOf, type Selection } from "./ItemList";
 import type { Scope } from "./Sidebar";
@@ -146,6 +147,29 @@ function ParentLink({ parent, onSelect }: { parent: Parent | null; onSelect: (s:
 }
 
 /** 在 App 的阅读器里打开 PDF */
+/** EPUB / PDF 附件：解析成文本（v0.4 概念研究）；解析过的显示「在概念页里读」 */
+function ParseButton({ id, title, contentType, status }: { id: number; title: string; contentType: string | null; status: string }) {
+  const [open, setOpen] = useState(false);
+  const ok = status !== "missing" && (contentType === "application/epub+zip" || contentType === "application/pdf");
+  const parsed = useQuery({ queryKey: ["conceptAttachment", id], queryFn: () => api.conceptAttachmentText(id), enabled: ok, staleTime: 0 });
+  if (!ok) return null;
+  const go = (uid: string) => window.dispatchEvent(new CustomEvent("pith:open-concept", { detail: uid }));
+  return (
+    <>
+      {parsed.data ? (
+        <button onClick={() => go(parsed.data!)} title="这个附件解析过了：在「概念」里读" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+          概念页
+        </button>
+      ) : (
+        <button onClick={() => setOpen(true)} title="解析成带段落号的文本，在「概念」里读和分析" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+          解析成文本
+        </button>
+      )}
+      {open && <ParseDialog attachmentId={id} title={title} onClose={() => setOpen(false)} onSaved={go} />}
+    </>
+  );
+}
+
 function ReadButton({ id, primary }: { id: number; primary?: boolean }) {
   const { read } = useRead();
   return (
@@ -515,6 +539,7 @@ function ChildRow({ a, onSelect }: { a: ChildAttachment; onSelect: (s: Selection
           a.size !== null && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatSize(a.size)}</span>
         )}
       </button>
+      <ParseButton id={a.id} title={a.title || contentTypeLabel(a.contentType)} contentType={a.contentType} status={a.status} />
       {a.readable ? <ReadButton id={a.id} /> : !missing && <OpenButton id={a.id} label={a.kind === "linked_url" ? "网页" : "打开"} />}
     </li>
   );
@@ -538,6 +563,7 @@ function Attachment({ d, onSelect, onGone }: { d: AttachmentDetail; onSelect: (s
             className="text-base leading-snug font-semibold"
           />
         </div>
+        <ParseButton id={d.id} title={d.title || d.originalName || ""} contentType={d.contentType} status={d.status} />
         {d.readable && <ReadButton id={d.id} primary />}
         {!missing && <OpenButton id={d.id} label={d.kind === "linked_url" ? "网页" : d.readable ? "系统程序" : "打开"} />}
       </div>

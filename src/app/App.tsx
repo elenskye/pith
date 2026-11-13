@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useCallback, useState } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import { api } from "@/shared/ipc";
@@ -13,13 +13,15 @@ import { FormatPage, type FormatAt } from "@/format/FormatPage";
 import { FormatSidebar } from "@/format/FormatSidebar";
 import { ResearchPage, type ResearchAt } from "@/research/ResearchPage";
 import { ResearchSidebar } from "@/research/ResearchSidebar";
+import { ConceptPage, type ConceptAt } from "@/concept/ConceptPage";
+import { ConceptSidebar } from "@/concept/ConceptSidebar";
 import { ReadContext } from "@/reader/useRead";
 import { MetadataProvider } from "@/metadata/MetadataProvider";
 
 // 阅读器连同 pdf.js 单独打包，第一次阅读时才加载
 const Reader = lazy(() => import("@/reader/Reader"));
 
-/** 外框：最左一列切换主页面（文献库、排版、调查）和设置，每个主页面有自己的侧栏（decisions/0023）。
+/** 外框：最左一列切换主页面（文献库、排版、调查、概念）和设置，每个主页面有自己的侧栏（decisions/0023）。
  *  文献库是三栏：导航 / 列表 / 详情；导入页占中右两栏。排版、调查、设置是侧栏 + 一页。
  *  阅读 PDF 时阅读器占满窗口；文献库只是藏起来（搜索词、滚动位置都还在），返回就回到原样。 */
 export function App() {
@@ -43,6 +45,24 @@ function Shell() {
   const [formatAt, setFormatAt] = useState<FormatAt>({ rulesetId: null, runId: null });
   // 调查页看到哪一次：同上
   const [researchAt, setResearchAt] = useState<ResearchAt>({ uid: null });
+  // 概念页看到哪：同上
+  const [conceptAt, setConceptAt] = useState<ConceptAt>({ text: null, unit: null, run: null, card: null });
+  // 文献库附件上「解析成文本」存好后、或点「概念页」：跳到那本书；删掉一本书：回到书架
+  useEffect(() => {
+    const open = (e: Event) => {
+      const uid = (e as CustomEvent<string>).detail;
+      setConceptAt({ text: uid, unit: null, run: null, card: null });
+      setReading(null);
+      setModule("concept");
+    };
+    const home = () => setConceptAt({ text: null, unit: null, run: null, card: null });
+    window.addEventListener("pith:open-concept", open);
+    window.addEventListener("pith:concept-home", home);
+    return () => {
+      window.removeEventListener("pith:open-concept", open);
+      window.removeEventListener("pith:concept-home", home);
+    };
+  }, []);
   const info = useQuery({ queryKey: ["appInfo"], queryFn: api.appInfo });
 
   // 换范围：清空选择与标签筛选；列表用 key 重建，搜索词、类型筛选、排序也清空
@@ -63,6 +83,7 @@ function Shell() {
     if (m === module) {
       if (m === "format") setFormatAt({ rulesetId: null, runId: null });
       if (m === "research") setResearchAt({ uid: null });
+      if (m === "concept") setConceptAt((a) => ({ text: a.text, unit: null, run: null, card: null }));
       if (m === "library") setView("library");
     }
     setModule(m);
@@ -147,6 +168,12 @@ function Shell() {
               <>
                 <ResearchSidebar at={researchAt} onAt={setResearchAt} />
                 <ResearchPage at={researchAt} onAt={setResearchAt} onSettings={toKeys} />
+              </>
+            )}
+            {module === "concept" && (
+              <>
+                <ConceptSidebar at={conceptAt} onAt={setConceptAt} />
+                <ConceptPage at={conceptAt} onAt={setConceptAt} onSettings={toKeys} />
               </>
             )}
             {module === "settings" && (

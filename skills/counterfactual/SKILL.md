@@ -4,6 +4,7 @@ title: 假设推演
 version: 1
 description: 改一个前提，推演会怎样；结果标明是推演，不是原著观点
 entries: [card, selection]
+instruction: optional
 produces: [counterfactual, relation]
 steps:
   - id: speculate

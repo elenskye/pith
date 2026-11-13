@@ -1,4 +1,4 @@
-// 设置 › 密钥与费用（decisions/0023）：三把密钥（Anthropic 的排版 Agent 和事实调查共用）、月度上限、本月已花。
+// 设置 › 密钥与费用（decisions/0023、0024）：五把密钥（Anthropic 的排版 Agent、事实调查、概念研究共用；v0.4 加 OpenAI、Mathpix）、月度上限、本月已花。
 // 以前分在「排版 Agent」「事实调查」两处，现在放一起：上限本来就是所有接口合计。
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useUi } from "@/shared/ui";
 import { Notice } from "@/format/parts";
 import { money } from "@/research/labels";
 import { KeyRow } from "@/settings/ResearchSettings";
+import { ConceptKeyRows } from "@/settings/ConceptSettings";
 
 export function KeysSettingsSection() {
   const qc = useQueryClient();
@@ -41,7 +42,7 @@ export function KeysSettingsSection() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        排版 Agent 和事实调查用的 API 密钥，和两边共用的月度上限。正式版把密钥存在 macOS 钥匙串，保存后这里不再显示；每次发送前按最坏情况估计，加上本月已花的会超过上限就不发。
+        排版 Agent、事实调查和概念研究用的 API 密钥，和共用的月度上限。正式版把密钥存在 macOS 钥匙串，保存后这里不再显示；每次发送前按最坏情况估计，加上本月已花的会超过上限就不发。
       </p>
       {status.isLoading && <LoaderCircle size={14} className="animate-spin text-muted-foreground" />}
       {status.error && <p className="selectable text-xs text-destructive">{String(status.error)}</p>}
@@ -57,6 +58,7 @@ export function KeysSettingsSection() {
             {s.keys.map((k) => (
               <KeyRow key={k.which} k={k} onStatus={put} />
             ))}
+            <ConceptKeyRows />
 
             <dt className="pt-1 text-muted-foreground">月度上限</dt>
             <dd className="text-xs">

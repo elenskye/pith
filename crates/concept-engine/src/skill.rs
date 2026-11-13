@@ -427,7 +427,15 @@ pub fn parse(folder: &str, src: &str, origin: Origin) -> Result<Skill, String> {
     if !steps.iter().any(|s| s.kind == StepKind::Model) {
         return Err("至少要有一个模型步骤。".into());
     }
-    let needs_instruction = steps.iter().any(|s| s.input.contains(&Input::Instruction));
+    // 要不要用户写一句要求：`instruction: required`（自由）；`optional` 或不写 = 可写可不写（推演）
+    let needs_instruction = match text("instruction").as_str() {
+        "required" => true,
+        "" | "optional" => false,
+        other => return Err(format!("instruction「{other}」不认识：只能是 required 或 optional。")),
+    };
+    if needs_instruction && !steps.iter().any(|s| s.input.contains(&Input::Instruction)) {
+        return Err("instruction: required，但没有一步的 input 里有 instruction。".into());
+    }
     Ok(Skill { name, title, version, description: text("description"), entries, produces, steps, general, origin, overrides_builtin: false, needs_instruction })
 }
 
@@ -509,6 +517,7 @@ mod tests {
         assert_eq!(critics.steps.iter().map(|s| s.kind).collect::<Vec<_>>(), [StepKind::Library, StepKind::Web, StepKind::Model]);
         assert!(critics.steps[1].off_by_default);
         assert!(all.iter().find(|s| s.name == "free").unwrap().needs_instruction);
+        assert!(!all.iter().find(|s| s.name == "counterfactual").unwrap().needs_instruction);
     }
 
     const OK: &str = "---\nname: my-skill\ntitle: 术语表\nversion: 2\ndescription: \"一章的术语表\"\nentries: [chapter, selection]\nproduces: [note]\nsteps:\n  - id: glossary\n    kind: model\n    produces: [note]\n    input: [scope, translation]\n    max_output_tokens: 4000\n---\n\n## 总则\n只写术语。\n\n## 步骤 glossary\n每个术语一张笔记。\n";

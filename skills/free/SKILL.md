@@ -4,6 +4,7 @@ title: 自由
 version: 1
 description: 任意范围 + 一句要求：做成笔记（如术语表、每章提要、复习题）；好用的再固化成技能
 entries: [chapter, selection, question, concept, card]
+instruction: required
 produces: [note]
 steps:
   - id: free

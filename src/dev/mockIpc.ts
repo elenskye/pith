@@ -4,6 +4,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import { agentHandlers } from "./mockAgent";
 import { researchHandlers } from "./mockResearch";
+import { conceptHandlers } from "./mockConcept";
 import type {
   Annotation,
   AnnotationPatch,
@@ -53,11 +54,16 @@ const items: MItem[] = [
   { id: 3, uid: "U3", itemType: "thesis", fields: { title: "示例学位论文：城市就业结构的变化", date: "2019-06", university: "合成大学" }, creators: [single("王芳")], tags: [], collectionIds: [], source: "manual", createdAt: t("2026-11-03"), updatedAt: t("2026-11-03"), deletedAt: null },
   { id: 4, uid: "U4", itemType: "webpage", fields: { title: "已删除的示例网页" }, creators: [], tags: [], collectionIds: [], source: "manual", createdAt: t("2026-11-04"), updatedAt: t("2026-11-05"), deletedAt: t("2026-11-05") },
   { id: 5, uid: "U5", itemType: "journalArticle", fields: { title: "公民政治效能感的测量与比较", date: "2021", DOI: "10.0000/EXAMPLE.2021.001", publicationTitle: "示例社会科学学报" }, creators: [single("张明")], tags: [], collectionIds: [], source: "bibtex", createdAt: t("2026-11-06"), updatedAt: t("2026-11-06"), deletedAt: null },
+  // v0.4 概念研究的两本书（mockConcept.ts）：英文夹具、合成中文，各带一个 EPUB 附件
+  { id: 6, uid: "U6", itemType: "book", fields: { title: "The Wealth of Nations (fixture)", date: "1776", language: "en", publisher: "Project Gutenberg #3300（公有领域，测试夹具）" }, creators: [person("Smith", "Adam")], tags: ["国富论"], collectionIds: [], source: "manual", createdAt: t("2026-11-13"), updatedAt: t("2026-11-13"), deletedAt: null },
+  { id: 7, uid: "U7", itemType: "book", fields: { title: "国富论（合成）", date: "2011", language: "zh" }, creators: [single("亚当·斯密")], tags: ["国富论"], collectionIds: [], source: "manual", createdAt: t("2026-11-13"), updatedAt: t("2026-11-13"), deletedAt: null },
 ];
 const atts: MAtt[] = [
   { id: 101, itemId: 1, kind: "stored", title: "Full Text PDF", originalName: "Zhang - 2021 - 示例.pdf", contentType: "application/pdf", status: "ok", size: 482113, tags: [], collectionIds: [], createdAt: t("2026-11-01"), deletedAt: null },
   { id: 102, itemId: 2, kind: "stored", title: "Full Text PDF", originalName: "missing.pdf", contentType: "application/pdf", status: "missing", size: null, tags: [], collectionIds: [], createdAt: t("2026-11-02"), deletedAt: null },
   { id: 103, itemId: null, kind: "stored", title: "独立的报告.pdf", originalName: "独立的报告.pdf", contentType: "application/pdf", status: "ok", size: 120344, tags: ["待读"], collectionIds: [3], createdAt: t("2026-11-06"), deletedAt: null },
+  { id: 104, itemId: 6, kind: "stored", title: "wealth-of-nations.epub", originalName: "wealth-of-nations.epub", contentType: "application/epub+zip", status: "ok", size: 61234, tags: [], collectionIds: [], createdAt: t("2026-11-13"), deletedAt: null },
+  { id: 105, itemId: 7, kind: "stored", title: "国富论-合成.epub", originalName: "国富论-合成.epub", contentType: "application/epub+zip", status: "ok", size: 12034, tags: [], collectionIds: [], createdAt: t("2026-11-13"), deletedAt: null },
 ];
 const notes: MNote[] = [
   { id: 201, itemId: 1, title: "读书笔记", text: "读书笔记\n内部效能感与外部效能感的区别……\n第二段。", tags: ["笔记"], collectionIds: [], imageCount: 0, createdAt: t("2026-11-01"), updatedAt: t("2026-11-01"), deletedAt: null },
@@ -761,6 +767,7 @@ const handlers: Record<string, (a: Args) => unknown> = {
   ...agentHandlers,
   // 事实调查（模拟实现和示例数据在 mockResearch.ts）
   ...researchHandlers,
+  ...conceptHandlers,
   // 系统对话框（@tauri-apps/plugin-dialog）：返回合成路径
   "plugin:dialog|open": (a) => {
     const o = (a.options ?? {}) as { directory?: boolean; multiple?: boolean; title?: string; filters?: unknown[] };

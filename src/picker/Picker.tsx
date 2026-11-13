@@ -1,12 +1,56 @@
 // 置顶搜索窗（decisions/0015、0017）：Word 里点 Add/Edit Citation 时 Pith 打开它；选文献、填页码，回车插入。
 // 窗口由 Rust 创建、显示、藏起；每次打开 Rust 发 picker-open 事件带上这一次（新插入 / 编辑已有引文的预填）。
 // 键盘：输入即搜；↑↓ 选、回车加入；搜索框空着时回车 = 插入；⌘回车 = 插入；Esc = 取消。
+// v0.4：选中一本解析过的书时多一栏「卡片里的原文」，定位可选「页 / 段」（conceptLocator.ts）。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { BookOpen, CornerDownLeft, LoaderCircle, Search, Trash2, X } from "lucide-react";
-import { api, type CiteRef, type PickerSession, type PickInfo } from "@/shared/ipc";
+import { api, type CiteRef, type ConceptQuote, type PickerSession, type PickInfo } from "@/shared/ipc";
+import { conceptCite, withoutQuote, type LocatorMode, type PithQuote } from "@/picker/conceptLocator";
 
 type Chosen = { cite: CiteRef; info: PickInfo };
+
+/** 卡片里的原文：选一句，定位自动填成「页 (段)」或「段」 */
+function Quotes({ cite, quotes, onCite }: { cite: CiteRef; quotes: ConceptQuote[]; onCite: (c: CiteRef) => void }) {
+  const current = cite.pithQuote as PithQuote | undefined;
+  const [mode, setMode] = useState<LocatorMode>(cite.label === "paragraph" ? "paragraph" : "page");
+  const chosen = current ? quotes.findIndex((q) => q.text === current.text && q.paragraph === current.paragraph) : -1;
+  const hasPages = quotes.some((q) => q.pages);
+  const pick = (i: number, m: LocatorMode) => onCite(i < 0 ? withoutQuote({ ...cite, locator: "", label: undefined }) : conceptCite(cite, quotes[i], m));
+  return (
+    <div className="mt-1 flex w-full basis-full flex-col gap-1 pl-5">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span className="shrink-0">卡片里的原文</span>
+        <select value={chosen} onChange={(e) => pick(Number(e.target.value), mode)} className="min-w-0 flex-1 rounded border bg-background px-1 py-0.5 text-xs text-foreground">
+          <option value={-1}>（不插原文）</option>
+          {quotes.map((q, i) => (
+            <option key={i} value={i}>
+              {q.paragraph}
+              {q.pages ? `，第 ${q.pages} 页` : ""} · {q.text.slice(0, 60)}
+            </option>
+          ))}
+        </select>
+        <span className="flex shrink-0 overflow-hidden rounded border">
+          {(["page", "paragraph"] as LocatorMode[]).map((m) => (
+            <button
+              key={m}
+              disabled={m === "page" && !hasPages}
+              onClick={() => {
+                setMode(m);
+                if (chosen >= 0) pick(chosen, m);
+              }}
+              title={m === "page" ? "定位写页码，后面带段落号" : "定位只写段落号"}
+              className={`px-1.5 py-0.5 disabled:opacity-40 ${mode === m ? "bg-accent text-accent-foreground" : ""}`}
+            >
+              {m === "page" ? "页" : "段"}
+            </button>
+          ))}
+        </span>
+      </div>
+      {chosen >= 0 && <p className="line-clamp-2 text-[11px] text-muted-foreground">插入时在引文前面加上：“{quotes[chosen].text}”</p>}
+    </div>
+  );
+}
 
 function Meta({ info }: { info: PickInfo }) {
   const bits = [info.creators, info.year ? String(info.year) : "", info.container ?? ""].filter(Boolean);
@@ -24,6 +68,18 @@ export function PickerApp() {
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
+  // 解析过的书：卡片里核对通过的原文（按文献 uid）
+  const [quotes, setQuotes] = useState<Record<string, ConceptQuote[]>>({});
+  useEffect(() => {
+    for (const c of chosen) {
+      if (!c.info.inLibrary || quotes[c.cite.id]) continue;
+      api.conceptQuotes(c.cite.id).then(
+        (q) => setQuotes((m) => ({ ...m, [c.cite.id]: q })),
+        () => setQuotes((m) => ({ ...m, [c.cite.id]: [] })),
+      );
+    }
+  }, [chosen]);
+  const setCite = (i: number, cite: CiteRef) => setChosen((cs) => cs.map((c, k) => (k === i ? { ...c, cite } : c)));
 
   const start = useCallback((s: PickerSession | null) => {
     setSession(s);
@@ -158,9 +214,9 @@ export function PickerApp() {
         {chosen.length === 0 ? (
           <p className="py-1 text-xs text-muted-foreground">还没选文献：在上面搜索，回车或点一下加进来。</p>
         ) : (
-          <ul className="mb-2 max-h-36 space-y-1 overflow-y-auto">
+          <ul className="mb-2 max-h-48 space-y-1 overflow-y-auto">
             {chosen.map((c, i) => (
-              <li key={c.cite.id} className="flex items-center gap-2 rounded-md border bg-background px-2 py-1">
+              <li key={c.cite.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-1">
                 <BookOpen size={13} className="shrink-0 text-muted-foreground" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-xs">{c.info.title}</span>
@@ -170,7 +226,7 @@ export function PickerApp() {
                   </span>
                 </div>
                 <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-                  页码
+                  {c.cite.label === "paragraph" ? "段落" : "页码"}
                   <input
                     value={c.cite.locator ?? ""}
                     onChange={(e) => setLocator(i, e.target.value)}
@@ -187,6 +243,7 @@ export function PickerApp() {
                 <button onClick={() => remove(i)} title="从这处引文去掉" className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted">
                   <X size={13} />
                 </button>
+                {(quotes[c.cite.id]?.length ?? 0) > 0 && <Quotes cite={c.cite} quotes={quotes[c.cite.id]} onCite={(cite) => setCite(i, cite)} />}
               </li>
             ))}
           </ul>

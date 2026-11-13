@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, TriangleAlert } from "lucide-react";
 
 /** 占中右两栏的一页：顶栏是面包屑（最后一项是当前页）和右侧按钮 */
-export function Page({ crumbs, actions, children }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode }) {
+export function Page({ crumbs, actions, children, wide }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
   return (
     <section className="min-w-0 flex-1 overflow-y-auto">
       <header className="sticky top-0 z-10 flex h-12 items-center gap-3 border-b bg-background px-6">
@@ -28,7 +28,7 @@ export function Page({ crumbs, actions, children }: { crumbs: { label: string; o
         </h1>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </header>
-      <div className="max-w-3xl space-y-6 px-6 py-6">{children}</div>
+      <div className={`${wide ? "max-w-6xl" : "max-w-3xl"} space-y-6 px-6 py-6`}>{children}</div>
     </section>
   );
 }

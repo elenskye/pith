@@ -971,6 +971,337 @@ export type ResearchStatus = {
 export type ResearchAdded = { key: string; itemId: number; created: boolean; attachmentId: number | null; attachmentError: string | null };
 export type ResearchExportFormat = "markdown" | "html" | "docx";
 
+// ---------- 概念研究（v0.4，decisions/0024；Rust：src-tauri/src/concept/、crates/concept-engine） ----------
+
+export type ConceptRole = "body" | "heading" | "sidenote" | "note" | "guide" | "matter";
+export type ConceptUnitKind = "book" | "chapter" | "section" | "part" | "container" | "guide" | "notes" | "matter";
+export type ConceptNumbering = "glasgow" | "chapter" | "plain";
+export type ConceptEntry = "chapter" | "selection" | "question" | "concept" | "card";
+export type ConceptProduce = "concept" | "argument" | "comment" | "counterfactual" | "note" | "relation";
+export type ConceptCardKind = "concept" | "argument" | "comment" | "counterfactual" | "note";
+export type ConceptCategory = "original" | "others" | "explanation" | "speculation";
+export type ConceptCheckStatus = "pending" | "verified" | "unanchored" | "speculative";
+export type ConceptZhStatus = "verified" | "paragraph_only" | "unaligned";
+export type ConceptRelationKind = "cause" | "contains" | "opposes" | "example" | "premise" | "revises";
+export type ConceptRunStatus = "ready" | "running" | "cancelled" | "failed" | "done";
+export type ConceptStepKind = "model" | "library" | "web";
+export type ConceptKeyWhich = "openai" | "mathpix";
+
+export type ConceptRoleCounts = { body: number; heading: number; sidenote: number; note: number; guide: number; matter: number };
+export type ConceptUnitPreview = { index: number; key: string; label: string; kind: ConceptUnitKind; depth: number; counts: ConceptRoleCounts; pages: [string, string] | null; first: string };
+export type ConceptPreview = {
+  title: string;
+  language: string;
+  format: string;
+  numbering: ConceptNumbering | null;
+  pageSource: string;
+  hasPages: boolean;
+  totals: ConceptRoleCounts;
+  paragraphs: number;
+  chars: number;
+  units: ConceptUnitPreview[];
+  warnings: string[];
+};
+
+export type ConceptTextSummary = {
+  uid: string;
+  title: string;
+  language: string;
+  format: string;
+  itemId: number | null;
+  itemTitle: string | null;
+  attachmentId: number | null;
+  numbering: string;
+  pageSource: string;
+  hasPages: boolean;
+  originalUid: string | null;
+  translationUid: string | null;
+  createdAt: string;
+  converter: string | null;
+  warnings: string[];
+};
+
+export type ConceptTextPreview = { ticket: number; preview: ConceptPreview; candidates: ConceptTextSummary[]; existing: string | null; converter: string | null; mock: boolean };
+export type ConceptPrepared =
+  | ({ kind: "epub" } & ConceptTextPreview)
+  | { kind: "pdf"; ticket: number; pages: number; limit: number; overLimit: boolean; hasMathpix: boolean; costUsd: number; budgetUsd: number; monthSpentUsd: number; mock: boolean };
+
+export type ConceptUnitInfo = {
+  index: number;
+  key: string;
+  label: string;
+  kind: ConceptUnitKind;
+  depth: number;
+  body: number;
+  sidenotes: number;
+  notes: number;
+  guide: number;
+  pages: [string, string] | null;
+  aligned: boolean | null;
+  otherCount: number | null;
+};
+
+export type ConceptTextView = {
+  summary: ConceptTextSummary;
+  units: ConceptUnitInfo[];
+  translation: ConceptTextSummary | null;
+  original: ConceptTextSummary | null;
+  alignedUnits: number;
+  mismatchedUnits: string[];
+};
+
+export type ConceptPageBreak = { at: number; page: string };
+export type ConceptPara = {
+  seq: number;
+  key: string;
+  role: ConceptRole;
+  number: number | null;
+  text: string;
+  page: string | null;
+  breaks: ConceptPageBreak[];
+  attached: number | null;
+  marker: string | null;
+  /** 对齐的另一边（seq） */
+  partner: number | null;
+};
+
+export type ConceptUnitView = {
+  textUid: string;
+  unit: ConceptUnitInfo;
+  paragraphs: ConceptPara[];
+  translationUid: string | null;
+  translation: ConceptPara[];
+  translationLabel: string | null;
+  aligned: boolean;
+  language: string;
+};
+
+export type ConceptSearchHit = {
+  seq: number;
+  key: string;
+  role: ConceptRole;
+  unit: number;
+  unitKey: string;
+  unitLabel: string;
+  text: string;
+  viaTranslation: boolean;
+  translationKey: string | null;
+  translationText: string | null;
+};
+
+export type ConceptSkillStep = {
+  id: string;
+  kind: ConceptStepKind;
+  title: string;
+  produces: ConceptProduce[];
+  input: string[];
+  maxOutputTokens: number;
+  optional: boolean;
+  offByDefault: boolean;
+  maxResults: number;
+  instructions: string;
+};
+export type ConceptSkill = {
+  name: string;
+  title: string;
+  version: number;
+  description: string;
+  entries: ConceptEntry[];
+  produces: ConceptProduce[];
+  steps: ConceptSkillStep[];
+  general: string;
+  origin: "builtin" | "user";
+  overridesBuiltin: boolean;
+  needsInstruction: boolean;
+};
+
+export type ConceptSettings = {
+  model: string;
+  effort: string;
+  dedicatedSearch: boolean;
+  pdfPageLimit: number;
+  openaiBase: string | null;
+  mathpixBase: string | null;
+  prices: ResearchSettings["prices"];
+};
+
+export type ConceptStatus = {
+  mock: boolean;
+  settings: ConceptSettings;
+  keys: { which: ConceptKeyWhich; label: string; has: boolean; place: AgentKeyPlace; needed: boolean }[];
+  provider: string;
+  searchEngine: string;
+  skills: ConceptSkill[];
+  brokenSkills: { folder: string; error: string }[];
+  skillsDir: string;
+  priceInput: number;
+  priceCached: number;
+  priceOutput: number;
+  longContextTokens: number;
+  webSearchUsd: number;
+  mathpixPageUsd: number;
+  budgetUsd: number;
+  monthSpentUsd: number;
+  calls: ResearchStatus["calls"];
+  running: string | null;
+};
+
+export type ConceptSpan = { start: number; end: number };
+export type ConceptCheck = {
+  status: ConceptCheckStatus;
+  span: ConceptSpan | null;
+  pages: string | null;
+  zhParagraph: string | null;
+  zhStatus: ConceptZhStatus | null;
+  zhSpan: ConceptSpan | null;
+  note: string | null;
+};
+export type ConceptSentence = { category: ConceptCategory; text: string; paragraph: string | null; quote: string | null; zh: string | null; source: string | null; check: ConceptCheck };
+export type ConceptCard = { id: string; kind: ConceptCardKind; title: string; sentences: ConceptSentence[]; step: string; about: string[] };
+export type ConceptRelation = { id: string; from: string; to: string; kind: ConceptRelationKind; note: ConceptSentence; step: string };
+export type ConceptSource = {
+  id: string;
+  origin: "library" | "web";
+  title: string;
+  itemId: number | null;
+  attachmentId: number | null;
+  url: string | null;
+  finalUrl: string | null;
+  sha256: string | null;
+  ext: string | null;
+  fetchedAt: string | null;
+  textChars: number;
+  error: string | null;
+  addedItem: number | null;
+};
+export type ConceptScope = {
+  entry: ConceptEntry;
+  text: string;
+  translation: string | null;
+  paragraphs: string[];
+  unit: string | null;
+  question: string | null;
+  terms: string[];
+  cards: [string, string][];
+  instruction: string | null;
+  skip: string[];
+  with: string[];
+};
+export type ConceptStepRecord = {
+  id: string;
+  label: string;
+  at: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  searches: number;
+  costUsd: number;
+  mock: boolean;
+  ok: boolean;
+  note: string | null;
+  raw: string | null;
+};
+export type ConceptRun = {
+  uid: string;
+  skill: string;
+  skillTitle: string;
+  skillVersion: number;
+  scope: ConceptScope | null;
+  status: ConceptRunStatus;
+  nextStep: number;
+  error: string | null;
+  model: { provider: string; model: string };
+  effort: string;
+  mock: boolean;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  steps: ConceptStepRecord[];
+  cards: ConceptCard[];
+  relations: ConceptRelation[];
+  sources: ConceptSource[];
+  rejected: { step: string; card: string; sentence: ConceptSentence; reason: string }[];
+  targets: ConceptCard[];
+  previous: string | null;
+};
+export type ConceptFinding = { at: string; sentence: number | null; message: string };
+export type ConceptAnchoredParagraph = { key: string; text: string; role: ConceptRole; pages: string | null; unit: number; seq: number; translation: boolean };
+export type ConceptRunView = {
+  textUid: string;
+  translationUid: string | null;
+  run: ConceptRun;
+  findings: ConceptFinding[];
+  svg: string;
+  running: boolean;
+  costUsd: number;
+  paragraphs: ConceptAnchoredParagraph[];
+};
+export type ConceptRunSummary = {
+  uid: string;
+  textUid: string;
+  skill: string;
+  skillTitle: string;
+  status: ConceptRunStatus;
+  mock: boolean;
+  unit: string | null;
+  firstParagraph: string | null;
+  label: string;
+  createdAt: string;
+  cards: { key: string; kind: ConceptCardKind; title: string }[];
+};
+export type ConceptRunRequest = {
+  textUid: string;
+  skill: string;
+  entry: ConceptEntry;
+  paragraphs?: string[];
+  unit?: string | null;
+  question?: string | null;
+  terms?: string[];
+  cards?: [string, string][];
+  instruction?: string | null;
+  skip?: string[];
+  with?: string[];
+};
+export type ConceptStepLine = { id: string; title: string; kind: ConceptStepKind; sends: string; maxOutputTokens: number; inputTokens: number; typicalUsd: number; maxUsd: number };
+export type ConceptRunPreview = {
+  ticket: number;
+  skill: string;
+  skillTitle: string;
+  resume: string | null;
+  paragraphs: number;
+  chars: number;
+  languages: string[];
+  first: string | null;
+  last: string | null;
+  targets: string[];
+  steps: ConceptStepLine[];
+  provider: string;
+  model: string;
+  effort: string;
+  searchEngine: string;
+  typicalUsd: number;
+  maxUsd: number;
+  budgetUsd: number;
+  monthSpentUsd: number;
+  withinBudget: boolean;
+  missingKeys: string[];
+  mock: boolean;
+};
+export type ConceptProgress = { uid: string; step: string; done: number; total: number; message: string };
+export type ConceptExportFormat = "markdown" | "html" | "docx";
+export type ConceptQuote = {
+  runUid: string;
+  card: string;
+  cardTitle: string;
+  text: string;
+  language: string;
+  paragraph: string;
+  pages: string | null;
+  zh: string | null;
+  zhParagraph: string | null;
+};
+
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   revealDataDir: () => invoke<void>("app_reveal_data_dir"),
@@ -1107,6 +1438,39 @@ export const api = {
   /** 手动加的来源文件 */
   pickResearchFile: async () =>
     (await open({ directory: false, multiple: false, title: "选择要加进来的文件", filters: [{ name: "网页、PDF、表格、文档", extensions: ["pdf", "html", "htm", "xlsx", "xls", "csv", "tsv", "docx", "txt", "md"] }] })) as string | null,
+  /** 概念研究：设置、密钥（OpenAI 一个框；Mathpix 两个框：appId、appKey） */
+  conceptStatus: () => invoke<ConceptStatus>("concept_status"),
+  conceptSettingsSet: (settings: ConceptSettings) => invoke<ConceptStatus>("concept_settings_set", { settings }),
+  conceptKeySet: (which: ConceptKeyWhich, key: string, appKey?: string) => invoke<ConceptStatus>("concept_key_set", { which, key, appKey: appKey ?? null }),
+  conceptKeyClear: (which: ConceptKeyWhich) => invoke<ConceptStatus>("concept_key_clear", { which }),
+  conceptSkillsReveal: () => invoke<void>("concept_skills_reveal"),
+  /** 解析成文本：EPUB 直接出结构预览；PDF 先算页数和费用，确认后 conceptPdfConvert（联网或本机） */
+  conceptTextPrepare: (attachmentId: number) => invoke<ConceptPrepared>("concept_text_prepare", { attachmentId }),
+  conceptPdfConvert: (ticket: number, local: boolean) => invoke<ConceptTextPreview>("concept_pdf_convert", { ticket, local }),
+  conceptTextRenumber: (ticket: number, numbering: ConceptNumbering) => invoke<ConceptTextPreview>("concept_text_renumber", { ticket, numbering }),
+  conceptTextSave: (ticket: number, originalUid: string | null) => invoke<ConceptTextSummary>("concept_text_save", { ticket, originalUid }),
+  conceptTextLink: (uid: string, originalUid: string | null) => invoke<ConceptTextSummary>("concept_text_link", { uid, originalUid }),
+  conceptTextDelete: (uid: string) => invoke<void>("concept_text_delete", { uid }),
+  conceptTextsList: () => invoke<ConceptTextSummary[]>("concept_texts_list"),
+  conceptAttachmentText: (attachmentId: number) => invoke<string | null>("concept_attachment_text", { attachmentId }),
+  conceptTextGet: (uid: string) => invoke<ConceptTextView>("concept_text_get", { uid }),
+  conceptUnitGet: (uid: string, unit: number) => invoke<ConceptUnitView>("concept_unit_get", { uid, unit }),
+  /** 段落检索：原著里搜不到的词先搜对齐的中译、再映射回原著；「；」分开的几个词各搜一遍 */
+  conceptSearch: (uid: string, query: string, limit?: number) => invoke<ConceptSearchHit[]>("concept_search", { uid, query, limit: limit ?? null }),
+  /** prepare 不联网：算出每步发什么、最坏多少钱；用户确认后拿 ticket 调 execute（后台跑，事件 concept-progress / concept-done） */
+  conceptRunPrepare: (request: ConceptRunRequest) => invoke<ConceptRunPreview>("concept_run_prepare", { request, resume: null }),
+  conceptRunResumePrepare: (uid: string) => invoke<ConceptRunPreview>("concept_run_prepare", { request: null, resume: uid }),
+  conceptRerunPrepare: (uid: string) => invoke<ConceptRunPreview>("concept_rerun_prepare", { uid }),
+  conceptRunExecute: (ticket: number) => invoke<string>("concept_run_execute", { ticket }),
+  conceptCancel: () => invoke<void>("concept_cancel"),
+  conceptRunsList: (textUid: string) => invoke<ConceptRunSummary[]>("concept_runs_list", { textUid }),
+  conceptRunGet: (uid: string) => invoke<ConceptRunView>("concept_run_get", { uid }),
+  conceptRunDelete: (uid: string) => invoke<void>("concept_run_delete", { uid }),
+  /** 写到 dir 下的新文件（不覆盖），返回路径；在访达中显示用 researchReveal */
+  conceptExport: (uid: string, format: ConceptExportFormat, dir: string) => invoke<string>("concept_export", { uid, format, dir }),
+  conceptAddToLibrary: (uid: string, keys: string[]) => invoke<{ added: { key: string; itemId: number; created: boolean; attachmentError: string | null }[]; view: ConceptRunView }>("concept_add_to_library", { uid, keys }),
+  /** Word 搜索窗：一条文献解析过的书里，卡片上核对通过的原文 */
+  conceptQuotes: (itemUid: string) => invoke<ConceptQuote[]>("concept_quotes", { itemUid }),
   /** 置顶搜索窗 */
   pickerSession: () => invoke<PickerSession | null>("picker_session"),
   pickerSearch: (q: string) => invoke<PickInfo[]>("picker_search", { q }),

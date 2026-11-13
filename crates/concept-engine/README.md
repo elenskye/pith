@@ -49,6 +49,7 @@ version: 1
 description: 一句话说明
 entries: [chapter]       # 能从哪些入口开始：chapter / selection / question / concept / card
 produces: [concept, argument, relation]   # concept / argument / comment / counterfactual / note / relation
+instruction: optional    # 要不要用户写一句要求：required（「自由」）/ optional（默认）
 steps:
   - id: concepts
     kind: model          # model（调一次模型）/ library（查文献库）/ web（网页检索 + 本机下载 + 快照）

@@ -161,6 +161,19 @@ App 图标（`src-tauri/icons/`）由一次性脚本绘制（三本书脊 + 书�
 
 测试与假服务器只用标准库（`std::net::TcpListener`），没有新的开发依赖。
 
+## Rust · v0.4 概念研究（src-tauri 的 `concept` 模块与 crates/concept-engine，云端 2026-11-13 加）
+
+**没有新的第三方依赖**（Cargo.lock 只多了本仓库的 concept-engine）：
+
+| 名称 | 版本 | 许可证 | 用途 | 链接 |
+| --- | --- | --- | --- | --- |
+| concept-engine（本仓库 `crates/concept-engine`） | 0.4.0 | 本项目 | 概念研究的纯逻辑：EPUB / Mathpix 文本层、段落号与页码、中英对齐、技能与工作流、核对与审计、关系图、渲染 | — |
+| zip（features: deflate） | 9.4.1 | MIT | concept-engine 读 EPUB（压缩包）、测试里现拼夹具 EPUB；和 docx-engine 同一个版本 | https://github.com/zip-rs/zip2 |
+| pdf-extract | 0.12.1 | MIT | 短 PDF 数页数、没有 Mathpix 密钥时按页取文字（和事实调查同一个库） | https://github.com/jrmuizel/pdf-extract |
+
+- XHTML / OPF / NCX 用 concept-engine 自己的容错读取（`markup.rs`，只用标准库），没有用 roxmltree（遇到 HTML 实体报错）或 scraper（按 HTML 解析会把自闭合的锚点当成没关上的元素）。
+- 夹具的英文文字来自 Project Gutenberg #3300（公有领域，去掉了 PG 的商标和许可说明），见 `crates/concept-engine/fixtures/wealth/README.md`。
+
 ## 参考但未引入
 
 | 名称 | 许可证 | 关系 |
