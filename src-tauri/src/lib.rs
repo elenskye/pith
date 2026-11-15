@@ -822,6 +822,7 @@ pub fn run() {
             concept::commands::concept_pdf_convert,
             concept::commands::concept_text_renumber,
             concept::commands::concept_text_save,
+            concept::commands::concept_text_reparse,
             concept::commands::concept_text_link,
             concept::commands::concept_text_delete,
             concept::commands::concept_texts_list,

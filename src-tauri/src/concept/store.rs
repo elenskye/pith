@@ -97,21 +97,49 @@ pub fn text_save(c: &Connection, n: &NewText) -> Result<i64, String> {
     )
     .map_err(err)?;
     let id = tx.last_insert_rowid();
+    text_rows_insert(&tx, id, t)?;
+    tx.commit()?;
+    Ok(id)
+}
+
+/// 一份文本的单元和段落
+fn text_rows_insert(c: &Connection, id: i64, t: &Text) -> Result<(), String> {
     for u in &t.units {
-        tx.execute(
+        c.execute(
             "INSERT INTO concept_units (text_id, position, kind, label, key, depth, parent, book, chapter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![id, u.index as i64, u.kind.key(), u.label, u.key, u.depth, u.parent.map(|p| p as i64), u.book, u.chapter],
         )
         .map_err(err)?;
     }
-    {
-        let mut st = tx.prepare("INSERT INTO concept_paragraphs (text_id, seq, unit, role, number, key, attached, body, page, breaks, marker, noterefs) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)").map_err(err)?;
-        for p in &t.paragraphs {
-            st.execute(params![id, p.seq as i64, p.unit as i64, p.role.key(), p.number, p.key, p.attached.map(|a| a as i64), p.text, p.page, json(&p.breaks)?, p.marker, json(&p.noterefs)?]).map_err(err)?;
-        }
+    let mut st = c.prepare("INSERT INTO concept_paragraphs (text_id, seq, unit, role, number, key, attached, body, page, breaks, marker, noterefs) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)").map_err(err)?;
+    for p in &t.paragraphs {
+        st.execute(params![id, p.seq as i64, p.unit as i64, p.role.key(), p.number, p.key, p.attached.map(|a| a as i64), p.text, p.page, json(&p.breaks)?, p.marker, json(&p.noterefs)?]).map_err(err)?;
     }
+    Ok(())
+}
+
+/// 重新解析：就地换掉一份文本的单元和段落。uid、id、文献和附件、译本关联、建的时间都不变；
+/// 对齐、检索、旧卡片的锚点由调用的一方接着刷新（`concept::reparse`，同一个事务里）
+pub fn text_replace(c: &Connection, uid: &str, t: &Text, meta: &Meta, source_sha256: &str, now: &str) -> Result<i64, String> {
+    let tx = Tx::begin(c)?;
+    let id = text_id(&tx, uid)?;
+    tx.execute(
+        "UPDATE concept_texts SET source_sha256 = ?1, format = ?2, parser = ?3, title = ?4, language = ?5, numbering = ?6, page_source = ?7, meta = ?8, updated_at = ?9 WHERE id = ?10",
+        params![source_sha256, t.format, t.parser, t.title, t.language, t.numbering.unwrap_or(Numbering::Chapter).key(), t.page_source, json(meta)?, now, id],
+    )
+    .map_err(err)?;
+    tx.execute("DELETE FROM concept_units WHERE text_id = ?1", [id]).map_err(err)?;
+    tx.execute("DELETE FROM concept_paragraphs WHERE text_id = ?1", [id]).map_err(err)?;
+    text_rows_insert(&tx, id, t)?;
     tx.commit()?;
     Ok(id)
+}
+
+/// 把它当原著的译本（uid）
+pub fn translations_of(c: &Connection, uid: &str) -> Result<Vec<String>, String> {
+    let id = text_id(c, uid)?;
+    let mut st = c.prepare("SELECT uid FROM concept_texts WHERE original_id = ?1 ORDER BY id").map_err(err)?;
+    st.query_map([id], |r| r.get(0)).map_err(err)?.collect::<Result<_, _>>().map_err(err)
 }
 
 fn text_row(r: &rusqlite::Row) -> rusqlite::Result<(TextRow, String)> {

@@ -358,3 +358,56 @@ pub fn english() -> Text {
 pub fn chinese() -> Text {
     text::from_epub(&chinese_epub(), None).expect("中文夹具")
 }
+
+/// 测试用：段落被增删、拆分之后重新排号（seq、正文段的序号、旁注和注释挂在哪一段、引用名），
+/// 模拟「解析器改了，同一本书解析出来不一样」。新加的段落（包括拆出来的后半段）`seq` 写 `usize::MAX`
+pub fn reflow(t: &mut Text) {
+    let map: std::collections::HashMap<usize, usize> = t.paragraphs.iter().enumerate().filter(|(_, p)| p.seq != usize::MAX).map(|(i, p)| (p.seq, i)).collect();
+    let mut numbers: std::collections::HashMap<usize, u32> = std::collections::HashMap::new();
+    for (i, p) in t.paragraphs.iter_mut().enumerate() {
+        p.seq = i;
+        p.attached = p.attached.and_then(|a| map.get(&a).copied());
+        p.number = (p.role == text::Role::Body).then(|| {
+            let n = numbers.entry(p.unit).or_insert(0);
+            *n += 1;
+            *n
+        });
+    }
+    t.renumber(t.numbering.unwrap_or(text::Numbering::Chapter));
+}
+
+/// 测试用：在 `before`（引用名）这一段前面加一段正文（同一单元），重新排号
+pub fn insert_before(t: &mut Text, before: &str, body: &str) {
+    let at = t.paragraph(before).expect("没有这一段").clone();
+    let new = text::Paragraph { seq: usize::MAX, text: body.to_string(), role: text::Role::Body, attached: None, breaks: Vec::new(), marker: None, noterefs: Vec::new(), ..at.clone() };
+    t.paragraphs.insert(at.seq, new);
+    reflow(t);
+}
+
+/// 测试用：把一段在第 `at` 个字处拆成两段（分页点跟着走），重新排号
+pub fn split(t: &mut Text, key: &str, at: usize) {
+    let p = t.paragraph(key).expect("没有这一段").clone();
+    let chars: Vec<char> = p.text.chars().collect();
+    let (head, tail): (String, String) = (chars[..at].iter().collect(), chars[at..].iter().collect());
+    let lead = tail.chars().take_while(|c| c.is_whitespace()).count();
+    let page = t.page_at(p.seq, at + lead);
+    let first = text::Paragraph { text: head.trim_end().to_string(), breaks: p.breaks.iter().filter(|b| b.at < at).cloned().collect(), noterefs: p.noterefs.iter().filter(|(i, _)| *i < at).cloned().collect(), ..p.clone() };
+    let second = text::Paragraph {
+        seq: usize::MAX,
+        text: tail.trim_start().to_string(),
+        page,
+        breaks: p.breaks.iter().filter(|b| b.at > at + lead).map(|b| text::PageBreak { at: b.at - at - lead, page: b.page.clone() }).collect(),
+        noterefs: p.noterefs.iter().filter(|(i, _)| *i >= at + lead).map(|(i, m)| (i - at - lead, m.clone())).collect(),
+        ..p.clone()
+    };
+    t.paragraphs[p.seq] = first;
+    t.paragraphs.insert(p.seq + 1, second);
+    reflow(t);
+}
+
+/// 测试用：删掉一段，重新排号
+pub fn remove(t: &mut Text, key: &str) {
+    let seq = t.paragraph(key).expect("没有这一段").seq;
+    t.paragraphs.remove(seq);
+    reflow(t);
+}
