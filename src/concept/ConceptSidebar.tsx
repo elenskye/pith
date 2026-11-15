@@ -98,7 +98,13 @@ export function ConceptSidebar({ at, onAt }: { at: ConceptAt; onAt: (at: Concept
                     indent
                     label={`${u.key} ${u.label}`}
                     title={u.label}
-                    right={u.aligned === false ? <Badge tone="warn" title="这一章中英正文段数不同，没有对齐">未对齐</Badge> : undefined}
+                    right={
+                      u.aligned === false ? (
+                        <Badge tone="warn" title="这一章没有对齐的中译：译本里找不到这一章，或者两边差得太远">未对齐</Badge>
+                      ) : u.low ? (
+                        <Badge tone="warn" title={u.method === "fitted" ? "这一章中英分段不同，是自动对齐的，把握不大，个别段落可能对错了" : "这一章中英段数相同，但有些段落长短对不上，中间可能错开了"}>对齐存疑</Badge>
+                      ) : undefined
+                    }
                     active={at.unit === u.index && !at.run}
                     onClick={() => onAt({ text: b.uid, unit: u.index, run: null, card: null })}
                   />

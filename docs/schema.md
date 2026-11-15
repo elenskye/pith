@@ -280,6 +280,7 @@ CREATE INDEX metadata_lookups_item ON metadata_lookups(item_id, id);
 | `0006_research.sql` | v0.3 | `research_questions`、`research_runs`、`research_searches`、`research_sources`、`research_facts`、`research_calcs`、`research_conclusions`、`research_conclusion_facts`、`research_steps` | 事实调查（`decisions/0020`）；快照文件在 `数据目录/research/sources/` |
 | `0007_research_fetch.sql` | v0.3 | `research_sources.fetched_via` | 下载失败时改用 Claude 网页抓取（`0023`） |
 | `0008_concept.sql` | v0.4 | `concept_texts`（一份解析好的文本：附件 SHA-256、解析器版本、关联的原著）、`concept_units`（篇章节、导读、注释、前后附）、`concept_paragraphs`（角色、引用名、页码与段内分页点、注释引用）、`concept_alignments` + `concept_aligned`（中英对齐）、`concept_runs`、`concept_steps`（含模型原始输出）、`concept_cards`、`concept_sentences`、`concept_anchors`（一句一行：段落号、核对状态、位置、页码、中译核对）、`concept_relations`、`concept_sources`、`concept_rejected` | 概念研究（`0024`、`0025`）；保存一次研究 = 一个事务里整份换掉子表；评论来源的快照在 `数据目录/concept/sources/` |
+| `0009_alignment.sql` | v0.5 | `concept_aligned_pairs`（对齐的段落，主键 `(alignment_id, original_seq, translation_seq)`：一段可以对几段、几段可以对一段，写成多行；按 `(alignment_id, translation_seq)` 另有索引）；`concept_alignments.algorithm`（对齐算法的版本 = `concept_engine::align::VERSION`，旧行默认 1）、`concept_alignments.similarity`（算的时候用了哪个向量模型的语义相似度，没用是 NULL） | 全书对齐：段数不同的章做单调对齐。`concept_alignments.units` 的 JSON 每章多了 `method`（exact / fitted / none）、`confidence`、`low`、`merged`、`unmatched`，旧的 JSON 照样读（按 `aligned` 补）。**0008 的 `concept_aligned`（主键 `(alignment_id, original_seq)`，存不了一对多）从这一版起不再读、不再写**，表留着。对齐是派生数据：读到 `algorithm` 比 App 旧的那一行，就用两份文本重算、存回去（`store::alignment_ensure`）；旧表里属于那份对齐的行这时随旧的那一行级联删掉 |
 
 ## 不在主库里的
 

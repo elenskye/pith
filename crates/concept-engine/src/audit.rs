@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Run, Status};
+use crate::model::{Run, Sentence, Status, ZhStatus};
 use crate::prompts::Books;
 use crate::verify::{self, SourceLookup};
 
@@ -15,6 +15,11 @@ pub struct Finding {
     /// 第几句（从 1 起）
     pub sentence: Option<usize>,
     pub message: String,
+}
+
+/// 存下的是「这一段没有对齐的中译」，现在对上了：对齐是派生数据，算法后来改进（v0.5 起段数不同的章也对齐）不算结果被改坏
+fn aligned_since(stored: &Sentence, again: &Sentence) -> bool {
+    stored.check.zh_status == Some(ZhStatus::Unaligned) && again.check.zh_status.is_some()
 }
 
 pub fn audit(run: &Run, books: &Books, sources: SourceLookup) -> Vec<Finding> {
@@ -33,7 +38,7 @@ pub fn audit(run: &Run, books: &Books, sources: SourceLookup) -> Vec<Finding> {
                             Status::Pending => "没核过",
                         };
                         out.push(Finding { at: card.id.clone(), sentence: Some(i + 1), message: format!("存下的是「{claimed}」，重新核对的结果不一样") });
-                    } else if again.check.span != s.check.span || again.check.pages != s.check.pages || again.check.zh_status != s.check.zh_status || again.paragraph != s.paragraph {
+                    } else if again.check.span != s.check.span || again.check.pages != s.check.pages || (again.check.zh_status != s.check.zh_status && !aligned_since(s, &again)) || again.paragraph != s.paragraph {
                         out.push(Finding { at: card.id.clone(), sentence: Some(i + 1), message: "存下的位置、页码或中译和重新核对的不一样".into() });
                     }
                 }

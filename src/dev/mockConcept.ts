@@ -34,7 +34,10 @@ const clone = <T>(v: T): T => structuredClone(v);
 type Para = { seq: number; unit: number; role: ConceptPara["role"]; number: number | null; key: string; attached: number | null; text: string; page: string | null; breaks: { at: number; page: string }[]; marker: string | null; noterefs: [number, string][] };
 type Unit = { index: number; kind: ConceptUnitInfo["kind"]; label: string; key: string; depth: number; parent: number | null; book: number | null; chapter: number | null };
 type MText = { title: string; language: string; format: string; numbering: string; pageSource: string; units: Unit[]; paragraphs: Para[]; warnings: string[] };
-type Alignment = { units: { key: string; label: string; otherLabel: string; unit: number; otherUnit: number | null; count: number; otherCount: number; aligned: boolean }[]; pairs: [number, number][] };
+type Alignment = {
+  units: { key: string; label: string; otherLabel: string; unit: number; otherUnit: number | null; count: number; otherCount: number; aligned: boolean; method: "exact" | "fitted" | "none"; confidence: number; low: boolean; merged: number; unmatched: number }[];
+  pairs: [number, number][];
+};
 
 const EN = data.en as unknown as MText;
 const ZH = data.zh as unknown as MText;
@@ -104,11 +107,11 @@ function unitInfos(t: MText, al: Alignment | null): ConceptUnitInfo[] {
   const pv = t === EN ? PREVIEW_EN : t === ZH ? PREVIEW_ZH : pdfPreview(t);
   return pv.units.map((u) => {
     const a = al?.units.find((x) => x.unit === u.index);
-    return { index: u.index, key: u.key, label: u.label, kind: u.kind, depth: u.depth, body: u.counts.body, sidenotes: u.counts.sidenote, notes: u.counts.note, guide: u.counts.guide, pages: u.pages, aligned: a ? a.aligned : null, otherCount: a ? a.otherCount : null };
+    return { index: u.index, key: u.key, label: u.label, kind: u.kind, depth: u.depth, body: u.counts.body, sidenotes: u.counts.sidenote, notes: u.counts.note, guide: u.counts.guide, pages: u.pages, aligned: a ? a.aligned : null, otherCount: a ? a.otherCount : null, method: a ? a.method : null, confidence: a ? Math.round(a.confidence * 100) / 100 : null, low: a ? a.low : null };
   });
 }
 
-const view = (p: Para, partner: number | null): ConceptPara => ({ seq: p.seq, key: p.key, role: p.role, number: p.number, text: p.text, page: p.page, breaks: p.breaks, attached: p.attached, marker: p.marker, partner });
+const view = (p: Para, partners: number[]): ConceptPara => ({ seq: p.seq, key: p.key, role: p.role, number: p.number, text: p.text, page: p.page, breaks: p.breaks, attached: p.attached, marker: p.marker, partners });
 const pagesOf = (p: Para) => (p.page ? (p.breaks.length ? `${p.page}–${p.breaks[p.breaks.length - 1].page}` : p.page) : null);
 const hasCjk = (s: string) => /[㐀-鿿]/.test(s);
 
@@ -150,12 +153,19 @@ function anchored(uid: string, run: ConceptRun): ConceptAnchoredParagraph[] {
     if (s.paragraph && !keysSeen.includes(s.paragraph)) keysSeen.push(s.paragraph);
     if (s.check.zhParagraph && !keysSeen.includes(`译:${s.check.zhParagraph}`)) keysSeen.push(`译:${s.check.zhParagraph}`);
   }
+  // 原著的一段对着哪几段中译（一对多时整组都带上）
+  const al = alignmentOf(uid);
+  const groupOf = (seq: number) => (al && zh ? al.pairs.filter((x) => x[0] === seq).map((x) => `译:${zh.paragraphs[x[1]].key}`) : []);
+  for (const k of [...keysSeen]) {
+    const p = k.startsWith("译:") ? undefined : en.paragraphs.find((x) => x.key === k);
+    if (p?.role === "body") for (const z of groupOf(p.seq)) if (!keysSeen.includes(z)) keysSeen.push(z);
+  }
   const out: ConceptAnchoredParagraph[] = [];
   for (const k of keysSeen) {
     const tr = k.startsWith("译:");
     const t = tr ? zh : en;
     const p = t?.paragraphs.find((x) => x.key === (tr ? k.slice(2) : k));
-    if (p) out.push({ key: k, text: p.text, role: p.role, pages: tr ? null : pagesOf(p), unit: p.unit, seq: p.seq, translation: tr });
+    if (p) out.push({ key: k, text: p.text, role: p.role, pages: tr ? null : pagesOf(p), unit: p.unit, seq: p.seq, translation: tr, aligned: !tr && p.role === "body" ? groupOf(p.seq) : [] });
   }
   return out;
 }
@@ -361,14 +371,14 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
     const t = textOf(uid as string);
     const al = alignmentOf(uid as string);
     const tr = partnerOf(uid as string);
-    return { summary: t.summary, units: unitInfos(t.text, al), translation: tr?.summary ?? null, original: t.summary.originalUid ? textOf(t.summary.originalUid).summary : null, alignedUnits: al?.units.filter((u) => u.aligned).length ?? 0, mismatchedUnits: al?.units.filter((u) => !u.aligned).map((u) => u.key) ?? [] };
+    return { summary: t.summary, units: unitInfos(t.text, al), translation: tr?.summary ?? null, original: t.summary.originalUid ? textOf(t.summary.originalUid).summary : null, alignedUnits: al?.units.filter((u) => u.aligned).length ?? 0, mismatchedUnits: al?.units.filter((u) => !u.aligned).map((u) => u.key) ?? [], fittedUnits: al?.units.filter((u) => u.method === "fitted").length ?? 0, lowUnits: al?.units.filter((u) => u.low).map((u) => u.key) ?? [], alignmentSimilarity: null };
   },
   concept_unit_get: ({ uid, unit }): ConceptUnitView => {
     const t = textOf(uid as string);
     const al = alignmentOf(uid as string);
     const info = unitInfos(t.text, al).find((u) => u.index === unit) ?? fail("找不到这一章");
-    const pairOf = (seq: number) => al?.pairs.find((p) => p[0] === seq)?.[1] ?? null;
-    const paragraphs = t.text.paragraphs.filter((p) => p.unit === unit).map((p) => view(p, pairOf(p.seq)));
+    const othersOf = (seq: number) => al?.pairs.filter((p) => p[0] === seq).map((p) => p[1]) ?? [];
+    const paragraphs = t.text.paragraphs.filter((p) => p.unit === unit).map((p) => view(p, othersOf(p.seq)));
     const tr = partnerOf(uid as string);
     const ua = al?.units.find((u) => u.unit === unit);
     let translation: ConceptPara[] = [];
@@ -376,9 +386,9 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
       const zu = ua.otherUnit;
       const guides: number[] = [];
       for (let g = zu; g > 0 && tr.text.units[g - 1].kind === "guide"; g--) guides.unshift(g - 1);
-      translation = [...guides.flatMap((g) => tr.text.paragraphs.filter((p) => p.unit === g).map((p) => view(p, null))), ...tr.text.paragraphs.filter((p) => p.unit === zu).map((p) => view(p, al!.pairs.find((x) => x[1] === p.seq)?.[0] ?? null))];
+      translation = [...guides.flatMap((g) => tr.text.paragraphs.filter((p) => p.unit === g).map((p) => view(p, []))), ...tr.text.paragraphs.filter((p) => p.unit === zu).map((p) => view(p, al!.pairs.filter((x) => x[1] === p.seq).map((x) => x[0])))];
     }
-    return { textUid: uid as string, unit: info, paragraphs, translationUid: tr?.summary.uid ?? null, translation, translationLabel: ua?.otherLabel ?? null, aligned: ua?.aligned ?? false, language: t.text.language };
+    return { textUid: uid as string, unit: info, paragraphs, translationUid: tr?.summary.uid ?? null, translation, translationLabel: ua?.otherLabel ?? null, aligned: ua?.aligned ?? false, merged: ua?.merged ?? 0, unmatched: ua?.unmatched ?? 0, language: t.text.language };
   },
   concept_search: ({ uid, query }): ConceptSearchHit[] => {
     const t = textOf(uid as string).text;
@@ -393,8 +403,7 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
         for (const z of zh.paragraphs) {
           if (!["body", "sidenote", "note"].includes(z.role) || !z.text.includes(term)) continue;
           const body = z.role === "body" ? z.seq : z.attached;
-          const o = al.pairs.find((x) => x[1] === body)?.[0];
-          if (o !== undefined && !hits.has(o)) hits.set(o, true);
+          for (const [o] of al.pairs.filter((x) => x[1] === body)) if (!hits.has(o)) hits.set(o, true);
         }
       }
     }
@@ -403,9 +412,8 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
       .map(([seq, via]) => {
         const p = t.paragraphs[seq];
         const u = t.units[p.unit];
-        const z = al?.pairs.find((x) => x[0] === seq)?.[1];
-        const zp = z !== undefined ? zh?.paragraphs[z] : undefined;
-        return { seq, key: p.key, role: p.role, unit: p.unit, unitKey: u.key, unitLabel: u.label, text: p.text, viaTranslation: via, translationKey: zp?.key ?? null, translationText: zp?.text ?? null };
+        const zps = zh && al ? al.pairs.filter((x) => x[0] === seq).map((x) => zh.paragraphs[x[1]]) : [];
+        return { seq, key: p.key, role: p.role, unit: p.unit, unitKey: u.key, unitLabel: u.label, text: p.text, viaTranslation: via, translationKey: zps.length ? zps.map((z) => z.key).join("、") : null, translationText: zps.length ? zps.map((z) => z.text).join("\n") : null };
       });
   },
   concept_run_prepare: ({ request, resume }) => {

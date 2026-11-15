@@ -480,6 +480,11 @@ pub struct UnitInfo {
     pages: Option<(String, String)>,
     aligned: Option<bool>,
     other_count: Option<usize>,
+    /// 这一章是怎么对上的：exact 段数相同 / fitted 算法对的 / none 没对上（没有译本是空）
+    method: Option<align::Method>,
+    /// 算法对的章：对得稳的段落占多少（0–1）、是不是要提示「可能有偏差」
+    confidence: Option<f32>,
+    low: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -491,6 +496,11 @@ pub struct TextView {
     original: Option<TextSummary>,
     aligned_units: usize,
     mismatched_units: Vec<String>,
+    /// 段数不同、算法对的章有几章；其中置信度低的
+    fitted_units: usize,
+    low_units: Vec<String>,
+    /// 对齐时用了哪个向量模型的语义相似度（没用是空：只看长度和锚点）
+    alignment_similarity: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -505,12 +515,12 @@ pub struct ParaView {
     breaks: Vec<text::PageBreak>,
     attached: Option<usize>,
     marker: Option<String>,
-    /// 对齐的另一边（seq）
-    partner: Option<usize>,
+    /// 对齐的另一边（seq）：一段可能对着几段，没对上是空的
+    partners: Vec<usize>,
 }
 
-fn para_view(p: &text::Paragraph, partner: Option<usize>) -> ParaView {
-    ParaView { seq: p.seq, key: p.key.clone(), role: p.role, number: p.number, text: p.text.clone(), page: p.page.clone(), breaks: p.breaks.clone(), attached: p.attached, marker: p.marker.clone(), partner }
+fn para_view(p: &text::Paragraph, partners: Vec<usize>) -> ParaView {
+    ParaView { seq: p.seq, key: p.key.clone(), role: p.role, number: p.number, text: p.text.clone(), page: p.page.clone(), breaks: p.breaks.clone(), attached: p.attached, marker: p.marker.clone(), partners }
 }
 
 #[derive(Serialize)]
@@ -524,6 +534,9 @@ pub struct UnitView {
     translation: Vec<ParaView>,
     translation_label: Option<String>,
     aligned: bool,
+    /// 合并（一对多、多对一）的有几组、落空的有几段（算法对的章）
+    merged: usize,
+    unmatched: usize,
     language: String,
 }
 
@@ -546,8 +559,9 @@ fn load_books(c: &rusqlite::Connection, uid: &str) -> Result<Loaded, String> {
     let (translation, alignment) = match store::partner(c, uid)? {
         Some((t, true)) => {
             let text = store::text_load(c, &t)?;
-            let al = store::alignment_load(c, uid, &t)?;
-            (Some((t, text)), al)
+            // 旧算法算的对齐（v0.4）在这里按新算法重算、存回去
+            let al = store::alignment_ensure(c, uid, &original, &t, &text, &apptext::now_iso())?;
+            (Some((t, text)), Some(al))
         }
         _ => (None, None),
     };
@@ -560,7 +574,7 @@ fn unit_infos(t: &Text, alignment: Option<&Alignment>) -> Vec<UnitInfo> {
         .into_iter()
         .map(|u| {
             let a = alignment.and_then(|a| a.units.iter().find(|x| x.unit == u.index));
-            UnitInfo { index: u.index, key: u.key, label: u.label, kind: u.kind, depth: u.depth, body: u.counts.body, sidenotes: u.counts.sidenote, notes: u.counts.note, guide: u.counts.guide, pages: u.pages, aligned: a.map(|x| x.aligned), other_count: a.map(|x| x.other_count) }
+            UnitInfo { index: u.index, key: u.key, label: u.label, kind: u.kind, depth: u.depth, body: u.counts.body, sidenotes: u.counts.sidenote, notes: u.counts.note, guide: u.counts.guide, pages: u.pages, aligned: a.map(|x| x.aligned), other_count: a.map(|x| x.other_count), method: a.map(|x| x.method), confidence: a.map(|x| x.confidence), low: a.map(|x| x.low) }
         })
         .collect()
 }
@@ -796,6 +810,12 @@ pub fn concept_text_get(state: State<AppState>, uid: String) -> Result<TextView,
             units: unit_infos(&loaded.original, al),
             aligned_units: al.map(|a| a.units.iter().filter(|u| u.aligned).count()).unwrap_or(0),
             mismatched_units: al.map(|a| a.mismatched().iter().map(|u| u.key.clone()).collect()).unwrap_or_default(),
+            fitted_units: al.map(|a| a.units.iter().filter(|u| u.method == align::Method::Fitted).count()).unwrap_or(0),
+            low_units: al.map(|a| a.low().iter().map(|u| u.key.clone()).collect()).unwrap_or_default(),
+            alignment_similarity: match &loaded.translation {
+                Some((t, _)) => store::alignment_meta(c, &uid, t)?.and_then(|(_, model)| model),
+                None => None,
+            },
             summary: s,
             translation,
             original,
@@ -810,15 +830,17 @@ pub fn concept_unit_get(state: State<AppState>, uid: String, unit: usize) -> Res
         let l = load_books(c, &uid)?;
         let t = &l.original;
         let info = unit_infos(t, l.alignment.as_ref()).into_iter().find(|u| u.index == unit).ok_or("找不到这一章")?;
-        let paragraphs: Vec<ParaView> = t.paragraphs.iter().filter(|p| p.unit == unit).map(|p| para_view(p, l.alignment.as_ref().and_then(|a| a.other_of(p.seq)))).collect();
+        let paragraphs: Vec<ParaView> = t.paragraphs.iter().filter(|p| p.unit == unit).map(|p| para_view(p, l.alignment.as_ref().map(|a| a.other_of(p.seq)).unwrap_or_default())).collect();
         let mut translation = Vec::new();
         let mut translation_label = None;
         let mut aligned = false;
+        let (mut merged, mut unmatched) = (0, 0);
         if let (Some((_, zh)), Some(al)) = (&l.translation, &l.alignment)
             && let Some(ua) = al.units.iter().find(|u| u.unit == unit)
             && let Some(zu) = ua.other_unit
         {
             aligned = ua.aligned;
+            (merged, unmatched) = (ua.merged, ua.unmatched);
             translation_label = Some(ua.other_label.clone());
             // 紧挨在前面的导读
             let mut g = zu;
@@ -829,11 +851,11 @@ pub fn concept_unit_get(state: State<AppState>, uid: String, unit: usize) -> Res
             }
             guides.reverse();
             for gu in guides {
-                translation.extend(zh.paragraphs.iter().filter(|p| p.unit == gu).map(|p| para_view(p, None)));
+                translation.extend(zh.paragraphs.iter().filter(|p| p.unit == gu).map(|p| para_view(p, Vec::new())));
             }
             translation.extend(zh.paragraphs.iter().filter(|p| p.unit == zu).map(|p| para_view(p, al.original_of(p.seq))));
         }
-        Ok(UnitView { text_uid: uid.clone(), unit: info, paragraphs, translation_uid: l.translation.as_ref().map(|(u, _)| u.clone()), translation, translation_label, aligned, language: t.language.clone() })
+        Ok(UnitView { text_uid: uid.clone(), unit: info, paragraphs, translation_uid: l.translation.as_ref().map(|(u, _)| u.clone()), translation, translation_label, aligned, merged, unmatched, language: t.language.clone() })
     })
 }
 
@@ -880,11 +902,10 @@ pub fn search_hits(c: &rusqlite::Connection, uid: &str, query: &str, limit: usiz
                     let zid = store::text_id(c, tu)?;
                     search::query(c, zid, term, pool)?
                         .into_iter()
-                        .filter_map(|(zseq, score)| {
-                            // 正文映射回原著；旁注、注释映射到它挂的正文段
-                            let z = zh.paragraphs.get(zseq)?;
-                            let body = if z.role == Role::Body { Some(zseq) } else { z.attached };
-                            al.original_of(body?).map(|o| (o, score))
+                        .flat_map(|(zseq, score)| {
+                            // 正文映射回原著（一段中译可能对着几段原文）；旁注、注释映射到它挂的正文段
+                            let body = zh.paragraphs.get(zseq).and_then(|z| if z.role == Role::Body { Some(zseq) } else { z.attached });
+                            body.map(|b| al.original_of(b)).unwrap_or_default().into_iter().map(move |o| (o, score))
                         })
                         .collect()
                 }
@@ -911,8 +932,13 @@ pub fn search_hits(c: &rusqlite::Connection, uid: &str, query: &str, limit: usiz
             .filter_map(|(seq, _, via)| {
                 let p = t.paragraphs.get(seq)?;
                 let u = &t.units[p.unit];
-                let zh = l.alignment.as_ref().and_then(|a| a.other_of(seq)).and_then(|z| l.translation.as_ref().and_then(|(_, tt)| tt.paragraphs.get(z)));
-                Some(SearchHit { seq, key: p.key.clone(), role: p.role, unit: p.unit, unit_key: u.key.clone(), unit_label: u.label.clone(), text: p.text.clone(), via_translation: via, translation_key: zh.map(|z| z.key.clone()), translation_text: zh.map(|z| z.text.clone()) })
+                // 对着几段中译的：段落号用顿号连起来，文字接在一起
+                let zh: Vec<&text::Paragraph> = match (&l.alignment, &l.translation) {
+                    (Some(a), Some((_, tt))) => a.other_of(seq).into_iter().filter_map(|z| tt.paragraphs.get(z)).collect(),
+                    _ => Vec::new(),
+                };
+                let joined = |f: &dyn Fn(&text::Paragraph) -> &str, sep: &str| (!zh.is_empty()).then(|| zh.iter().map(|z| f(z)).collect::<Vec<_>>().join(sep));
+                Some(SearchHit { seq, key: p.key.clone(), role: p.role, unit: p.unit, unit_key: u.key.clone(), unit_label: u.label.clone(), text: p.text.clone(), via_translation: via, translation_key: joined(&|z| z.key.as_str(), "、"), translation_text: joined(&|z| z.text.as_str(), "\n") })
             })
             .collect())
     }
@@ -1246,6 +1272,8 @@ pub struct AnchoredParagraph {
     unit: usize,
     seq: usize,
     translation: bool,
+    /// 原著的段落：对齐的中译段落（`译:` 开头的引用名；一段可能对着几段，都在 `paragraphs` 里）
+    aligned: Vec<String>,
 }
 
 fn source_lookup(state: &AppState, run: &Run) -> Vec<(String, String)> {
@@ -1274,6 +1302,20 @@ fn view(state: &AppState, concept: &ConceptState, uid: &str) -> Result<RunView, 
             }
         }
     }
+    // 原著的一段对着哪几段中译（一对多时整组都带上，点锚点时都显示）
+    let zh_group = |seq: usize| -> Vec<String> {
+        match (books.translation, books.alignment) {
+            (Some(zh), Some(al)) => align::counterpart(al, books.original, zh, seq).iter().map(|z| format!("{}{}", concept_engine::prompts::TRANSLATION_PREFIX, z.key)).collect(),
+            _ => Vec::new(),
+        }
+    };
+    for k in keys.clone() {
+        for z in books.original.paragraph(&k).map(|p| zh_group(p.seq)).unwrap_or_default() {
+            if !keys.contains(&z) {
+                keys.push(z);
+            }
+        }
+    }
     let mut paragraphs = Vec::new();
     for k in keys {
         let (book, key, tr) = match k.strip_prefix(concept_engine::prompts::TRANSLATION_PREFIX) {
@@ -1283,7 +1325,7 @@ fn view(state: &AppState, concept: &ConceptState, uid: &str) -> Result<RunView, 
         if let Some(b) = book
             && let Some(p) = b.paragraph(&key)
         {
-            paragraphs.push(AnchoredParagraph { key: k.clone(), text: p.text.clone(), role: p.role, pages: if tr { None } else { b.paragraph_pages(p.seq) }, unit: p.unit, seq: p.seq, translation: tr });
+            paragraphs.push(AnchoredParagraph { key: k.clone(), text: p.text.clone(), role: p.role, pages: if tr { None } else { b.paragraph_pages(p.seq) }, unit: p.unit, seq: p.seq, translation: tr, aligned: if tr { Vec::new() } else { zh_group(p.seq) } });
         }
     }
     Ok(RunView { svg: graph::svg(&graph::layout(&run)), running: concept.running().as_deref() == Some(uid), cost_usd: run.cost_usd(), translation_uid: l.translation.as_ref().map(|(u, _)| u.clone()), text_uid, findings, paragraphs, run })

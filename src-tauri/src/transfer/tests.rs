@@ -109,9 +109,18 @@ fn exercise(c: &Connection) {
     }
     crate::metadata::settings_get(c).unwrap();
     for t in crate::concept::store::texts_list(c).unwrap() {
-        crate::concept::store::text_load(c, &t.uid).unwrap();
+        let text = crate::concept::store::text_load(c, &t.uid).unwrap();
         for r in crate::concept::store::runs_list(c, &t.uid).unwrap() {
             crate::concept::store::run_load(c, &r.uid).unwrap();
+        }
+        // 原著和译本的对齐：旧版本存的（0008，算法 1）读到时按现在的算法重算、存回去，每一章都有结果
+        if let Some((other, true)) = crate::concept::store::partner(c, &t.uid).unwrap() {
+            let translation = crate::concept::store::text_load(c, &other).unwrap();
+            let al = crate::concept::store::alignment_ensure(c, &t.uid, &text, &other, &translation, "2026-11-15T10:00:00.000Z").unwrap();
+            assert_eq!(al, concept_engine::align::align(&text, &translation));
+            assert!(!al.units.is_empty() && al.mismatched().is_empty());
+            assert_eq!(crate::concept::store::alignment_meta(c, &t.uid, &other).unwrap().map(|m| m.0), Some(concept_engine::align::VERSION));
+            assert_eq!(crate::concept::store::alignment_load(c, &t.uid, &other).unwrap(), Some(al));
         }
     }
     for q in crate::research::store::questions_list(c).unwrap() {

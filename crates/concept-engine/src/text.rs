@@ -3,11 +3,13 @@
 //! - **角色**靠规则认，不看 class 名（两本真实 EPUB 的 class 名都没有意义）：
 //!   1. 先按目录项的文字分单元：「Book One / 第一编」是篇，「CHAPTER I / 第一章」是章，「PART I / 第一部分」是节，
 //!      「导读 / 导言 / Analytical Introduction」是导读，「Notes / 注释 / Footnotes」是注释，「Contents / 目录 / Index / 版权页 / 序」等是前后附；
-//!      上一层是导读、注释、前后附的，下面都跟着它。
+//!      上一层是导读、注释、前后附的，下面都跟着它。平铺的目录里，「Footnotes」后面同层的「Page 60」和夹在中间的章名也都是注释；
+//!      单元名就是书名（或书名加卷册）的是书名页，它自己名下的段落算前后附；光写着「Introduction」、不在任何一篇里、
+//!      后面隔着目录或书名页才到正文的，是编者的导读。
 //!   2. 篇、章、节和其他正文单元里再逐块认：h1–h6、单元开头全是粗体或链接、或和目录文字一样的是标题；
 //!      短的 `blockquote`（或 epub:type 是 marginalia / sidebar 的）是旁注；
 //!      以「［1］」这类标记开头、并且是注释引用指向的（或者前面正文里有同一个标记）的段落开始「注释区」，到单元结尾都是注释；
-//!      epub:type 是 footnote / endnote 的是注释；其余是正文。
+//!      epub:type 是 footnote / endnote 的是注释；其余是正文。数据表格整张算一段正文（一行一行，格之间是制表符）。
 //! - **段落号**只给正文：「篇.章.段」（Glasgow 式，`I.iii.5`）或「章.段」（`3.5`）；目录有篇、章两层时默认前一种。
 //!   旁注、注释挂到前面的正文段上（注释先找带同一个引用标记的正文段）。
 //! - **页码**：段落开头所在的页，加上段内的分页点（按字符位置）；一句引文的页码按它在段内的位置算，跨页写「110–111」。
@@ -20,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::epub::{self, Block};
 
 /// 解析器版本：规则变了就改，存下的文本记着它（`decisions/0024`「存进主库」）
-pub const PARSER_VERSION: &str = "concept-text-1";
+pub const PARSER_VERSION: &str = "concept-text-2";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -362,6 +364,58 @@ fn intro_like(label: &str) -> bool {
     l.contains("introduction") || l.contains("引言") || l.contains("引 言")
 }
 
+/// 只留字母和数字，小写（比单元名和书名用）
+fn letters(s: &str) -> String {
+    s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect()
+}
+
+/// 去掉括号里的字
+fn without_brackets(s: &str) -> String {
+    let mut depth = 0u32;
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '(' | '（' | '[' | '［' => depth += 1,
+            ')' | '）' | ']' | '］' => depth = depth.saturating_sub(1),
+            c if depth == 0 => out.push(c),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// 单元名就是书名（「《国富论》」「《国富论》（上）」「The Wealth of Nations Books I-III」）：书名页、分册的封面
+fn title_like(label: &str, title: &str) -> bool {
+    let l = letters(&without_brackets(label));
+    if l.is_empty() {
+        return false;
+    }
+    title.split([':', '：', '(', '（', ')', '）', '—', '–', '|', '·']).map(letters).any(|seg| {
+        let long_enough = seg.chars().count() >= if seg.chars().any(is_cjk) { 2 } else { 6 };
+        long_enough && (l == seg || l.starts_with(&seg))
+    })
+}
+
+/// 注释的小目录：「Page 128」「p. 60」「第 128 页」
+fn page_like(label: &str) -> bool {
+    let l = label.trim().to_lowercase();
+    let number = |s: &str| !s.is_empty() && (s.chars().all(|c| c.is_ascii_digit()) || parse_roman(s).is_some());
+    if let Some(rest) = l.strip_prefix("pages").or_else(|| l.strip_prefix("page")).or_else(|| l.strip_prefix("pp.")).or_else(|| l.strip_prefix("p.")) {
+        return number(rest.trim().trim_end_matches('.'));
+    }
+    let cleaned: String = l.chars().filter(|c| !c.is_whitespace()).collect();
+    cleaned.strip_prefix('第').and_then(|r| r.strip_suffix('页')).is_some_and(|n| parse_chinese_number(n).is_some())
+}
+
+/// 光写着「Introduction」（斯密自己的是「Introduction and Plan of the Work」）
+fn bare_introduction(label: &str) -> bool {
+    matches!(letters(label).as_str(), "introduction" | "theintroduction")
+}
+
+fn ends_sentence(text: &str) -> bool {
+    text.trim_end().chars().last().is_some_and(|c| ".。!！?？;；:：,，”’\"'）)".contains(c))
+}
+
 /// 去掉括号、空白的单元名（引用名里用）
 fn short_label(label: &str) -> String {
     let t: String = label.chars().filter(|c| !matches!(c, '〔' | '〕' | '［' | '］' | '【' | '】')).collect();
@@ -431,19 +485,45 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
     let has_descendant = |units: &[Unit], labels: &[Label], i: usize, want: &dyn Fn(Label) -> bool| -> bool {
         (i + 1..units.len()).take_while(|j| units[*j].depth > units[i].depth).any(|j| want(labels[j]))
     };
-    // 目录是平的（篇和章同一层，Penguin 第二册）：章跟着前面最近的同层的篇
+    // 目录是平的（篇和章同一层，Penguin 第二册）：章跟着前面最近的同层的篇。
+    // 同层的篇比上一层的篇近（中文版的目录把第五编放在第四编下面，第五编后面同层的「第三章」是第五编的）
     let mut flat_book: Option<(u32, Option<usize>, Option<u32>)> = None;
+    // 平铺的目录里「Footnotes」后面同层的「Page 60」和夹在中间的章名：注释的小目录
+    let mut flat_notes: Option<(u32, Option<usize>)> = None;
+    // 书名页（单元名就是书名）：它自己名下的段落算前后附
+    let mut title_page = vec![false; units.len()];
+    let structural = |l: Label| matches!(l, Label::Book(_) | Label::Chapter(_));
     for i in 0..units.len() {
         let parent_kind = units[i].parent.map(|p| units[p].kind);
         let in_chapter = ancestors(&units, i).any(|a| units[a].kind == UnitKind::Chapter);
-        let book_no = ancestors(&units, i)
-            .find(|a| units[*a].kind == UnitKind::Book)
-            .and_then(|a| units[a].book)
-            .or_else(|| flat_book.filter(|(d, p, _)| *d == units[i].depth && *p == units[i].parent).and_then(|(_, _, b)| b));
+        let level = (units[i].depth, units[i].parent);
+        let flat_no = flat_book.filter(|(d, p, _)| (*d, *p) == level).map(|(_, _, b)| b);
+        let in_book = flat_no.is_some() || ancestors(&units, i).any(|a| units[a].kind == UnitKind::Book);
+        let book_no = match flat_no {
+            Some(b) => b,
+            None => ancestors(&units, i).find(|a| units[*a].kind == UnitKind::Book).and_then(|a| units[a].book),
+        };
+        // 同层后面第一个不是篇、章的单元
+        let next_plain = (i + 1..units.len()).take_while(|j| units[*j].depth >= level.0).filter(|j| (units[*j].depth, units[*j].parent) == level).find(|j| !structural(labels[*j]));
+        let notes_index = flat_notes == Some(level) && (page_like(&units[i].label) || (structural(labels[i]) && next_plain.is_some_and(|j| page_like(&units[j].label))));
+        if flat_notes == Some(level) && !notes_index {
+            flat_notes = None;
+        }
+        let is_title = labels[i] == Label::Other && !in_chapter && title_like(&units[i].label, &book.title);
+        // 编者的导读：光写着「Introduction」、不在任何一篇里，后面隔着目录、注释、书名页才到正文
+        let editors_intro = labels[i] == Label::Other && !in_book && !in_chapter && bare_introduction(&units[i].label) && {
+            let next = (i + 1..units.len()).find(|j| structural(labels[*j]));
+            next.is_some_and(|n| (i + 1..n).any(|j| matches!(labels[j], Label::Matter | Label::Notes | Label::Guide) || title_like(&units[j].label, &book.title)))
+        };
         let kind = match (parent_kind, labels[i]) {
             (Some(k @ (UnitKind::Guide | UnitKind::Notes | UnitKind::Matter)), _) => k,
+            _ if notes_index => UnitKind::Notes,
+            _ if editors_intro => UnitKind::Guide,
             (_, Label::Guide) => UnitKind::Guide,
-            (_, Label::Notes) => UnitKind::Notes,
+            (_, Label::Notes) => {
+                flat_notes = Some(level);
+                UnitKind::Notes
+            }
             (_, Label::Matter) => UnitKind::Matter,
             (_, Label::Book(n)) => {
                 units[i].book = n;
@@ -458,7 +538,10 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
             (_, Label::Section | Label::Other) if in_chapter => UnitKind::Section,
             (_, Label::Section | Label::Other) => {
                 if has_descendant(&units, &labels, i, &|l| matches!(l, Label::Book(_) | Label::Chapter(_))) {
+                    title_page[i] = is_title;
                     UnitKind::Container
+                } else if is_title {
+                    UnitKind::Matter
                 } else {
                     units[i].book = book_no;
                     UnitKind::Part
@@ -486,6 +569,7 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
         let index = units.len();
         units.push(Unit { index, kind: if entries.is_empty() { UnitKind::Part } else { UnitKind::Matter }, label: if entries.is_empty() { "全文".into() } else { "前附".into() }, key: String::new(), depth: 1, parent: None, book: None, chapter: None });
         order.push((0, 0, index));
+        title_page.push(false);
     }
     order.sort();
     // 每一块归哪个单元：起点不晚于它的最后一个（同一处起的，目录里靠后、更深的那个）
@@ -560,13 +644,16 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
         let ow = owned.entry(owner).or_default();
         let label_folded: String = units[owner].label.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase();
         let text_folded: String = block.text.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase();
+        // 篇名单元开头不成句的短行是篇的标题（「BOOK IV」下面那行篇名是普通的 <p>）
+        let book_title = kind == UnitKind::Book && !ends_sentence(&block.text);
         let headingish = block.tag.starts_with('h') && block.tag.len() == 2
-            || (!ow.has_body && text_len <= 120 && (block.emphatic || (!label_folded.is_empty() && (label_folded.contains(&text_folded) || (text_folded.starts_with(&label_folded) && text_folded.chars().count() <= label_folded.chars().count() + 8)))));
+            || (block.tag != "table" && !ow.has_body && text_len <= 120 && (block.emphatic || book_title || (!label_folded.is_empty() && (label_folded.contains(&text_folded) || (text_folded.starts_with(&label_folded) && text_folded.chars().count() <= label_folded.chars().count() + 8)))));
         let semantics = |w: &str| block.semantics.iter().any(|s| s == w || s == &format!("doc-{w}"));
         // 注释开头的标记：文字里的「［1］」，或者开头那个回到正文的链接（它被当成引用标记拿掉了）
         let leading_marker = leading_note_marker(&block.text).or_else(|| block.noterefs.first().filter(|r| r.at == 0).map(|r| r.marker.clone()));
         let role = match kind {
             UnitKind::Matter => Role::Matter,
+            _ if title_page[owner] => Role::Matter,
             UnitKind::Guide => {
                 if headingish {
                     Role::Heading
@@ -965,5 +1052,109 @@ mod tests {
         assert_eq!(leading_note_marker("[12] note").as_deref(), Some("12"));
         assert_eq!(leading_note_marker("第一，工人"), None);
         assert_eq!(leading_note_marker("（1）熟练程度的提高"), None);
+        assert!(page_like("Page 128") && page_like("p. 60") && page_like("第 12 页") && !page_like("Pages of history") && !page_like("Part I"));
+        assert!(title_like("《国富论》（上）", "影响世界历史进程的书:国富论(套装上下册)"));
+        assert!(title_like("The Wealth of Nations, Books IV-V", "The Wealth of Nations (I-V)"));
+        assert!(!title_like("Introduction", "The Wealth of Nations (I-V)") && !title_like("Of Wealth", "The Wealth of Nations"));
+        assert!(bare_introduction("INTRODUCTION") && !bare_introduction("Introduction and Plan of the Work"));
+    }
+
+    /// 目录项：（深度, 名字, 块）。块写成（标签, 文字）；标签后面带 `!` 的是全粗体
+    type Entry<'a> = (u32, &'a str, &'a [(&'a str, &'a str)]);
+
+    /// 合成的一本书：每个目录项一个文件
+    fn synthetic(title: &str, language: &str, entries: &[Entry]) -> Text {
+        let mut book = epub::Book { title: title.into(), language: language.into(), page_source: "none".into(), ..Default::default() };
+        for (i, (depth, label, blocks)) in entries.iter().enumerate() {
+            let file = format!("t{i}.xhtml");
+            book.toc.push(epub::TocEntry { label: label.to_string(), file: file.clone(), fragment: None, depth: *depth });
+            let blocks = blocks.iter().map(|(tag, text)| Block { tag: tag.trim_end_matches('!').into(), text: text.to_string(), emphatic: tag.ends_with('!'), ..Default::default() }).collect();
+            book.docs.push(epub::Doc { file, blocks, loose_ids: Vec::new() });
+        }
+        from_book(&book, None)
+    }
+
+    fn body_units(t: &Text) -> Vec<(String, usize)> {
+        t.chapters().iter().map(|u| (u.key.clone(), t.body_of(u.index).count())).collect()
+    }
+
+    /// 两本真实 EPUB 的目录是这两种样子（`decisions/0025` 记的归类问题）；文字是合成的
+    #[test]
+    fn omnibus_tables_of_contents() {
+        // 平铺的目录（篇、章、注释的小目录都在同一层），书前有分册的书名页和编者的导读
+        let en = synthetic(
+            "A Treatise (I-V)",
+            "en",
+            &[
+                (1, "A Treatise, Books IV-V", &[("p", "The author was born in a small town."), ("p", "A TREATISE")]),
+                (2, "Contents", &[("p", "Book IV")]),
+                (2, "Preface", &[("p", "This edition follows the text of 1776.")]),
+                (2, "Introduction", &[("h3", "Introduction"), ("p", "The editor explains the plan of the last two books."), ("p", "He also explains the notes.")]),
+                (2, "A Treatise Books IV–V", &[("p", "A TREATISE")]),
+                (2, "Contents", &[("p", "Chapter I")]),
+                (2, "Book IV", &[("h2", "BOOK IV"), ("p", "Of Systems of political Economy"), ("p", "Political economy proposes two distinct objects."), ("p", "Different ages have given occasion to two systems.")]),
+                (2, "Chapter I", &[("h2", "CHAPTER I"), ("p", "That wealth consists in money is a popular notion."), ("table", "Years\tPrice\n1202\t12"), ("p", "A rich country is supposed to abound in money.")]),
+                (2, "Chapter II", &[("h2", "CHAPTER II"), ("p", "High duties restrain importation.")]),
+                (2, "Book V", &[("h2", "BOOK V")]),
+                (2, "Chapter I", &[("h2", "CHAPTER I"), ("p", "The first duty of the sovereign is defence.")]),
+                (2, "Appendix", &[("p", "An account of bounties paid.")]),
+                (2, "Index", &[("p", "Bounties, 12")]),
+                (2, "Footnotes", &[("h2", "Footnotes")]),
+                (2, "Chapter I", &[("p", "Chapter I")]),
+                (2, "Page 60", &[("p", "See the first book.")]),
+                (2, "Page 77", &[("p", "Lowndes, p. 5.")]),
+                (2, "Chapter V", &[("p", "Chapter V")]),
+                (2, "Page 97", &[("p", "See the tracts on the corn trade.")]),
+            ],
+        );
+        // 只有篇的引言、各章和附录是正文；表格整张算一段
+        assert_eq!(body_units(&en), [("IV".to_string(), 2), ("IV.i".into(), 3), ("IV.ii".into(), 1), ("V.i".into(), 1), ("V.U2".into(), 1)]);
+        let kind = |t: &Text, label: &str| -> Vec<UnitKind> { t.units.iter().filter(|u| u.label == label).map(|u| u.kind).collect() };
+        assert_eq!(kind(&en, "Introduction"), [UnitKind::Guide]);
+        assert_eq!(kind(&en, "A Treatise, Books IV-V"), [UnitKind::Container]);
+        assert_eq!(kind(&en, "A Treatise Books IV–V"), [UnitKind::Matter]);
+        assert_eq!(kind(&en, "Page 60"), [UnitKind::Notes]);
+        // 脚注目录里夹着的章名是注释，不是又一个第一章
+        assert_eq!(kind(&en, "Chapter I"), [UnitKind::Chapter, UnitKind::Chapter, UnitKind::Notes]);
+        assert_eq!(kind(&en, "Chapter V"), [UnitKind::Notes]);
+        let role = |t: &Text, needle: &str| t.paragraphs.iter().find(|p| p.text.contains(needle)).map(|p| p.role);
+        assert_eq!(role(&en, "born in a small town"), Some(Role::Matter));
+        assert_eq!(role(&en, "The editor explains"), Some(Role::Guide));
+        assert_eq!(role(&en, "Of Systems of political Economy"), Some(Role::Heading));
+        assert_eq!(role(&en, "Lowndes"), Some(Role::Note));
+        assert_eq!(role(&en, "Years\tPrice"), Some(Role::Body));
+        assert_eq!(en.paragraph("IV.i.2").map(|p| p.text.as_str()), Some("Years\tPrice\n1202\t12"));
+        // 正文的段落号没有重的（v0.4 里脚注目录的「Chapter I」又编出一套 IV.i.1）
+        let keys: Vec<&str> = en.paragraphs.iter().filter(|p| p.role == Role::Body).map(|p| p.key.as_str()).collect();
+        assert_eq!(keys, ["IV.1", "IV.2", "IV.i.1", "IV.i.2", "IV.i.3", "IV.ii.1", "V.i.1", "V.U2.1"]);
+
+        // 中文版：书名页是一个单元；第五编挂在第四编下面，它的第三章和附录又和它同层
+        let zh = synthetic(
+            "丛书:论财富(套装上下册)",
+            "zh",
+            &[
+                (1, "《论财富》", &[("p", "一部关于财富的书。"), ("p", "名家推荐。")]),
+                (1, "《论财富》（下）", &[]),
+                (2, "第四编 论体系", &[("p!", "第四编 论体系")]),
+                (3, "引言", &[("p!", "引言"), ("p", "政治经济学有两个目标。"), ("p", "不同的时代产生了两种体系。")]),
+                (3, "第一章 论货币", &[("p!", "第一章 论货币"), ("p", "财富就是货币，这是流行的看法。"), ("p", "富国被认为货币充裕。")]),
+                (3, "第五编 论收入", &[("p!", "第五编 论收入")]),
+                (4, "第一章 论支出", &[("p!", "第一章 论支出"), ("p", "君主的首要职责是国防。")]),
+                (3, "第三章 论公债", &[("p!", "第三章 论公债"), ("p", "公债的积累。")]),
+                (3, "附录", &[("p!", "附录"), ("p", "奖金的账目。")]),
+            ],
+        );
+        assert_eq!(body_units(&zh), [("IV.Intro".to_string(), 2), ("IV.i".into(), 2), ("V.i".into(), 1), ("V.iii".into(), 1), ("V.U2".into(), 1)]);
+        assert_eq!(kind(&zh, "《论财富》"), [UnitKind::Matter]);
+        assert_eq!(role(&zh, "名家推荐"), Some(Role::Matter));
+
+        // 对齐：篇名下面的引言对「引言」，附录对附录；第四编第一章多一张表格，算法来对；第四编第二章译本里没有
+        let a = crate::align::align(&en, &zh);
+        let summary: Vec<(&str, &str, crate::align::Method)> = a.units.iter().map(|u| (u.key.as_str(), u.other_label.as_str(), u.method)).collect();
+        use crate::align::Method::{Exact, Fitted, None as Missing};
+        assert_eq!(summary, [("IV", "引言", Exact), ("IV.i", "第一章 论货币", Fitted), ("IV.ii", "", Missing), ("V.i", "第一章 论支出", Exact), ("V.U2", "附录", Exact)]);
+        let table = en.paragraph("IV.i.2").unwrap().seq;
+        assert!(a.other_of(table).is_empty());
+        assert_eq!(a.other_of(en.paragraph("IV.i.3").unwrap().seq), [zh.paragraph("IV.i.2").unwrap().seq]);
     }
 }
