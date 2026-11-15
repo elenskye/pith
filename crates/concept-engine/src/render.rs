@@ -53,17 +53,27 @@ fn sentence_inlines(s: &Sentence, books: &Books) -> Vec<Inline> {
         match s.check.zh_status {
             Some(ZhStatus::Verified) => v.push(text(format!(" 中译：“{}”（{}）", s.zh.clone().unwrap_or_default(), s.check.zh_paragraph.clone().unwrap_or_default()))),
             Some(ZhStatus::ParagraphOnly) => {
-                if let (Some(zh), Some(key)) = (books.translation, &s.check.zh_paragraph)
-                    && let Some(p) = zh.paragraph(key)
-                {
-                    v.push(text(format!(" 中译（整段，{key}）：{}", p.text)));
+                if let Some((keys, whole)) = zh_whole(s, books) {
+                    v.push(text(format!(" 中译（整段，{keys}）：{whole}")));
                 }
             }
-            Some(ZhStatus::Unaligned) => v.push(Inline::Tag("这一章没有对齐的中译".into())),
+            Some(ZhStatus::Unaligned) => v.push(Inline::Tag("这一段没有对齐的中译".into())),
             None => {}
         }
     }
     v
+}
+
+/// 整段译文：锚点那一段原文对着的中文段落（一段可能对着几段，都列出）。返回（段落号, 文字）
+fn zh_whole(s: &Sentence, books: &Books) -> Option<(String, String)> {
+    let zh = books.translation?;
+    let group = match (books.alignment, s.paragraph.as_deref().and_then(|k| books.original.paragraph(k))) {
+        (Some(al), Some(p)) => crate::align::counterpart(al, books.original, zh, p.seq),
+        _ => Vec::new(),
+    };
+    // 没有对齐可查（或者对齐后来变了）：照存下的那一段
+    let group = if group.is_empty() { vec![zh.paragraph(s.check.zh_paragraph.as_deref()?)?] } else { group };
+    Some((group.iter().map(|p| p.key.as_str()).collect::<Vec<_>>().join("、"), group.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join(" ")))
 }
 
 fn scope_label(run: &Run) -> String {
@@ -352,13 +362,11 @@ pub fn html(run: &Run, books: &Books, findings: &[Finding]) -> String {
                 match s.check.zh_status {
                     Some(ZhStatus::Verified) => h.push_str(&format!("<div class=\"zh\">中译：“{}”（{}）</div>", esc(s.zh.as_deref().unwrap_or("")), esc(s.check.zh_paragraph.as_deref().unwrap_or("")))),
                     Some(ZhStatus::ParagraphOnly) => {
-                        if let (Some(zh), Some(key)) = (books.translation, &s.check.zh_paragraph)
-                            && let Some(p) = zh.paragraph(key)
-                        {
-                            h.push_str(&format!("<div class=\"zh\">中译（整段，{}）：{}</div>", esc(key), esc(&p.text)));
+                        if let Some((keys, whole)) = zh_whole(s, books) {
+                            h.push_str(&format!("<div class=\"zh\">中译（整段，{}）：{}</div>", esc(&keys), esc(&whole)));
                         }
                     }
-                    Some(ZhStatus::Unaligned) => h.push_str("<div class=\"zh\">这一章中英段数不同，没有对齐的中译</div>"),
+                    Some(ZhStatus::Unaligned) => h.push_str("<div class=\"zh\">这一段没有对齐的中译</div>"),
                     None => {}
                 }
             }

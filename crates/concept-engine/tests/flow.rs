@@ -165,13 +165,24 @@ fn selection_question_and_concept_entries() {
     let note = &run.cards[1].sentences[0];
     assert_eq!((note.category, note.check.status, note.quote.as_deref()), (Category::Explanation, Status::Verified, Some("the trade of a pin-maker")));
     assert!(note.check.span.is_some());
-    // 问一个问题：第三章段数对不上，原文句没有对齐的中译
+    // 问一个问题：第三章中英段数不同（v0.4 整章没有中译），现在是算法对的，原文句有对齐的中文段落
     let mut q = scope(Entry::Question, &["I.iii.1", "I.iii.2"]);
     q.question = Some("分工为什么受市场范围的限制？".into());
     let run = run_with(&w, &skill("ask"), q, Vec::new(), &MockModel::default(), true);
     assert_eq!(run.cards.len(), 1);
     assert_eq!(run.cards[0].title, "分工为什么受市场范围的限制？");
-    assert!(run.cards[0].sentences.iter().filter(|s| s.category == Category::Original).all(|s| s.check.zh_status == Some(ZhStatus::Unaligned)));
+    assert_eq!(w.al.units.iter().find(|u| u.key == "I.iii").unwrap().method, align::Method::Fitted);
+    let originals: Vec<_> = run.cards[0].sentences.iter().filter(|s| s.category == Category::Original).collect();
+    assert!(!originals.is_empty());
+    assert!(originals.iter().all(|s| matches!(s.check.zh_status, Some(ZhStatus::Verified | ZhStatus::ParagraphOnly)) && s.check.zh_paragraph.as_deref().is_some_and(|k| k.starts_with("I.iii."))));
+    // v0.4 存下的研究里这些句子记的是「没有对齐的中译」：现在对上了，审计不把它当成结果被改坏
+    let mut old = run.clone();
+    for s in old.cards.iter_mut().flat_map(|c| &mut c.sentences).filter(|s| s.category == Category::Original) {
+        s.check.zh_status = Some(ZhStatus::Unaligned);
+        s.check.zh_paragraph = None;
+        s.check.zh_span = None;
+    }
+    assert_eq!(audit::audit(&old, &w.books(), &|_| None), Vec::new());
     // 追踪概念
     let mut c = scope(Entry::Concept, &["I.i.1", "I.ii.1", "I.iii.1"]);
     c.terms = vec!["division of labour".into(), "分工".into()];

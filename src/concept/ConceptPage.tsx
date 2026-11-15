@@ -198,7 +198,9 @@ function BookHome({ uid, onUnit }: { uid: string; onUnit: (unit: number) => void
         {d.translation ? (
           <p>
             中译：{d.translation.title || d.translation.itemTitle}；{d.alignedUnits} 章对齐
-            {d.mismatchedUnits.length > 0 && <span className="text-amber-700 dark:text-amber-400">，{d.mismatchedUnits.length} 章段数不同没有对齐（{d.mismatchedUnits.slice(0, 8).join("、")}{d.mismatchedUnits.length > 8 ? "…" : ""}）</span>}
+            {d.fittedUnits > 0 && `（其中 ${d.fittedUnits} 章中英分段不同，是自动对齐的）`}
+            {d.lowUnits.length > 0 && <span className="text-amber-700 dark:text-amber-400">，{d.lowUnits.length} 章对齐存疑（{d.lowUnits.slice(0, 8).join("、")}{d.lowUnits.length > 8 ? "…" : ""}）</span>}
+            {d.mismatchedUnits.length > 0 && <span className="text-amber-700 dark:text-amber-400">，{d.mismatchedUnits.length} 章没有对齐（{d.mismatchedUnits.slice(0, 8).join("、")}{d.mismatchedUnits.length > 8 ? "…" : ""}）</span>}
           </p>
         ) : (
           orphans.length > 0 && (
@@ -235,7 +237,19 @@ function BookHome({ uid, onUnit }: { uid: string; onUnit: (unit: number) => void
                 <td className="py-1 pr-2 text-right tabular-nums">{u.body}</td>
                 <td className="py-1 pr-2 text-right text-muted-foreground tabular-nums">{u.sidenotes + u.notes > 0 ? `${u.sidenotes} / ${u.notes}` : ""}</td>
                 <td className="py-1 pr-2 text-muted-foreground tabular-nums">{u.pages ? `${u.pages[0]}–${u.pages[1]}` : ""}</td>
-                <td className="py-1">{u.aligned === null ? "" : u.aligned ? <Badge tone="ok">对齐</Badge> : <Badge tone="warn">{`段数不同（${u.otherCount ?? 0}）`}</Badge>}</td>
+                <td className="py-1">
+                  {u.aligned === null ? (
+                    ""
+                  ) : !u.aligned ? (
+                    <Badge tone="warn" title="译本里找不到这一章，或者两边差得太远">{`没对上（${u.otherCount ?? 0} 段）`}</Badge>
+                  ) : u.low ? (
+                    <Badge tone="warn" title="个别段落可能对错了，读的时候留意">{u.method === "fitted" ? `自动对齐，存疑（${u.otherCount ?? 0} 段）` : "对齐存疑"}</Badge>
+                  ) : u.method === "fitted" ? (
+                    <Badge title="中英分段不同，按长度、数字等自动对齐，一段可能对着几段">{`自动对齐（${u.otherCount ?? 0} 段）`}</Badge>
+                  ) : (
+                    <Badge tone="ok">对齐</Badge>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

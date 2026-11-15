@@ -53,7 +53,7 @@ function Sentence({ s, onAnchor }: { s: ConceptSentence; onAnchor: (s: ConceptSe
       )}
       {s.category === "original" && s.check.zhStatus === "verified" && <span className="block text-[13px] text-muted-foreground">中译：“{s.zh}”（{s.check.zhParagraph}）</span>}
       {s.category === "original" && s.check.zhStatus === "paragraph_only" && <span className="block text-[11px] text-muted-foreground">中译句核不上，点锚点看整段译文（{s.check.zhParagraph}）</span>}
-      {s.category === "original" && s.check.zhStatus === "unaligned" && <span className="block text-[11px] text-muted-foreground">这一章中英段数不同，没有对齐的中译</span>}
+      {s.category === "original" && s.check.zhStatus === "unaligned" && <span className="block text-[11px] text-muted-foreground">这一段没有对齐的中译</span>}
     </li>
   );
 }
@@ -192,7 +192,10 @@ export function RunScreen({ uid, card, onCard, onOpenText, onPrepare, onDeleted 
       ui.notify(`已加入文献库 ${res.added.length} 条${bad.length ? `（${bad.length} 条没带上原件）` : ""}`);
     });
   const para = anchor?.paragraph ? v.paragraphs.find((p) => p.key === anchor.paragraph) : undefined;
-  const zhPara = anchor?.check.zhParagraph ? v.paragraphs.find((p) => p.key === `译:${anchor.check.zhParagraph}`) : undefined;
+  // 对齐的中译：一段原文可能对着几段，都列出；中译句核对上的那一段高亮
+  const zhFound = anchor?.check.zhParagraph ? `译:${anchor.check.zhParagraph}` : null;
+  const zhKeys = para && !para.translation && para.aligned.length > 0 ? para.aligned : zhFound ? [zhFound] : [];
+  const zhParas = anchor?.category === "original" || zhFound ? zhKeys.map((k) => v.paragraphs.find((p) => p.key === k)).filter((p) => p !== undefined) : [];
   const sources = r.sources;
 
   return (
@@ -403,11 +406,16 @@ export function RunScreen({ uid, card, onCard, onOpenText, onPrepare, onDeleted 
             ) : (
               <p className="text-xs text-muted-foreground">找不到这一段。</p>
             )}
-            {zhPara && (
-              <p className="selectable border-t pt-2 text-muted-foreground">
-                <span className="mr-1 text-[11px]">中译 {anchor.check.zhParagraph}</span>
-                <Highlighted p={zhPara} start={anchor.check.zhSpan?.start} end={anchor.check.zhSpan?.end} />
-              </p>
+            {zhParas.length > 0 && (
+              <div className="space-y-1.5 border-t pt-2 text-muted-foreground">
+                {zhParas.map((z) => (
+                  <p key={z.key} className="selectable">
+                    <span className="mr-1 text-[11px]">中译 {z.key.slice(2)}</span>
+                    <Highlighted p={z} start={z.key === zhFound ? anchor.check.zhSpan?.start : undefined} end={z.key === zhFound ? anchor.check.zhSpan?.end : undefined} />
+                  </p>
+                ))}
+                {zhParas.length > 1 && <p className="text-[11px]">这一段原文对着 {zhParas.length} 段中译（中英分段不同，自动对齐的）。</p>}
+              </div>
             )}
             <div className="flex justify-end gap-2 text-xs">
               {para && !para.translation && (

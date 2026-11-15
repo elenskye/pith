@@ -77,8 +77,8 @@ PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith impo
 
 ## 概念研究（v0.4，`decisions/0024`、`0025`）
 
-- **引擎**（`crates/concept-engine`）：EPUB 2 / 3 夹具（现拼，不放二进制；英文是 Project Gutenberg #3300 的第一篇第 1–3 章，中文是合成的）上的单元、角色、段落号、页码、对齐；`SKILL.md` 的格式检查；录制回复跑四种入口、反方（文献库 / 上网）、推演、自由；**改坏**：引文改一个字、挂错段落、不存在的段落号、标成原文却没有锚点、推演混进原文类、旁注或导读被标成原文、他人观点没有来源，都拦下；`audit` 查出存下的结果被改。
-- **App 一侧**（`src-tauri/src/concept/tests.rs`）：附件 → 解析 → 存（导入前备份）→ 对齐；段落检索（中文词映射回原著）、检索表自动重建；从 v7 升级；OpenAI Responses 与网页搜索、Mathpix（本地假服务器）；端到端整章分析 + 反方，费用合计 = 账本；Word 搜索窗的原文。
+- **引擎**（`crates/concept-engine`）：EPUB 2 / 3 夹具（现拼，不放二进制；英文是 Project Gutenberg #3300 的第一篇第 1–3 章，中文是合成的）上的单元、角色、段落号、页码、对齐；合成的两种目录（平铺的篇章和脚注小目录、书名页、编者的导读、挂错层的第五编）的归类，数据表格整张算一段；对齐（`align.rs` 的单元测试）：合成的中英两章含合并、拆分、多出一段，结果确定；段数相同的章照旧按顺序对；**改坏**（把一段挪走：两边各落空一次，别的段不跟着错位；两边差得太远：不硬对）；锚点和调用方给的相似度各能定下长度定不了的对法；表格段落空不扣分；v0.4 存的 JSON 照样读；`SKILL.md` 的格式检查；录制回复跑四种入口、反方（文献库 / 上网）、推演、自由；**改坏**：引文改一个字、挂错段落、不存在的段落号、标成原文却没有锚点、推演混进原文类、旁注或导读被标成原文、他人观点没有来源，都拦下；`audit` 查出存下的结果被改。
+- **App 一侧**（`src-tauri/src/concept/tests.rs`）：附件 → 解析 → 存（导入前备份）→ 对齐（新库：一对多、多对一存进 `concept_aligned_pairs` 再原样读回；升级：把存下的对齐改回 v0.4 的样子，读书时按新算法重算、存回去；冻结的样本库和各版本的投影升级后，`transfer::tests::exercise` 逐份对齐都重算过、每章有结果）；段落检索（中文词映射回原著）、检索表自动重建；从 v7 升级；OpenAI Responses 与网页搜索、Mathpix（本地假服务器）；端到端整章分析 + 反方，费用合计 = 账本；Word 搜索窗的原文。
 - **重新解析**：引擎 `tests/reanchor.rs`（同样的文本原位跟过去；段落号后移时短引文也跟着原来那一段走；一段拆成两段按引文找；段落被删标「没挂上原文」、下次解析回来了重新挂上；多处命中取同一单元、再取最近的；角色不对的不算；译本重新解析后中译重新核对；整章入口的范围、关系的说明、入口选的卡片跟着换；挂来源的他人句不动；**改坏**位置和段落号审计查得出）。App `concept/reparse_tests.rs`（从附件重新解析同样的内容：uid、id、关联、对齐、研究、检索都不变；段落号后移：库里的锚点行、对齐、检索表都是新的；拆段、删段、译本重新解析；换到一半出错、存研究时出错（临时触发器）都整个回滚；**改坏**库里重找的位置审计查得出；同一个附件不存第二份）。夹具文本用 `fixture::insert_before` / `split` / `remove` / `reflow` 改出「解析器变了」的样子。真实数据（默认忽略，不联网不花钱；**用数据目录的副本**，会被改）：
 
 ```bash
@@ -87,10 +87,17 @@ PITH_ACCEPT_DIR=<验收数据目录的副本> PITH_EXPECT_SAME=1 PITH_PERTURB=1 
 
   每份 EPUB 文本从它的附件重新解析一遍，只打印聚合数字；`PITH_EXPECT_SAME=1` 要求每句原位跟过去、审计 0 个问题（解析器没变时）；`PITH_PERTURB=1` 再假装解析器变了（每章最前面多一段）、然后换回来，看研究是不是和最开始逐句一样。
 - **Word**：`word/bridge.rs` 的 `pick_card_quote_adds_a_quote_line`（选了卡片原文时多一行 `Q`）；`src/cite/concept-locator.test.ts`（页码 + 段落号、只有段落号在 GB/T 与 APA 下的写法）。
-- **两本真实 EPUB**（默认忽略，只打印聚合数字）：
+- **两本真实 EPUB**（默认忽略，只打印聚合数字）：解析与归类（`real_epubs_first_three_chapters`）、全书对齐（`real_epubs_full_alignment`：每个单元都有结果、段数相同的章和按顺序对完全一样、顺序不交叉、结果确定；在段数相同的章上按固定规则合并、删段，看算法找回多少）。
 
 ```bash
 PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p concept-engine --test real_books -- --ignored --nocapture
+```
+
+  再给本机向量服务的地址，就多比一遍「长度、锚点加语义相似度」和一组不同的权重（用 `curl` 调，引擎本身不联网；向量缓存在 `target/tmp/`，只有哈希和数字）。第一次要算四千多段，约 5 分钟：
+
+```bash
+# 先把本机的向量服务起起来（OpenAI 兼容的 /v1/embeddings）
+PITH_EMBED_URL=http://127.0.0.1:8081/v1/embeddings PITH_EMBED_MODEL=qwen3-embedding-0.6b PITH_BOOK_EN=… PITH_BOOK_ZH=… cargo test -p concept-engine --test real_books real_epubs_full_alignment -- --ignored --nocapture
 ```
 
 - **mock 数据**由引擎生成，改了输出结构就重新生成：

@@ -70,6 +70,55 @@ pub(crate) fn library_with_books(name: &str) -> (crate::db::tests::TempDir, AppS
     (dir, state, en, zh, en_item)
 }
 
+/// 把存下的对齐改回 v0.4 的样子：算法版本 1，段落在旧表 `concept_aligned` 里，段数不同的章没对
+pub(crate) fn downgrade_alignment(c: &Connection, original: &str, translation: &str) {
+    let al = store::alignment_load(c, original, translation).unwrap().unwrap();
+    let (o, t) = (store::text_id(c, original).unwrap(), store::text_id(c, translation).unwrap());
+    let id: i64 = c.query_row("SELECT id FROM concept_alignments WHERE original_id = ?1 AND translation_id = ?2", [o, t], |r| r.get(0)).unwrap();
+    let old_units: Vec<Value> = al
+        .units
+        .iter()
+        .map(|u| json!({ "key": u.key, "label": u.label, "otherLabel": u.other_label, "unit": u.unit, "otherUnit": u.other_unit, "count": u.count, "otherCount": u.other_count, "aligned": u.method == align::Method::Exact }))
+        .collect();
+    c.execute("UPDATE concept_alignments SET algorithm = 1, units = ?2 WHERE id = ?1", rusqlite::params![id, Value::Array(old_units).to_string()]).unwrap();
+    c.execute("DELETE FROM concept_aligned_pairs WHERE alignment_id = ?1", [id]).unwrap();
+    c.execute("DELETE FROM concept_aligned WHERE alignment_id = ?1", [id]).unwrap();
+    let text = store::text_load(c, original).unwrap();
+    let exact: Vec<usize> = al.units.iter().filter(|u| u.method == align::Method::Exact).map(|u| u.unit).collect();
+    for (a, b) in al.pairs.iter().filter(|(a, _)| exact.contains(&text.paragraphs[*a].unit)) {
+        c.execute("INSERT INTO concept_aligned (alignment_id, original_seq, translation_seq) VALUES (?1, ?2, ?3)", rusqlite::params![id, *a as i64, *b as i64]).unwrap();
+    }
+}
+
+/// 升级：v0.4 存的对齐（旧算法）读到时按新算法重算、存回去
+#[test]
+fn old_alignments_are_recomputed_on_load() {
+    let (_dir, state, en, zh, _) = library_with_books("concept-realign");
+    state
+        .with_db(|c| {
+            let fresh = store::alignment_load(c, &en, &zh)?.unwrap();
+            downgrade_alignment(c, &en, &zh);
+            let rows = |table: &str| -> i64 { c.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)).unwrap() };
+            assert_eq!((rows("concept_aligned_pairs"), rows("concept_aligned")), (0, 16));
+            assert_eq!(store::alignment_meta(c, &en, &zh)?, Some((1, None)));
+            // 旧算法算的当作没有
+            assert_eq!(store::alignment_load(c, &en, &zh)?, None);
+            // App 里任何一次读书（这里是检索）都会把它重算、存回去：第三章的中文段落也搜得到、映射得回原著了
+            let hits = commands::search_hits(c, &en, "水运", 20)?;
+            assert!(hits.iter().any(|h| h.unit_key == "I.iii" && h.via_translation), "{:?}", hits.iter().map(|h| &h.key).collect::<Vec<_>>());
+            assert_eq!(store::alignment_meta(c, &en, &zh)?, Some((align::VERSION, None)));
+            assert_eq!(store::alignment_load(c, &en, &zh)?, Some(fresh.clone()));
+            // 旧表里那份对齐的行跟着旧的那一行一起删掉了（级联）；表留着，不再写
+            assert_eq!((rows("concept_aligned_pairs"), rows("concept_aligned")), (fresh.pairs.len() as i64, 0));
+            // 从译本那一边读也一样
+            downgrade_alignment(c, &en, &zh);
+            let (et, zt) = (store::text_load(c, &en)?, store::text_load(c, &zh)?);
+            assert_eq!(store::alignment_ensure(c, &en, &et, &zh, &zt, "2026-11-15T10:00:00.000Z")?, fresh);
+            Ok(())
+        })
+        .unwrap();
+}
+
 #[test]
 fn texts_are_saved_linked_aligned_and_searchable() {
     let (dir, state, en, zh, _) = library_with_books("concept-texts");
@@ -89,6 +138,13 @@ fn texts_are_saved_linked_aligned_and_searchable() {
             assert_eq!(store::partner(c, &zh)?, Some((en.clone(), false)));
             let al = store::alignment_load(c, &en, &zh)?.unwrap();
             assert_eq!(al, align::align(&parsed, &fixture::chinese()));
+            // 第三章中英段数不同，是算法对的：一段对几段、几段对一段都原样存取（0009 的新表；v0.4 的旧表不再写）
+            let third = al.units.iter().find(|u| u.key == "I.iii").unwrap();
+            assert_eq!((third.method, third.count, third.other_count), (align::Method::Fitted, 8, 7));
+            assert!(al.pairs.iter().any(|(a, _)| al.other_of(*a).len() > 1) && al.pairs.iter().any(|(_, b)| al.original_of(*b).len() > 1));
+            let rows = |table: &str| -> i64 { c.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)).unwrap() };
+            assert_eq!((rows("concept_aligned_pairs"), rows("concept_aligned")), (al.pairs.len() as i64, 0));
+            assert_eq!(store::alignment_meta(c, &en, &zh)?, Some((align::VERSION, None)));
             // 检索：英文词、中文词（先搜中译再映射回原著）、旁注里的词（映射到它挂的正文段）
             let hits = commands::search_hits(c, &en, "pin-maker", 20)?;
             assert_eq!(hits.iter().map(|h| (h.key.as_str(), h.via_translation)).collect::<Vec<_>>(), [("I.i.3", false)]);

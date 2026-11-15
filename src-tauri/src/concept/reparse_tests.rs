@@ -240,21 +240,23 @@ fn anchors_follow_when_paragraph_numbers_shift() {
     let before = everything(&state, &en, &zh);
     let new = shifted(&before.bodies[0]);
     let done = reparse_with(&state, &en, &new).unwrap();
-    // 没有丢的，审计没有问题；第一章中英段数对不上了，中译如实标成没有对齐
+    // 没有丢的，审计没有问题。第一章中英段数对不上了：v0.5 起照样对齐（单调对齐），但夹具的中文是合成的、不是真译文，
+    // 对到的中文段不一定还含那句中译，核不上的如实标成「只显示整段」
     assert_eq!((done.runs.len(), done.lost, done.findings), (2, 0, 0));
     // （中译原来核对通过的：整章分析 8 句 + 手写的 1 句）
-    assert!(done.moved > 20 && done.zh_lost == 9, "{} {}", done.moved, done.zh_lost);
+    assert!(done.moved > 20 && (1..=9).contains(&done.zh_lost), "{} {}", done.moved, done.zh_lost);
     let after = everything(&state, &en, &zh);
     assert!(after.bodies[0] == new && after.bodies[1] == before.bodies[1]);
     assert!(after.alignment.as_ref() == Some(&align::align(&new, &before.bodies[1])));
     let chapter = after.alignment.as_ref().unwrap().units.iter().find(|u| u.key == "I.i").unwrap();
-    assert_eq!((chapter.aligned, chapter.count, chapter.other_count), (false, 12, 11));
+    assert_eq!((chapter.aligned, chapter.count, chapter.other_count), (true, 12, 11));
     // 手写的那次：段落号后移一位，位置不变，页码往后一页；译本上的、第三章的段落号不变
     let (was, now) = (&before.runs[1], &after.runs[1]);
     assert_eq!(paragraphs(now), [Some("I.i.4"), Some("I.i.4"), Some("I.i.4"), Some("译:I.i.3 旁注"), Some("I.iii.1")]);
     let (a, b) = (&sentences(was, "K1")[0], &sentences(now, "K1")[0]);
     let page = |s: &Sentence| s.check.pages.as_deref().map(|p| p.parse::<u32>().unwrap());
-    assert_eq!((b.check.span, page(b), b.check.zh_status, b.check.zh_paragraph.as_deref()), (a.check.span, page(a).map(|p| p + 1), Some(ZhStatus::Unaligned), None));
+    assert_eq!((b.check.span, page(b)), (a.check.span, page(a).map(|p| p + 1)));
+    assert!(matches!(b.check.zh_status, Some(ZhStatus::Verified | ZhStatus::ParagraphOnly)) && b.check.zh_paragraph.is_some(), "{:?}", b.check);
     assert_eq!((now.scope.as_ref().unwrap().paragraphs.as_slice(), done.runs[1].label.as_str()), (["I.i.4".to_string()].as_slice(), "I.i.4"));
     // 整章分析那次：每个挂在原著上的锚点后移一位；范围是新文本里这一章的 12 段
     let (was, now) = (&before.runs[0], &after.runs[0]);
@@ -270,8 +272,11 @@ fn anchors_follow_when_paragraph_numbers_shift() {
         .with_db(|c| Ok(c.query_row("SELECT a.paragraph, a.span_start, a.pages FROM concept_anchors a JOIN concept_sentences s ON s.id = a.sentence_id JOIN concept_cards k ON k.id = s.card_id JOIN concept_runs r ON r.id = k.run_id WHERE r.uid = ?1 AND s.position = 0", [MID], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap()))
         .unwrap();
     assert_eq!((row.0.as_str(), row.1 as usize, row.2.parse::<u32>().ok()), ("I.i.4", b.check.span.unwrap().start, page(b)));
-    // 检索表里是新段落：新加的那一段搜得到，原来的段落换了段落号；中文词映射不回第一章了（没对齐）
-    assert_eq!(after.hits, [("I.i.4".to_string(), false), ("I.i.1".to_string(), false)]);
+    // 检索表里是新段落：新加的那一段搜得到，原来的段落换了段落号；第一章照样对齐了，中文词仍映射回这一章
+    // （合成的中文不是真译文，对到相邻的一段）
+    let direct: Vec<&str> = after.hits.iter().filter(|h| !h.1).map(|h| h.0.as_str()).collect();
+    assert_eq!(direct, ["I.i.4", "I.i.1"]);
+    assert!(after.hits.iter().filter(|h| h.1).all(|h| h.0.starts_with("I.i.")), "{:?}", after.hits);
     assert_eq!(after.indexed, before.indexed + 1);
     for uid in [CHAPTER, MID, OWN] {
         assert!(audit_of(&state, uid).is_empty());

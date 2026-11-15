@@ -141,18 +141,31 @@ fn translation_section(run: &Run, books: &Books) -> String {
     let mut apparatus = String::new();
     let mut missing = Vec::new();
     let mut zh_units: Vec<usize> = Vec::new();
+    // 一段原文可能对着几段中译（都列出，段落号相同）；几段原文对一段中译的写在一起（「[I.v.30、I.v.31]」），不重复列
+    let mut listed: Vec<usize> = Vec::new();
+    let mut fitted = false;
     for p in scope_paragraphs(run, books) {
-        match align::counterpart(al, books.original, zh, p.seq) {
-            Some(z) => {
-                body.push_str(&format!("[{}] {}\n", p.key, z.text));
-                if !zh_units.contains(&z.unit) {
-                    zh_units.push(z.unit);
-                }
-                for a in zh.paragraphs.iter().filter(|x| x.attached == Some(z.seq) && matches!(x.role, Role::Sidenote | Role::Note)) {
-                    apparatus.push_str(&format!("[{TRANSLATION_PREFIX}{}] {}\n", a.key, a.text));
-                }
+        if listed.contains(&p.seq) {
+            continue;
+        }
+        let group = align::counterpart(al, books.original, zh, p.seq);
+        if group.is_empty() {
+            missing.push(p.key.clone());
+            continue;
+        }
+        let (originals, _) = al.group_of(p.seq);
+        let keys: Vec<&str> = originals.iter().filter_map(|s| books.original.paragraphs.get(*s)).map(|o| o.key.as_str()).collect();
+        let keys = keys.join("、");
+        listed.extend(originals);
+        fitted |= al.units.iter().any(|u| u.unit == p.unit && u.method == align::Method::Fitted);
+        for z in group {
+            body.push_str(&format!("[{keys}] {}\n", z.text));
+            if !zh_units.contains(&z.unit) {
+                zh_units.push(z.unit);
             }
-            None => missing.push(p.key.clone()),
+            for a in zh.paragraphs.iter().filter(|x| x.attached == Some(z.seq) && matches!(x.role, Role::Sidenote | Role::Note)) {
+                apparatus.push_str(&format!("[{TRANSLATION_PREFIX}{}] {}\n", a.key, a.text));
+            }
         }
     }
     // 章前的导读（紧挨在这一章前面的导读单元）
@@ -168,7 +181,10 @@ fn translation_section(run: &Run, books: &Books) -> String {
     let mut s = format!("## 对齐的中译（{}）\n", if zh.title.is_empty() { "译本" } else { &zh.title });
     s.push_str(&body);
     if !missing.is_empty() {
-        s.push_str(&format!("（{} 没有对齐的中译：这一章中英正文段数不同）\n", missing.join("、")));
+        s.push_str(&format!("（{} 没有对齐的中译）\n", missing.join("、")));
+    }
+    if fitted {
+        s.push_str("（这里中英分段不同，中译是程序自动对齐的：一段原文可能对着几段中译，个别段落可能有偏差。zh 只摘确实对应的那一句，拿不准就写 null）\n");
     }
     if !apparatus.is_empty() {
         s.push_str("\n## 译本的旁注、注释、导读（不是原著正文；引用时标成他人）\n");

@@ -7,8 +7,8 @@
 //! | 解释 | 尽量有；挂的段落号必须存在，带引文的引文也要找得到 | 去掉锚点照样显示，标「没挂上原文」 |
 //! | 推演 | 不要求；引原文当前提的，前提那句按原文核对 | 前提核不上就拦下 |
 //!
-//! 逐字核对用概念研究的折叠（`fold`：v0.3 的规则 + 引号样式 + 拉丁字母大小写）。原文句的中译在对齐的中文段落里核对，
-//! 核不上只显示整段译文。
+//! 逐字核对用概念研究的折叠（`fold`：v0.3 的规则 + 引号样式 + 拉丁字母大小写）。原文句的中译在对齐的中文段落里核对
+//! （一段原文对着几段中译时，在其中任意一段里找得到就算，锚点记找到的那一段），核不上只显示整段译文。
 
 use crate::align;
 use crate::fold::Folded;
@@ -73,15 +73,19 @@ fn check_original(s: &mut Sentence, books: &Books, what: &str) -> Result<(), Str
     s.check.pages = text.pages_of(p.seq, span.start, span.end);
     // 中译句：在对齐的中文段落里核对
     if let (Some(zh), Some(al)) = (books.translation, books.alignment) {
-        match align::counterpart(al, books.original, zh, p.seq) {
-            Some(z) => {
-                s.check.zh_paragraph = Some(z.key.clone());
-                match s.zh.as_deref().and_then(|q| Folded::new(&z.text).find(q)) {
-                    Some((zspan, _)) => {
+        let group = align::counterpart(al, books.original, zh, p.seq);
+        match group.first() {
+            Some(first) => {
+                // 对着几段中译的：在哪一段里找到就记哪一段；都找不到记第一段（显示时整组都列出）
+                let found = s.zh.as_deref().and_then(|q| group.iter().find_map(|z| Folded::new(&z.text).find(q).map(|(zspan, _)| (*z, zspan))));
+                match found {
+                    Some((z, zspan)) => {
+                        s.check.zh_paragraph = Some(z.key.clone());
                         s.check.zh_status = Some(ZhStatus::Verified);
                         s.check.zh_span = Some(zspan);
                     }
                     None => {
+                        s.check.zh_paragraph = Some(first.key.clone());
                         s.check.zh_status = Some(ZhStatus::ParagraphOnly);
                         if s.zh.is_some() {
                             s.check.note = Some("中译句在对齐的段落里找不到，只显示整段译文".into());

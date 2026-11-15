@@ -982,6 +982,8 @@ export type ConceptCardKind = "concept" | "argument" | "comment" | "counterfactu
 export type ConceptCategory = "original" | "others" | "explanation" | "speculation";
 export type ConceptCheckStatus = "pending" | "verified" | "unanchored" | "speculative";
 export type ConceptZhStatus = "verified" | "paragraph_only" | "unaligned";
+/** 一章是怎么对上的：exact 段数相同、按顺序对；fitted 段数不同、算法对的（可能有偏差）；none 没对上 */
+export type ConceptAlignMethod = "exact" | "fitted" | "none";
 export type ConceptRelationKind = "cause" | "contains" | "opposes" | "example" | "premise" | "revises";
 export type ConceptRunStatus = "ready" | "running" | "cancelled" | "failed" | "done";
 export type ConceptStepKind = "model" | "library" | "web";
@@ -1062,6 +1064,11 @@ export type ConceptUnitInfo = {
   pages: [string, string] | null;
   aligned: boolean | null;
   otherCount: number | null;
+  /** 没有译本是 null */
+  method: ConceptAlignMethod | null;
+  /** 对得稳的段落占多少（0–1）；low = 要提示「可能有偏差」 */
+  confidence: number | null;
+  low: boolean | null;
 };
 
 export type ConceptTextView = {
@@ -1071,6 +1078,11 @@ export type ConceptTextView = {
   original: ConceptTextSummary | null;
   alignedUnits: number;
   mismatchedUnits: string[];
+  /** 段数不同、算法对的章数；其中置信度低的章 */
+  fittedUnits: number;
+  lowUnits: string[];
+  /** 对齐时用的向量模型（null = 只看长度和锚点） */
+  alignmentSimilarity: string | null;
 };
 
 export type ConceptPageBreak = { at: number; page: string };
@@ -1084,8 +1096,8 @@ export type ConceptPara = {
   breaks: ConceptPageBreak[];
   attached: number | null;
   marker: string | null;
-  /** 对齐的另一边（seq） */
-  partner: number | null;
+  /** 对齐的另一边（seq）：一段可能对着几段，没对上是空的 */
+  partners: number[];
 };
 
 export type ConceptUnitView = {
@@ -1096,6 +1108,9 @@ export type ConceptUnitView = {
   translation: ConceptPara[];
   translationLabel: string | null;
   aligned: boolean;
+  /** 算法对的章：合并（一对多、多对一）的组数、落空的段数 */
+  merged: number;
+  unmatched: number;
   language: string;
 };
 
@@ -1290,7 +1305,8 @@ export type ConceptRun = {
   previous: string | null;
 };
 export type ConceptFinding = { at: string; sentence: number | null; message: string };
-export type ConceptAnchoredParagraph = { key: string; text: string; role: ConceptRole; pages: string | null; unit: number; seq: number; translation: boolean };
+/** aligned：原著的段落对齐的中译段落（「译:」开头的引用名，一段可能对着几段，都在 paragraphs 里） */
+export type ConceptAnchoredParagraph = { key: string; text: string; role: ConceptRole; pages: string | null; unit: number; seq: number; translation: boolean; aligned: string[] };
 export type ConceptRunView = {
   textUid: string;
   translationUid: string | null;

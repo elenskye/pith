@@ -419,6 +419,17 @@ impl Builder {
         self.space = true;
     }
 
+    /// 表格里的分隔：格之间一个制表符，行之间一个换行（普通段落的空白都合并成空格，所以正文里的制表符只会来自表格）
+    fn separator(&mut self, c: char) {
+        if self.text.ends_with(' ') {
+            self.text.pop();
+            self.chars -= 1;
+        }
+        self.text.push(c);
+        self.chars += 1;
+        self.space = true;
+    }
+
     fn is_empty(&self) -> bool {
         self.text.trim().is_empty() && self.ids.is_empty() && self.pages.is_empty()
     }
@@ -520,8 +531,15 @@ impl Walker<'_> {
         let mine = Self::semantics_of(e);
         let pushed = mine.len();
         semantics.extend(mine);
+        if e.name == "table"
+            && let Some(rows) = data_table(e)
+        {
+            self.table(e, &rows, ancestors, semantics);
+            semantics.truncate(semantics.len() - pushed);
+            return;
+        }
         if !makes_block(&e.name) {
-            // 不出块的容器（ul、table……）：只往里走
+            // 不出块的容器（ul、排版用的 table……）：只往里走
             ancestors.push(e.name.clone());
             for n in &e.children {
                 if let Node::Element(c) = n {
@@ -558,6 +576,51 @@ impl Walker<'_> {
         ancestors.pop();
         self.flush(&mut b, &e.name, ancestors, semantics);
         semantics.truncate(semantics.len() - pushed);
+    }
+
+    /// 一张数据表格 → 一块：一行一行，格之间用制表符。格里的分页点、id、注释引用照记
+    fn table(&mut self, e: &Element, rows: &[Vec<&Element>], ancestors: &[String], semantics: &[String]) {
+        let mut b = Builder { space: true, ..Default::default() };
+        if let Some(id) = e.id() {
+            self.loose.push(id.to_string());
+        }
+        if let Some(p) = self.page_mark(e) {
+            self.loose_pages.push(p);
+        }
+        self.take_loose(&mut b);
+        for (r, row) in rows.iter().enumerate() {
+            if r > 0 {
+                b.separator('\n');
+            }
+            for (c, cell) in row.iter().enumerate() {
+                if c > 0 {
+                    b.separator('\t');
+                }
+                self.cell(cell, &mut b);
+            }
+        }
+        self.flush(&mut b, "table", ancestors, semantics);
+    }
+
+    /// 表格的一格：里面的块元素不另起一块，用空格隔开
+    fn cell(&mut self, e: &Element, b: &mut Builder) {
+        if let Some(id) = e.id() {
+            b.ids.push((id.to_string(), b.chars));
+        }
+        if let Some(p) = self.page_mark(e) {
+            b.pages.push((b.chars, p));
+        }
+        for n in &e.children {
+            match n {
+                Node::Text(t) => b.push_text(t, false),
+                Node::Element(c) if is_block(&c.name) => {
+                    b.push_text(" ", false);
+                    self.cell(c, b);
+                    b.push_text(" ", false);
+                }
+                Node::Element(c) => self.inline(c, b, false),
+            }
+        }
     }
 
     fn take_loose(&mut self, b: &mut Builder) {
@@ -648,6 +711,31 @@ impl Walker<'_> {
     }
 }
 
+/// 一格最多多少字还算数据表格（再长就是拿表格排版的正文，照旧一格一块）
+const TABLE_CELL_MAX: usize = 300;
+
+/// 数据表格的行和格；不是数据表格（有很长的格、或者只有一格）返回 None
+fn data_table(table: &Element) -> Option<Vec<Vec<&Element>>> {
+    fn rows<'a>(e: &'a Element, out: &mut Vec<Vec<&'a Element>>) {
+        for c in e.elements() {
+            match c.name.as_str() {
+                "tr" => out.push(c.elements().filter(|x| x.name == "td" || x.name == "th").collect()),
+                "caption" => out.push(vec![c]),
+                "thead" | "tbody" | "tfoot" => rows(c, out),
+                _ => {}
+            }
+        }
+    }
+    let mut out = Vec::new();
+    rows(table, &mut out);
+    out.retain(|r| !r.is_empty());
+    let cells = out.iter().map(|r| r.len()).sum::<usize>();
+    if cells < 2 || out.iter().flatten().any(|c| c.text().chars().count() > TABLE_CELL_MAX) {
+        return None;
+    }
+    Some(out)
+}
+
 fn extract(root: &Element, file: &str, page_ids: Option<&HashMap<String, String>>, anchors_only: bool) -> Doc {
     let mut w = Walker { file, page_ids, anchors_only, blocks: Vec::new(), loose: Vec::new(), loose_pages: Vec::new(), loose_ids: Vec::new() };
     let body = root.find(&|e| e.name == "body").unwrap_or(root);
@@ -726,6 +814,25 @@ mod tests {
         assert_eq!(b[3].text, "inner");
         assert_eq!(b[3].ancestors, vec!["body".to_string(), "div".to_string()]);
         assert_eq!(b[4].text, "tail text");
+    }
+
+    #[test]
+    fn data_tables_become_one_block() {
+        let root = markup::parse(r#"<body><p>before</p><table id="t1"><tr><th>Years</th><th><p>Price</p></th></tr><tr><td>1202</td><td><a id="page_300"/>12<sup><a href="n.html#n1">1</a></sup></td></tr><tr><td></td><td>3</td></tr></table><p>after</p></body>"#);
+        let doc = extract(&root, "c.html", None, true);
+        assert_eq!(doc.blocks.len(), 3);
+        let t = &doc.blocks[1];
+        assert_eq!(t.tag, "table");
+        assert_eq!(t.text, "Years\tPrice\n1202\t12\n\t3");
+        assert_eq!(t.pages, vec![(17, "300".to_string())]);
+        assert_eq!(t.noterefs[0].at, 19);
+        assert_eq!(block_with_id(&doc, "t1"), Some(1));
+        // 拿表格排版的正文（格里是长段落）照旧一格一块
+        let long = "word ".repeat(80);
+        let root = markup::parse(&format!("<body><table><tr><td><p>{long}</p></td><td><p>short</p></td></tr></table></body>"));
+        let doc = extract(&root, "c.html", None, true);
+        assert_eq!(doc.blocks.len(), 2);
+        assert_eq!(doc.blocks[0].tag, "p");
     }
 
     #[test]

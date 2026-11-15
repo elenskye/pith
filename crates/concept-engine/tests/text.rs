@@ -112,16 +112,23 @@ fn chinese_and_english_align_where_counts_match() {
     let en = fixture::english();
     let zh = fixture::chinese();
     let a = align::align(&en, &zh);
-    let summary: Vec<(&str, usize, usize, bool)> = a.units.iter().map(|u| (u.key.as_str(), u.count, u.other_count, u.aligned)).collect();
-    assert_eq!(summary, [("I.i", 11, 11, true), ("I.ii", 5, 5, true), ("I.iii", 8, 7, false)]);
-    assert_eq!(a.pairs.len(), 16);
+    let summary: Vec<(&str, usize, usize, align::Method)> = a.units.iter().map(|u| (u.key.as_str(), u.count, u.other_count, u.method)).collect();
+    assert_eq!(summary, [("I.i", 11, 11, align::Method::Exact), ("I.ii", 5, 5, align::Method::Exact), ("I.iii", 8, 7, align::Method::Fitted)]);
+    // 段数相同的章：按顺序一段对一段（和 v0.4 一样）
+    let exact: Vec<(usize, usize)> = ["I.i", "I.ii"].iter().flat_map(|k| { let u = a.units.iter().find(|u| u.key == *k).unwrap(); en.body_of(u.unit).map(|p| p.seq).zip(zh.body_of(u.other_unit.unwrap()).map(|p| p.seq)).collect::<Vec<_>>() }).collect();
+    assert_eq!(exact.len(), 16);
+    assert_eq!(a.pairs[..16], exact[..]);
     let en3 = en.paragraph("I.i.3").unwrap();
-    let zh3 = align::counterpart(&a, &en, &zh, en3.seq).unwrap();
-    assert_eq!(zh3.key, "I.i.3");
-    assert!(zh3.text.starts_with("以制针业为例"));
-    // 段数不同的章不对齐
-    assert!(align::counterpart(&a, &en, &zh, en.paragraph("I.iii.1").unwrap().seq).is_none());
-    assert_eq!(a.mismatched().len(), 1);
+    let zh3 = align::counterpart(&a, &en, &zh, en3.seq);
+    assert_eq!(zh3.len(), 1);
+    assert_eq!(zh3[0].key, "I.i.3");
+    assert!(zh3[0].text.starts_with("以制针业为例"));
+    // 段数不同的章（v0.4 整章不对齐）：算法来对，每段原文都有中译，顺序不交叉
+    let third = a.units.iter().find(|u| u.key == "I.iii").unwrap();
+    assert!(third.aligned && third.merged + third.unmatched >= 1);
+    assert!(a.pairs.windows(2).all(|w| w[0].0 <= w[1].0 && w[0].1 <= w[1].1));
+    assert!(a.mismatched().is_empty());
+    println!("夹具第三章：{:?}，置信度 {}，合并 {} 组，落空 {} 段", align::shapes(&a), third.confidence, third.merged, third.unmatched);
 }
 
 #[test]

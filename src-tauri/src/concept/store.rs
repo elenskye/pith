@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use concept_engine::align::{Alignment, UnitAlignment};
+use concept_engine::align::{self, Alignment, UnitAlignment};
 use concept_engine::model::{Card, CardKind, Category, Check, CommentSource, Rejected, Relation, RelationKind, Run, RunStatus, Scope, Sentence, SourceOrigin, Status, StepRecord, ZhStatus};
 use concept_engine::text::{Numbering, PageBreak, Paragraph, Role, Text, Unit, UnitKind};
 use research_engine::fold::Span;
@@ -270,14 +270,25 @@ pub fn partner(c: &Connection, uid: &str) -> Result<Option<(String, bool)>, Stri
 
 // ---------- 对齐 ----------
 
+/// 存一份对齐（只用长度和锚点算的）。同时记下算法版本
 pub fn alignment_save(c: &Connection, original_uid: &str, translation_uid: &str, a: &Alignment, now: &str) -> Result<(), String> {
+    alignment_save_with(c, original_uid, translation_uid, a, None, now)
+}
+
+/// `similarity`：算的时候用了哪个向量模型的语义相似度（没用是 None）。
+/// 段落存在 `concept_aligned_pairs`（一段可以对几段）；v0.4 的 `concept_aligned` 不再写（0009）
+pub fn alignment_save_with(c: &Connection, original_uid: &str, translation_uid: &str, a: &Alignment, similarity: Option<&str>, now: &str) -> Result<(), String> {
     let tx = Tx::begin(c)?;
     let (o, t) = (text_id(&tx, original_uid)?, text_id(&tx, translation_uid)?);
     tx.execute("DELETE FROM concept_alignments WHERE original_id = ?1 AND translation_id = ?2", params![o, t]).map_err(err)?;
-    tx.execute("INSERT INTO concept_alignments (original_id, translation_id, units, created_at) VALUES (?1, ?2, ?3, ?4)", params![o, t, json(&a.units)?, now]).map_err(err)?;
+    tx.execute(
+        "INSERT INTO concept_alignments (original_id, translation_id, units, created_at, algorithm, similarity) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![o, t, json(&a.units)?, now, align::VERSION as i64, similarity],
+    )
+    .map_err(err)?;
     let id = tx.last_insert_rowid();
     {
-        let mut st = tx.prepare("INSERT INTO concept_aligned (alignment_id, original_seq, translation_seq) VALUES (?1, ?2, ?3)").map_err(err)?;
+        let mut st = tx.prepare("INSERT INTO concept_aligned_pairs (alignment_id, original_seq, translation_seq) VALUES (?1, ?2, ?3)").map_err(err)?;
         for (a, b) in &a.pairs {
             st.execute(params![id, *a as i64, *b as i64]).map_err(err)?;
         }
@@ -285,13 +296,38 @@ pub fn alignment_save(c: &Connection, original_uid: &str, translation_uid: &str,
     tx.commit()
 }
 
+/// 存下的对齐是哪一版算法算的、用没用语义相似度（没有这一份对齐是 None）
+pub fn alignment_meta(c: &Connection, original_uid: &str, translation_uid: &str) -> Result<Option<(u32, Option<String>)>, String> {
+    let (o, t) = (text_id(c, original_uid)?, text_id(c, translation_uid)?);
+    c.query_row("SELECT algorithm, similarity FROM concept_alignments WHERE original_id = ?1 AND translation_id = ?2", params![o, t], |r| Ok((r.get::<_, i64>(0)? as u32, r.get(1)?))).optional().map_err(err)
+}
+
+/// 存下的对齐。旧算法算的（v0.4：段落在 `concept_aligned` 里，段数不同的章没对）当作没有：调用方用 `alignment_ensure` 重算
 pub fn alignment_load(c: &Connection, original_uid: &str, translation_uid: &str) -> Result<Option<Alignment>, String> {
     let (o, t) = (text_id(c, original_uid)?, text_id(c, translation_uid)?);
-    let Some((id, units)): Option<(i64, String)> = c.query_row("SELECT id, units FROM concept_alignments WHERE original_id = ?1 AND translation_id = ?2", params![o, t], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(err)? else { return Ok(None) };
+    let Some((id, units, algorithm)): Option<(i64, String, i64)> =
+        c.query_row("SELECT id, units, algorithm FROM concept_alignments WHERE original_id = ?1 AND translation_id = ?2", params![o, t], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().map_err(err)?
+    else {
+        return Ok(None);
+    };
+    if algorithm < align::VERSION as i64 {
+        return Ok(None);
+    }
     let units: Vec<UnitAlignment> = from_json(&units)?;
-    let mut st = c.prepare("SELECT original_seq, translation_seq FROM concept_aligned WHERE alignment_id = ?1 ORDER BY original_seq").map_err(err)?;
+    let mut st = c.prepare("SELECT original_seq, translation_seq FROM concept_aligned_pairs WHERE alignment_id = ?1 ORDER BY original_seq, translation_seq").map_err(err)?;
     let pairs = st.query_map([id], |r| Ok((r.get::<_, i64>(0)? as usize, r.get::<_, i64>(1)? as usize))).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
     Ok(Some(Alignment { units, pairs }))
+}
+
+/// 读对齐；没有、或者是旧算法算的，就用两份文本按现在的算法重算一遍、存回去（对齐是派生数据，重算不丢东西）。
+/// 这里只用长度和锚点；要加语义相似度的，算好后用 `alignment_save_with` 存
+pub fn alignment_ensure(c: &Connection, original_uid: &str, original: &Text, translation_uid: &str, translation: &Text, now: &str) -> Result<Alignment, String> {
+    if let Some(a) = alignment_load(c, original_uid, translation_uid)? {
+        return Ok(a);
+    }
+    let a = align::align(original, translation);
+    alignment_save(c, original_uid, translation_uid, &a, now)?;
+    Ok(a)
 }
 
 // ---------- 一次研究 ----------

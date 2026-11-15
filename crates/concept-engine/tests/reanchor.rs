@@ -137,8 +137,9 @@ fn anchors_follow_their_paragraph_when_numbers_shift() {
     assert_eq!(now.check.span, was.check.span);
     let page = |s: &Sentence| s.check.pages.as_deref().map(|p| p.parse::<u32>().unwrap());
     assert_eq!(page(now), page(was).map(|p| p + 1));
-    // 第一章多了一段，中英段数对不上了：中译如实标成没有对齐
-    assert_eq!(now.check.zh_status, Some(ZhStatus::Unaligned));
+    // 第一章多了一段，中英段数对不上了：v0.5 起这样的章照样对齐（`align` 的单调对齐），不再整章标「没有对齐」。
+    // 夹具的中文是合成的、不是真译文，多出一段后对到的中文段不一定还含那句中译：如实标成「只显示整段」
+    assert_eq!(now.check.zh_status, Some(ZhStatus::ParagraphOnly));
     // 只有挂在译本旁注上的那一句没变（译本没重新解析）；第三章那句段落号没变，页码变了
     assert_eq!((report.kept, report.moved, report.lost, report.zh_lost), (1, 6, 0, 1));
     assert_eq!(report.changes.iter().find(|c| c.sentence == Some(1)).map(|c| (c.outcome, c.from.as_deref(), c.to.as_deref(), c.zh_lost)), Some((Outcome::Moved, Some("I.i.3"), Some("I.i.4"), true)));
