@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Run, Status};
+use crate::model::{Category, Run, Status};
 use crate::prompts::Books;
 use crate::verify::{self, SourceLookup};
 
@@ -21,6 +21,11 @@ pub fn audit(run: &Run, books: &Books, sources: SourceLookup) -> Vec<Finding> {
     let mut out = Vec::new();
     for card in &run.cards {
         for (i, s) in card.sentences.iter().enumerate() {
+            // 重新解析后找不到锚点的原文、他人、推演前提（`reanchor`）：如实列出来。解释句没挂上原文是允许的，不算问题
+            if s.check.status == Status::Unanchored && s.category != Category::Explanation {
+                out.push(Finding { at: card.id.clone(), sentence: Some(i + 1), message: format!("{}句没挂上原文：{}", s.category.label(), s.check.note.as_deref().unwrap_or("没有说明")) });
+                continue;
+            }
             let mut again = s.clone();
             match verify::check(&mut again, books, sources) {
                 Err(why) => out.push(Finding { at: card.id.clone(), sentence: Some(i + 1), message: format!("{}句核不上了：{why}", s.category.label()) }),

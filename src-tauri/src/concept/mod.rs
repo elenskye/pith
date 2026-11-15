@@ -6,8 +6,11 @@ pub mod fixtures;
 pub mod keys;
 pub mod library;
 pub mod mathpix;
+pub mod reparse;
 pub mod responses;
 pub mod search;
 pub mod store;
+#[cfg(test)]
+mod reparse_tests;
 #[cfg(test)]
 pub(crate) mod tests;

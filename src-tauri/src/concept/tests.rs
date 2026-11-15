@@ -49,7 +49,7 @@ fn item_with_file(c: &Connection, attachments: &std::path::Path, dir: &std::path
 }
 
 /// 新库里两本书（英文夹具、合成中文），解析、存好、对齐
-fn library_with_books(name: &str) -> (crate::db::tests::TempDir, AppState, String, String, i64) {
+pub(crate) fn library_with_books(name: &str) -> (crate::db::tests::TempDir, AppState, String, String, i64) {
     let dir = temp_dir(name);
     let state = AppState::init(DataPaths::new(dir.join("data")));
     let (en, zh, en_item) = state
@@ -133,9 +133,9 @@ fn concept_tables_upgrade_from_v7() {
     assert_eq!(store::text_row_get(&c, uid).unwrap().item_id, None);
 }
 
-struct Rec<'a> {
-    c: &'a Connection,
-    text: String,
+pub(super) struct Rec<'a> {
+    pub c: &'a Connection,
+    pub text: String,
 }
 
 impl Recorder for Rec<'_> {
@@ -180,7 +180,7 @@ pub(crate) fn sample(c: &Connection, backups: &std::path::Path, item: i64) {
     assert!(!critics.sources.is_empty());
 }
 
-fn chapter_scope(t: &text::Text, unit: &str, translation: &str, text_uid: &str) -> Scope {
+pub(super) fn chapter_scope(t: &text::Text, unit: &str, translation: &str, text_uid: &str) -> Scope {
     let u = t.chapters().into_iter().find(|u| u.key == unit).unwrap().index;
     Scope { entry: Entry::Chapter, text: text_uid.into(), translation: Some(translation.into()), paragraphs: t.body_of(u).map(|p| p.key.clone()).collect(), unit: Some(unit.into()), question: None, terms: Vec::new(), cards: Vec::new(), instruction: None, skip: Vec::new(), with: Vec::new() }
 }

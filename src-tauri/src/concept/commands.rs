@@ -2,6 +2,7 @@
 //!
 //! - 解析成文本：`concept_text_prepare`（EPUB 直接解析出结构预览；PDF 先算页数和费用）→（PDF：`concept_pdf_convert` 走 Mathpix 或本机取文字）
 //!   →（可选 `concept_text_renumber` 换段落号写法）→ `concept_text_save`（先做「导入前」备份；译本连上原著并对齐；段落进检索）。
+//!   附件已经解析过的：确认后走 `concept_text_reparse`（就地换掉文本、重新对齐、旧卡片重新找锚点，见 `concept::reparse`），不存第二份。
 //! - 一次研究：`concept_run_prepare` 算出每步要发什么、最坏多少钱（不联网）→ 用户确认 → `concept_run_execute` 在后台线程里跑，
 //!   过程中发 `concept-progress` 事件，做完发 `concept-done`；`concept_cancel` 停下，`concept_run_prepare` 带 `resume` 接着做。
 //! - 和排版 Agent、事实调查一样：只有「应用程序」里用正式数据目录的 Pith 用真接口和钥匙串；开发版、测试、指定了数据目录的打包版
@@ -29,7 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use super::library::{self as shelf, Copying, DbShelf, MockWeb};
 use super::mathpix::{self, Mathpix};
 use super::responses::{self, OpenAiSearch, Responses};
-use super::{keys, search, store};
+use super::{keys, reparse, search, store};
 use crate::agent::secret::{ApiKey, Place};
 use crate::agent::usage::{self, Ledger, Prices};
 use crate::agent::{self as format_agent, AgentState};
@@ -452,8 +453,8 @@ pub struct TextPreview {
     preview: Preview,
     /// 可以连上的原著（别的、语言不同的文本）
     candidates: Vec<TextSummary>,
-    /// 同一条文献已经解析过的（再存就是第二份）
-    existing: Option<String>,
+    /// 这个附件已经解析过的文本：确认后是重新解析（`concept_text_reparse`），不再存第二份
+    existing: Option<reparse::Existing>,
     converter: Option<String>,
     mock: bool,
 }
@@ -462,7 +463,7 @@ pub struct TextPreview {
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum Prepared {
     Epub(Box<TextPreview>),
-    Pdf { ticket: u64, pages: u32, limit: u32, over_limit: bool, has_mathpix: bool, cost_usd: f64, budget_usd: f64, month_spent_usd: f64, mock: bool },
+    Pdf { ticket: u64, pages: u32, limit: u32, over_limit: bool, has_mathpix: bool, cost_usd: f64, budget_usd: f64, month_spent_usd: f64, mock: bool, existing: Option<reparse::Existing> },
 }
 
 #[derive(Serialize)]
@@ -624,7 +625,7 @@ fn candidates(c: &rusqlite::Connection, language: &str, item_id: Option<i64>) ->
 fn text_preview(c: &rusqlite::Connection, concept: &ConceptState, t: Ticket) -> Result<TextPreview, String> {
     let Ticket::Text { text, attachment_id, item_id, meta, .. } = &t else { return Err("内部错误：不是文本".into()) };
     let preview = text::preview(text);
-    let existing = store::text_of_attachment(c, *attachment_id)?;
+    let existing = reparse::existing(c, *attachment_id)?;
     let cands = candidates(c, &text.language, *item_id)?;
     let converter = meta.converter.clone();
     Ok(TextPreview { ticket: concept.ticket(t), preview, candidates: cands, existing, converter, mock: mock_mode() })
@@ -668,10 +669,17 @@ pub fn concept_text_prepare(state: State<AppState>, agent: State<AgentState>, re
             return Err("这份 PDF 读不了页数（可能损坏或加密）。".into());
         }
         let spent = Ledger::new(&state.paths.root).month_total(apptext::now_iso().get(..7).unwrap_or("")).unwrap_or(0.0);
+        let existing = state.with_db(|c| reparse::existing(c, attachment_id))?;
         let ticket = concept.ticket(Ticket::Pdf { attachment_id, pages });
-        return Ok(Prepared::Pdf { ticket, pages, limit: s.pdf_page_limit, over_limit: pages > s.pdf_page_limit, has_mathpix: mock_mode() || has_key(&state, &agent, &research, ApiKey::Mathpix), cost_usd: pages as f64 * mathpix::PAGE_USD, budget_usd: format_agent::budget(&state), month_spent_usd: spent, mock: mock_mode() });
+        return Ok(Prepared::Pdf { ticket, pages, limit: s.pdf_page_limit, over_limit: pages > s.pdf_page_limit, has_mathpix: mock_mode() || has_key(&state, &agent, &research, ApiKey::Mathpix), cost_usd: pages as f64 * mathpix::PAGE_USD, budget_usd: format_agent::budget(&state), month_spent_usd: spent, mock: mock_mode(), existing });
     }
-    let (t, meta) = parse_epub(&bytes)?;
+    let (mut t, meta) = parse_epub(&bytes)?;
+    // 重新解析：默认沿用原来的段落号写法（预览里还可以换）
+    if let Some(n) = state.with_db(|c| reparse::numbering_of(c, attachment_id))?
+        && t.numbering != Some(n)
+    {
+        t.renumber(n);
+    }
     let ticket = Ticket::Text { text: Box::new(t), attachment_id, item_id: file.item_id, sha256: file.sha256, meta };
     state.with_db(|c| Ok(Prepared::Epub(Box::new(text_preview(c, &concept, ticket)?))))
 }
@@ -733,6 +741,7 @@ pub fn concept_text_save(state: State<AppState>, concept: State<ConceptState>, t
     let t = concept.take(ticket)?;
     let Ticket::Text { text, attachment_id, item_id, sha256, meta, .. } = &t else { return Err("这次确认已经过期，请重新确认。".into()) };
     let saved = state.with_db(|c| {
+        reparse::refuse_second(c, *attachment_id)?;
         let uid = save_text(c, &state.paths.backups, text, meta, Some(*attachment_id), *item_id, sha256, original_uid.as_deref())?;
         summary(c, &uid)
     });
@@ -740,6 +749,33 @@ pub fn concept_text_save(state: State<AppState>, concept: State<ConceptState>, t
         concept.put_back(ticket, t);
     }
     saved
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReparseResult {
+    summary: TextSummary,
+    report: reparse::Reparsed,
+}
+
+/// 附件已经解析过：确认后重新解析。就地换掉这份文本（uid、研究、译本关联都在），重新对齐，给旧卡片重新找锚点
+/// （`concept::reparse`）。先做「导入前」备份；中途出错整个回滚
+#[tauri::command(async)]
+pub fn concept_text_reparse(state: State<AppState>, concept: State<ConceptState>, ticket: u64) -> Result<ReparseResult, String> {
+    if concept.running().is_some() {
+        return Err("有一次概念研究正在进行，先停止。".into());
+    }
+    let t = concept.take(ticket)?;
+    let Ticket::Text { text, attachment_id, sha256, meta, .. } = &t else { return Err("这次确认已经过期，请重新确认。".into()) };
+    let done = state.with_db(|c| {
+        let uid = store::text_of_attachment(c, *attachment_id)?.ok_or("这个附件还没有解析过。")?;
+        let report = reparse::apply(c, &state.paths.backups, &shelf::snapshots(&state.paths.root), &uid, text, meta, sha256)?;
+        Ok(ReparseResult { summary: summary(c, &uid)?, report })
+    });
+    if done.is_err() {
+        concept.put_back(ticket, t);
+    }
+    done
 }
 
 /// 改一份译本对应的原著（或取消关联），重新对齐
