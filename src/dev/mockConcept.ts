@@ -6,6 +6,8 @@ import { emit } from "@tauri-apps/api/event";
 import data from "./mockConcept.json";
 import type {
   ConceptAnchoredParagraph,
+  ConceptAskResult,
+  ConceptIndexStatus,
   ConceptCard,
   ConceptPara,
   ConceptPreview,
@@ -22,6 +24,7 @@ import type {
   ConceptTextView,
   ConceptUnitInfo,
   ConceptUnitView,
+  LocalStatus,
 } from "@/shared/ipc";
 
 type Args = Record<string, unknown>;
@@ -497,4 +500,36 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
     return { added, view: conceptHandlers.concept_run_get({ uid }) };
   },
   concept_quotes: ({ itemUid }) => quotes(itemUid as string),
+  // 语义检索：模拟里没有向量模型，按「问题里的字有几个出现在段落里」打分，装作是按意思找的
+  concept_ask_search: ({ uid, question, limit }): ConceptAskResult => {
+    const t = textOf(uid as string).text;
+    const al = alignmentOf(uid as string);
+    const zh = partnerOf(uid as string)?.text;
+    const q = [...new Set(String(question).toLowerCase().replace(/[\s，。？！、；：,.?!;:]/g, ""))];
+    const scored = t.paragraphs
+      .filter((p) => p.role === "body")
+      .map((p) => {
+        const z = al?.pairs.find((x) => x[0] === p.seq)?.[1];
+        const zp = z !== undefined ? zh?.paragraphs[z] : undefined;
+        const hay = (p.text + (zp?.text ?? "")).toLowerCase();
+        const score = q.length ? q.filter((ch) => hay.includes(ch)).length / q.length : 0;
+        return { p, zp, score };
+      })
+      .filter((x) => x.score > 0.3)
+      .sort((a, b) => b.score - a.score || a.p.seq - b.p.seq)
+      .slice(0, (limit as number | null) ?? 12);
+    const hits = scored.map(({ p, zp, score }) => {
+      const u = t.units[p.unit];
+      return { seq: p.seq, key: p.key, role: p.role, unit: p.unit, unitKey: u.key, unitLabel: u.label, text: p.text, viaTranslation: false, translationKey: zp?.key ?? null, translationText: zp?.text ?? null, score: Math.round(score * 100) / 100, via: "semantic" as const };
+    });
+    return { hits, mode: "semantic", reranked: true, note: null, index: indexStatus(uid as string) };
+  },
+  concept_index_start: ({ uid }) => indexStatus(uid as string),
+  concept_index_status: ({ uid }) => indexStatus(uid as string),
+  local_status: (): LocalStatus => ({ mode: "mock", dir: "~/Documents/LLM", embedding: { key: "mock-embedding", name: "模拟向量模型", context: 8192, query: null }, rerank: { key: "mock-rerank", name: "模拟重排模型", context: 8192, query: null }, embeddingRunning: true, rerankRunning: true, issue: null }),
 };
+
+function indexStatus(uid: string): ConceptIndexStatus {
+  const n = textOf(uid).text.paragraphs.filter((p) => ["body", "sidenote", "note", "guide"].includes(p.role)).length;
+  return { textUid: uid, total: n, done: n, running: false, error: null, model: "模拟向量模型", issue: null };
+}

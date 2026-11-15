@@ -8,6 +8,7 @@ pub mod library;
 pub mod mathpix;
 pub mod responses;
 pub mod search;
+pub mod semantic;
 pub mod store;
 #[cfg(test)]
 pub(crate) mod tests;

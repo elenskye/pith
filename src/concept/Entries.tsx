@@ -2,20 +2,23 @@
 // - 问这本书：本地搜出候选段落，用户勾选，再交给「问这本书」技能；
 // - 追踪概念：中英两种写法在全书里检索，按章列出命中，用户勾选，再交给「追踪概念」；
 // 以及「自由」：任意范围 + 一句要求。
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { LoaderCircle, Search } from "lucide-react";
-import { api, type ConceptRunRequest, type ConceptSearchHit } from "@/shared/ipc";
+import { api, type ConceptAskResult, type ConceptIndexStatus, type ConceptRunRequest, type ConceptSearchHit } from "@/shared/ipc";
 import { Modal } from "@/shared/ui";
 import { ROLE } from "@/concept/labels";
 
-function Hits({ hits, chosen, onChosen, grouped }: { hits: ConceptSearchHit[]; chosen: Set<string>; onChosen: (s: Set<string>) => void; grouped?: boolean }) {
+type Hit = ConceptSearchHit & { score?: number | null; via?: "semantic" | "keyword" | "both" };
+
+function Hits({ hits, chosen, onChosen, grouped }: { hits: Hit[]; chosen: Set<string>; onChosen: (s: Set<string>) => void; grouped?: boolean }) {
   const toggle = (k: string) => {
     const n = new Set(chosen);
     if (n.has(k)) n.delete(k);
     else n.add(k);
     onChosen(n);
   };
-  const groups: [string, ConceptSearchHit[]][] = [];
+  const groups: [string, Hit[]][] = [];
   for (const h of hits) {
     const g = grouped ? `${h.unitKey} ${h.unitLabel}` : "";
     const last = groups[groups.length - 1];
@@ -35,6 +38,12 @@ function Hits({ hits, chosen, onChosen, grouped }: { hits: ConceptSearchHit[]; c
                 <span className="font-medium tabular-nums">{h.key}</span>
                 {h.role !== "body" && <span className="ml-1 text-muted-foreground">（{ROLE[h.role]}）</span>}
                 {h.viaTranslation && <span className="ml-1 text-amber-700 dark:text-amber-400">在中译里搜到</span>}
+                {typeof h.score === "number" && (
+                  <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground tabular-nums" title="相关度（本机的重排模型打的分，0–100）">
+                    {Math.round(h.score * 100)}
+                  </span>
+                )}
+                {h.via === "keyword" && <span className="ml-1 text-[10px] text-muted-foreground">按词搜到</span>}
                 <span className="line-clamp-2 text-muted-foreground">{h.text}</span>
                 {h.viaTranslation && h.translationText && <span className="line-clamp-1 text-muted-foreground">中译：{h.translationText}</span>}
               </span>
@@ -67,13 +76,64 @@ function useSearch(textUid: string) {
   return { hits, chosen, setChosen, busy, error, run };
 }
 
+/** 「问这本书」的检索：按意思找（本机的向量和重排模型）；用不了时后端退回按词，并在 note 里说明 */
+function useAsk(textUid: string) {
+  const [result, setResult] = useState<ConceptAskResult | null>(null);
+  const [index, setIndex] = useState<ConceptIndexStatus | null>(null);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // 打开就在后台建语义索引（已经建好的什么都不做），进度跟着事件走
+  useEffect(() => {
+    let alive = true;
+    api.conceptIndexStart(textUid).then((st) => alive && setIndex(st), () => {});
+    const un = listen<{ textUid: string; done: number; total: number; running: boolean; error: string | null }>("concept-index", (e) => {
+      if (e.payload.textUid === textUid) setIndex((old) => (old ? { ...old, ...e.payload } : old));
+    }).catch(() => null); // 浏览器预览里没有事件
+    return () => {
+      alive = false;
+      void un.then((f) => f?.());
+    };
+  }, [textUid]);
+  const run = async (q: string, preselect: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.conceptAskSearch(textUid, q, 16);
+      const hits = r.hits.filter((h) => h.role === "body");
+      setResult({ ...r, hits });
+      if (!r.index.running) setIndex(r.index);
+      setChosen(new Set(hits.slice(0, preselect).map((h) => h.key)));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { result, index, chosen, setChosen, busy, error, run };
+}
+
+function IndexLine({ index }: { index: ConceptIndexStatus | null }) {
+  if (!index) return null;
+  if (index.issue) return <p className="text-muted-foreground">{index.issue}现在按词找：长句子可以只写关键词（用「；」分开几个词）。</p>;
+  if (index.error && !index.running) return <p className="selectable text-destructive">语义索引没建成：{index.error}</p>;
+  if (index.done < index.total)
+    return (
+      <p className="flex items-center gap-1.5 text-muted-foreground">
+        {index.running && <LoaderCircle size={12} className="animate-spin" />}
+        正在给这本书建语义索引：{index.done} / {index.total} 段（{index.model}，在本机算，不联网）。建好之前按词找。
+      </p>
+    );
+  return <p className="text-muted-foreground">按意思找：直接写问题就行，中文、英文都可以（{index.model}，在本机算，不联网、不花钱）。</p>;
+}
+
 export function AskDialog({ textUid, onRequest, onClose }: { textUid: string; onRequest: (r: ConceptRunRequest) => void; onClose: () => void }) {
   const [question, setQuestion] = useState("");
-  const s = useSearch(textUid);
+  const s = useAsk(textUid);
   return (
     <Modal title="问这本书" onClose={onClose} width="w-[640px]">
       <div className="space-y-3 text-xs">
-        <p className="text-muted-foreground">先在这本书里搜出可能相关的段落，勾选以后再问模型。中文问题会先搜对齐的中译，再对回原著。</p>
+        <p className="text-muted-foreground">先在这本书里找出相关的段落，勾选以后再问模型。找段落在本机做；勾选的段落确认后才发给模型。</p>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -87,9 +147,12 @@ export function AskDialog({ textUid, onRequest, onClose }: { textUid: string; on
             找段落
           </button>
         </form>
-        <p className="text-muted-foreground">检索按词找，长句子可以只写关键词（用「；」分开几个词）。</p>
+        <IndexLine index={s.index} />
+        {s.busy && <p className="text-muted-foreground">第一次找要先启动本机的模型，可能要等十几秒。</p>}
         {s.error && <p className="selectable text-destructive">{s.error}</p>}
-        {s.hits && <Hits hits={s.hits} chosen={s.chosen} onChosen={s.setChosen} />}
+        {s.result?.note && <p className="selectable text-amber-700 dark:text-amber-400">{s.result.note}</p>}
+        {s.result && s.result.mode === "semantic" && s.result.hits.length > 0 && <p className="text-muted-foreground">按相关度排，数字是相关度（0–100）；前 6 段已经勾上。</p>}
+        {s.result && <Hits hits={s.result.hits} chosen={s.chosen} onChosen={s.setChosen} />}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="rounded-md border px-3 py-1.5 hover:bg-muted">
             取消

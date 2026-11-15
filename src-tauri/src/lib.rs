@@ -13,6 +13,7 @@ mod edit;
 mod fields;
 mod import;
 mod library;
+mod local;
 mod metadata;
 mod paths;
 mod protocol;
@@ -40,6 +41,8 @@ pub struct AppState {
     epoch: AtomicU64,
     /// 联网补全的后台队列
     lookups: metadata::Queue,
+    /// 本机的向量和重排模型（语义检索；测试里是模拟的）
+    local: std::sync::Arc<local::LocalModels>,
 }
 
 /// 搜索索引是派生数据：挂不上或重建失败都不挡启动，搜索时再报错
@@ -77,7 +80,7 @@ impl AppState {
             }
             Ok(conn)
         });
-        Self { paths, db: Mutex::new(opened), epoch: AtomicU64::new(0), lookups: metadata::Queue::default() }
+        Self { paths, db: Mutex::new(opened), epoch: AtomicU64::new(0), lookups: metadata::Queue::default(), local: std::sync::Arc::new(local::LocalModels::detect()) }
     }
 
     fn with_db<T>(&self, f: impl FnOnce(&mut Connection) -> Result<T, String>) -> Result<T, String> {
@@ -683,6 +686,8 @@ pub fn run() {
             research::commands::manage(app);
             // 概念研究：后台进行中的研究、待确认的解析
             concept::commands::manage(app);
+            // 本机的向量和重排模型（语义检索）
+            concept::semantic::manage(app);
             word::start_service(app.handle());
             Ok(())
         })
@@ -824,6 +829,10 @@ pub fn run() {
             concept::commands::concept_text_get,
             concept::commands::concept_unit_get,
             concept::commands::concept_search,
+            concept::semantic::concept_ask_search,
+            concept::semantic::concept_index_start,
+            concept::semantic::concept_index_status,
+            concept::semantic::local_status,
             concept::commands::concept_run_prepare,
             concept::commands::concept_rerun_prepare,
             concept::commands::concept_run_execute,
@@ -841,6 +850,7 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 word::stop_service(app);
                 if let Some(state) = app.try_state::<AppState>() {
+                    state.local.stop_ours_on_exit();
                     state.close();
                 }
             }

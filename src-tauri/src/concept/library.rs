@@ -82,6 +82,13 @@ pub struct DbShelf<'a> {
 }
 
 impl Shelf for DbShelf<'_> {
+    /// 本机的重排模型（用不了就返回 None，挑片段只看字面）
+    fn relevance(&self, query: &str, passages: &[String]) -> Option<Vec<f32>> {
+        let local = &self.state.local;
+        let model = local.ensure(crate::local::Svc::Rerank).ok()?;
+        crate::local::rerank::scores(local, &model, query, passages).ok()
+    }
+
     fn find(&self, terms: &[String], max: usize, _: &AtomicBool) -> Result<Vec<ShelfHit>, String> {
         let attachments = self.state.paths.attachments.clone();
         self.state.with_db(|c| {

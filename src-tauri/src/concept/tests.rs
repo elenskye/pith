@@ -49,7 +49,7 @@ fn item_with_file(c: &Connection, attachments: &std::path::Path, dir: &std::path
 }
 
 /// 新库里两本书（英文夹具、合成中文），解析、存好、对齐
-fn library_with_books(name: &str) -> (crate::db::tests::TempDir, AppState, String, String, i64) {
+pub(crate) fn library_with_books(name: &str) -> (crate::db::tests::TempDir, AppState, String, String, i64) {
     let dir = temp_dir(name);
     let state = AppState::init(DataPaths::new(dir.join("data")));
     let (en, zh, en_item) = state

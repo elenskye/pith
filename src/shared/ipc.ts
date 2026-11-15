@@ -1089,6 +1089,47 @@ export type ConceptSearchHit = {
   translationText: string | null;
 };
 
+/** 「问这本书」按意思找到的一段：比按词检索多了相关度和找到的方式 */
+export type ConceptAskHit = ConceptSearchHit & {
+  /** 相关度 0…1（重排的分数；重排用不了时是向量的相似度；按词检索时是 null） */
+  score: number | null;
+  via: "semantic" | "keyword" | "both";
+};
+
+/** 一份文本的语义索引建到哪了（向量在 search.db，本机模型算的） */
+export type ConceptIndexStatus = {
+  textUid: string;
+  total: number;
+  done: number;
+  running: boolean;
+  error: string | null;
+  /** 向量模型的名字；本机模型用不了时是 null，issue 说原因 */
+  model: string | null;
+  issue: string | null;
+};
+
+export type ConceptAskResult = {
+  hits: ConceptAskHit[];
+  /** semantic：按意思找的；keyword：退回了按词检索 */
+  mode: "semantic" | "keyword";
+  reranked: boolean;
+  note: string | null;
+  index: ConceptIndexStatus;
+};
+
+export type LocalServiceModel = { key: string; name: string; context: number; query: string | null };
+
+/** 本机模型（~/Documents/LLM 里的向量和重排模型）的状态 */
+export type LocalStatus = {
+  mode: "real" | "mock" | "off";
+  dir: string;
+  embedding: LocalServiceModel | null;
+  rerank: LocalServiceModel | null;
+  embeddingRunning: boolean;
+  rerankRunning: boolean;
+  issue: string | null;
+};
+
 export type ConceptSkillStep = {
   id: string;
   kind: ConceptStepKind;
@@ -1457,6 +1498,12 @@ export const api = {
   conceptUnitGet: (uid: string, unit: number) => invoke<ConceptUnitView>("concept_unit_get", { uid, unit }),
   /** 段落检索：原著里搜不到的词先搜对齐的中译、再映射回原著；「；」分开的几个词各搜一遍 */
   conceptSearch: (uid: string, query: string, limit?: number) => invoke<ConceptSearchHit[]>("concept_search", { uid, query, limit: limit ?? null }),
+  /** 「问这本书」：用本机的向量和重排模型按意思找段落；用不了时退回按词（result.mode、result.note 说明）。会在后台把没建完的索引建完 */
+  conceptAskSearch: (uid: string, question: string, limit?: number) => invoke<ConceptAskResult>("concept_ask_search", { uid, question, limit: limit ?? null }),
+  /** 在后台给一份文本（和它连着的译本）建语义索引；进度发事件 concept-index */
+  conceptIndexStart: (uid: string) => invoke<ConceptIndexStatus>("concept_index_start", { uid }),
+  conceptIndexStatus: (uid: string) => invoke<ConceptIndexStatus>("concept_index_status", { uid }),
+  localStatus: () => invoke<LocalStatus>("local_status"),
   /** prepare 不联网：算出每步发什么、最坏多少钱；用户确认后拿 ticket 调 execute（后台跑，事件 concept-progress / concept-done） */
   conceptRunPrepare: (request: ConceptRunRequest) => invoke<ConceptRunPreview>("concept_run_prepare", { request, resume: null }),
   conceptRunResumePrepare: (uid: string) => invoke<ConceptRunPreview>("concept_run_prepare", { request: null, resume: uid }),

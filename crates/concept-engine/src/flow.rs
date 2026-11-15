@@ -24,6 +24,11 @@ pub trait Shelf: Send + Sync {
     fn keep(&self, text: &str) -> Result<String, String>;
     /// 读回来源的正文（核对、审计、接着做时用）
     fn text(&self, source: &CommentSource) -> Result<String, String>;
+    /// 按意思给几段文字打分（0…1，和 `passages` 一一对应），用来在长来源里挑片段（`excerpt`）。
+    /// App 一侧有本机的重排模型时实现它；默认没有，挑片段就只看字面
+    fn relevance(&self, _query: &str, _passages: &[String]) -> Option<Vec<f32>> {
+        None
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -269,7 +274,8 @@ pub fn execute(run: &mut Run, skill: &Skill, books: &Books, ports: &mut Ports) -
 fn model_step(run: &mut Run, skill: &Skill, i: usize, books: &Books, ports: &mut Ports) -> Result<(), PortError> {
     let step = &skill.steps[i];
     let sources = source_texts(run, ports.shelf);
-    let req = prompts::request(skill, step, run, books, &sources);
+    // 太长的来源只发挑出来的片段；核对引文（下面的 lookup）照旧用全文
+    let req = prompts::request(skill, step, run, books, &crate::excerpt::for_prompt(&sources, run, ports.shelf));
     let info = ports.model.info();
     let base = StepRecord { provider: info.provider, model: info.model, mock: ports.model.is_mock(), ..record(&step.id, if step.title.is_empty() { step.id.clone() } else { step.title.clone() }, (ports.now)()) };
     let reply = match ports.model.complete(&req, ports.cancel) {

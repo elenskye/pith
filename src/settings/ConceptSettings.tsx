@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, FolderOpen, LoaderCircle } from "lucide-react";
-import { api, type ConceptSettings, type ConceptStatus } from "@/shared/ipc";
+import { api, type ConceptSettings, type ConceptStatus, type LocalStatus } from "@/shared/ipc";
 import { useUi } from "@/shared/ui";
 import { Badge, Notice, SectionTitle, Switch } from "@/format/parts";
 import { money } from "@/research/labels";
@@ -212,6 +212,8 @@ export function ConceptSettingsSection({ onKeys }: { onKeys: () => void }) {
         {s.brokenSkills.length > 0 && <Notice tone="danger" title="这些技能读不了（格式不对），没有列进来：" items={s.brokenSkills.map((b) => `${b.folder}：${b.error}`)} />}
       </section>
 
+      <LocalModels />
+
       {s.calls.length > 0 && (
         <section>
           <SectionTitle>最近的调用</SectionTitle>
@@ -231,5 +233,43 @@ export function ConceptSettingsSection({ onKeys }: { onKeys: () => void }) {
         </section>
       )}
     </div>
+  );
+}
+
+/** 本机模型（~/Documents/LLM 里的向量和重排）：只显示状态。Pith 只读那个文件夹，用到时才启动，闲置 15 分钟自己停 */
+function LocalModels() {
+  const q = useQuery({ queryKey: ["localStatus"], queryFn: api.localStatus, staleTime: 0 });
+  const st: LocalStatus | undefined = q.data;
+  if (!st) return null;
+  const row = (label: string, m: LocalStatus["embedding"], running: boolean) => (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="flex items-center gap-1.5 text-xs">
+        {m ? (
+          <>
+            <span>{m.name}</span>
+            <Badge tone={running ? "accent" : "plain"}>{running ? "运行中" : "没在运行，用到时启动"}</Badge>
+          </>
+        ) : (
+          <span className="text-muted-foreground">清单里没有</span>
+        )}
+      </dd>
+    </>
+  );
+  return (
+    <section>
+      <SectionTitle>本机模型</SectionTitle>
+      <p className="mb-2 text-xs text-muted-foreground">
+        「问这本书」按意思找段落、反方挑相关的片段时用：向量模型把段落变成向量，重排模型给候选段落打分。都在这台电脑上算，不联网、不花钱；用到时才启动，闲置 15 分钟自动停。
+      </p>
+      {st.mode === "mock" && <Notice tone="info" title="现在用的是模拟的本机模型（测试用）。" />}
+      {st.issue && <Notice title={st.issue} />}
+      <dl className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm">
+        <dt className="text-muted-foreground">位置</dt>
+        <dd className="selectable font-mono text-xs">{st.dir}</dd>
+        {st.mode !== "off" && row("向量模型", st.embedding, st.embeddingRunning)}
+        {st.mode !== "off" && row("重排模型", st.rerank, st.rerankRunning)}
+      </dl>
+    </section>
   );
 }

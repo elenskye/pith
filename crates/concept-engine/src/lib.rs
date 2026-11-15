@@ -13,6 +13,7 @@ pub mod markup;
 pub mod epub;
 pub mod text;
 pub mod align;
+pub mod excerpt;
 pub mod fold;
 pub mod mathpix;
 pub mod fixture;
