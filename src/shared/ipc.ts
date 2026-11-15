@@ -1021,10 +1021,33 @@ export type ConceptTextSummary = {
   warnings: string[];
 };
 
-export type ConceptTextPreview = { ticket: number; preview: ConceptPreview; candidates: ConceptTextSummary[]; existing: string | null; converter: string | null; mock: boolean };
+/** 这个附件已经解析过的文本，和重新解析会动到的研究、卡片（译本还算上原著上的研究） */
+export type ConceptExisting = { uid: string; runs: number; cards: number };
+/** `existing` 不为空：确认后走 conceptTextReparse（就地替换），不再存第二份 */
+export type ConceptTextPreview = { ticket: number; preview: ConceptPreview; candidates: ConceptTextSummary[]; existing: ConceptExisting | null; converter: string | null; mock: boolean };
 export type ConceptPrepared =
   | ({ kind: "epub" } & ConceptTextPreview)
-  | { kind: "pdf"; ticket: number; pages: number; limit: number; overLimit: boolean; hasMathpix: boolean; costUsd: number; budgetUsd: number; monthSpentUsd: number; mock: boolean };
+  | { kind: "pdf"; ticket: number; pages: number; limit: number; overLimit: boolean; hasMathpix: boolean; costUsd: number; budgetUsd: number; monthSpentUsd: number; mock: boolean; existing: ConceptExisting | null };
+/** 重新解析后一句的结果：原位跟过去 / 位置变了 / 没挂上原文 */
+export type ConceptReanchorOutcome = "kept" | "moved" | "lost";
+/** 有变化的一句：`at` 是卡片编号（K3）或关系编号（R2），`sentence` 从 1 起（关系的说明是 null） */
+export type ConceptReanchorChange = { at: string; title: string; sentence: number | null; outcome: ConceptReanchorOutcome; from: string | null; to: string | null; zhLost: boolean; note: string | null };
+export type ConceptReparseRun = {
+  uid: string;
+  textUid: string;
+  skillTitle: string;
+  label: string;
+  cards: number;
+  kept: number;
+  moved: number;
+  lost: number;
+  zhLost: number;
+  scopeDropped: number;
+  changes: ConceptReanchorChange[];
+  findings: ConceptFinding[];
+};
+export type ConceptReparseReport = { uid: string; backup: string; paragraphs: number; cards: number; kept: number; moved: number; lost: number; zhLost: number; findings: number; runs: ConceptReparseRun[] };
+export type ConceptReparseResult = { summary: ConceptTextSummary; report: ConceptReparseReport };
 
 export type ConceptUnitInfo = {
   index: number;
@@ -1449,6 +1472,8 @@ export const api = {
   conceptPdfConvert: (ticket: number, local: boolean) => invoke<ConceptTextPreview>("concept_pdf_convert", { ticket, local }),
   conceptTextRenumber: (ticket: number, numbering: ConceptNumbering) => invoke<ConceptTextPreview>("concept_text_renumber", { ticket, numbering }),
   conceptTextSave: (ticket: number, originalUid: string | null) => invoke<ConceptTextSummary>("concept_text_save", { ticket, originalUid }),
+  /** 附件已经解析过：就地换掉文本（uid、研究、译本关联都在），重新对齐，旧卡片按引文重新找锚点；先做「导入前」备份 */
+  conceptTextReparse: (ticket: number) => invoke<ConceptReparseResult>("concept_text_reparse", { ticket }),
   conceptTextLink: (uid: string, originalUid: string | null) => invoke<ConceptTextSummary>("concept_text_link", { uid, originalUid }),
   conceptTextDelete: (uid: string) => invoke<void>("concept_text_delete", { uid }),
   conceptTextsList: () => invoke<ConceptTextSummary[]>("concept_texts_list"),

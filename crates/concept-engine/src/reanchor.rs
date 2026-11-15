@@ -246,7 +246,9 @@ impl<'a> Reanchor<'a> {
         }
     }
 
-    fn record(&self, report: &mut Report, at: &str, title: &str, index: Option<usize>, before: &Sentence, after: &Sentence, outcome: Outcome) {
+    /// 记一句的结果。`place`：卡片或关系的编号、标题、第几句
+    fn record(report: &mut Report, place: (&str, &str, Option<usize>), before: &Sentence, after: &Sentence, outcome: Outcome) {
+        let (at, title, index) = place;
         match outcome {
             Outcome::Kept => report.kept += 1,
             Outcome::Moved => report.moved += 1,
@@ -305,14 +307,14 @@ impl<'a> Reanchor<'a> {
             for (i, s) in card.sentences.iter_mut().enumerate() {
                 let before = s.clone();
                 if let Some(outcome) = self.sentence(s, sources) {
-                    self.record(&mut report, &card.id, &card.title, Some(i + 1), &before, s, outcome);
+                    Self::record(&mut report, (&card.id, &card.title, Some(i + 1)), &before, s, outcome);
                 }
             }
         }
         for r in &mut run.relations {
             let before = r.note.clone();
             if let Some(outcome) = self.sentence(&mut r.note, sources) {
-                self.record(&mut report, &r.id, &format!("{} → {}", r.from, r.to), None, &before, &r.note, outcome);
+                Self::record(&mut report, (&r.id, &format!("{} → {}", r.from, r.to), None), &before, &r.note, outcome);
             }
         }
         self.targets(&mut run.targets, sources);

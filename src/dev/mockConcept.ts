@@ -7,9 +7,13 @@ import data from "./mockConcept.json";
 import type {
   ConceptAnchoredParagraph,
   ConceptCard,
+  ConceptExisting,
   ConceptPara,
   ConceptPreview,
   ConceptQuote,
+  ConceptReparseReport,
+  ConceptReparseResult,
+  ConceptReparseRun,
   ConceptRun,
   ConceptRunPreview,
   ConceptRunRequest,
@@ -132,10 +136,56 @@ const PDF_TEXT: MText = {
   warnings: ["模拟模式：没有真的调用 Mathpix，用本机取的文字拼成行。"],
 };
 
+/** 重新解析会动到的研究：这份文本上的；它是别的原著的译本时，还有原著上的 */
+function affectedRuns(uid: string) {
+  const s = textOf(uid).summary;
+  return runs.filter((r) => r.textUid === uid || (s.originalUid !== null && r.textUid === s.originalUid));
+}
+
+function existingOf(attachmentId: number): ConceptExisting | null {
+  const uid = texts.find((t) => t.summary.attachmentId === attachmentId)?.summary.uid;
+  if (!uid) return null;
+  const hit = affectedRuns(uid);
+  return { uid, runs: hit.length, cards: hit.reduce((n, r) => n + r.run.cards.length, 0) };
+}
+
 function textPreview(ticket: number, preview: ConceptPreview, attachmentId: number) {
   const lang = preview.language;
-  const existing = texts.find((t) => t.summary.attachmentId === attachmentId)?.summary.uid ?? null;
-  return { ticket, preview, candidates: texts.filter((t) => t.summary.language !== lang && !t.summary.originalUid).map((t) => t.summary), existing, converter: preview.format === "pdf" ? "mathpix（模拟）" : null, mock: true };
+  return { ticket, preview, candidates: texts.filter((t) => t.summary.language !== lang && !t.summary.originalUid).map((t) => t.summary), existing: existingOf(attachmentId), converter: preview.format === "pdf" ? "mathpix（模拟）" : null, mock: true };
+}
+
+/** 重新解析的结果：模拟里文本没变，每句都原位跟过去。`?mock&reparse=changed` 时编几句「位置变了 / 没挂上 / 中译核不上」，
+ * 只为了看结果摘要长什么样（示例数据本身不改） */
+function reparseReport(uid: string): ConceptReparseReport {
+  const demo = new URLSearchParams(location.search).get("reparse") === "changed";
+  const bump = (k: string) => k.replace(/(\d+)$/, (n) => String(Number(n) + 1));
+  const out: ConceptReparseReport = { uid, backup: "library-20261115-100000-before-import.db", paragraphs: textOf(uid).text.paragraphs.length, cards: 0, kept: 0, moved: 0, lost: 0, zhLost: 0, findings: 0, runs: [] };
+  for (const { textUid, run } of affectedRuns(uid)) {
+    const r: ConceptReparseRun = { uid: run.uid, textUid, skillTitle: run.skillTitle, label: runSummary(textUid, run).label, cards: run.cards.length, kept: 0, moved: 0, lost: 0, zhLost: 0, scopeDropped: 0, changes: [], findings: [] };
+    const all = [...run.cards.flatMap((c) => c.sentences.map((s, i) => ({ at: c.id, title: c.title, sentence: i + 1 as number | null, s }))), ...run.relations.map((x) => ({ at: x.id, title: `${x.from} → ${x.to}`, sentence: null as number | null, s: x.note }))];
+    all.filter((x) => x.s.paragraph && !x.s.source).forEach((x, i) => {
+      const from = x.s.paragraph!;
+      if (demo && i % 5 === 1) {
+        r.moved++;
+        const zhLost = x.s.check.zhStatus === "verified";
+        if (zhLost) r.zhLost++;
+        r.changes.push({ at: x.at, title: x.title, sentence: x.sentence, outcome: "moved", from, to: bump(from), zhLost, note: null });
+      } else if (demo && i === 7) {
+        r.lost++;
+        const note = `重新解析后引文在新文本里找不到了（原来挂在「${from}」）：没挂上原文`;
+        r.changes.push({ at: x.at, title: x.title, sentence: x.sentence, outcome: "lost", from, to: null, zhLost: false, note });
+        if (x.s.category !== "explanation") r.findings.push({ at: x.at, sentence: x.sentence, message: `${x.s.category === "original" ? "原文" : "他人"}句没挂上原文：${note}` });
+      } else r.kept++;
+    });
+    out.runs.push(r);
+    out.cards += r.cards;
+    out.kept += r.kept;
+    out.moved += r.moved;
+    out.lost += r.lost;
+    out.zhLost += r.zhLost;
+    out.findings += r.findings.length;
+  }
+  return out;
 }
 
 function bodyOf(uid: string) {
@@ -309,7 +359,7 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
       return { kind: "epub", ...textPreview(ticket, preview, id) };
     }
     tickets.set(ticket, { kind: "pdf", attachmentId: id });
-    return { kind: "pdf", ticket, pages: 2, limit: settings.pdfPageLimit, overLimit: 2 > settings.pdfPageLimit, hasMathpix: true, costUsd: 0.01, budgetUsd: 30, monthSpentUsd: 0, mock: true };
+    return { kind: "pdf", ticket, pages: 2, limit: settings.pdfPageLimit, overLimit: 2 > settings.pdfPageLimit, hasMathpix: true, costUsd: 0.01, budgetUsd: 30, monthSpentUsd: 0, mock: true, existing: existingOf(id) };
   },
   concept_pdf_convert: ({ ticket }) => {
     const t = tickets.get(ticket as number);
@@ -332,6 +382,7 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
     const t = tickets.get(ticket as number);
     if (!t || t.kind !== "text") fail("这次确认已经过期，请重新确认。");
     const x = t as { preview: ConceptPreview; attachmentId: number; pdf: boolean };
+    if (existingOf(x.attachmentId)) fail("这个附件已经解析过了，请用「重新解析」。");
     const text = x.pdf ? PDF_TEXT : x.attachmentId === BOOK_ITEMS.zh.attachment ? ZH : EN;
     const uid = `MOCK-T${nextTicket++}`;
     const s = summary(uid, text, null, x.preview.title, x.attachmentId, (originalUid as string | null) ?? null, null);
@@ -339,6 +390,17 @@ export const conceptHandlers: Record<string, (a: Args) => unknown> = {
     texts.push({ summary: s, text });
     if (s.originalUid) textOf(s.originalUid).summary.translationUid = uid;
     return s;
+  },
+  concept_text_reparse: ({ ticket }): ConceptReparseResult => {
+    const t = tickets.get(ticket as number);
+    if (!t || t.kind !== "text") fail("这次确认已经过期，请重新确认。");
+    if (running) fail("有一次概念研究正在进行，先停止。");
+    const x = t as { preview: ConceptPreview; attachmentId: number };
+    const uid = existingOf(x.attachmentId)?.uid ?? fail("这个附件还没有解析过。");
+    tickets.delete(ticket as number);
+    const s = textOf(uid).summary;
+    s.numbering = x.preview.numbering ?? s.numbering;
+    return { summary: s, report: reparseReport(uid) };
   },
   concept_text_link: ({ uid, originalUid }) => {
     const t = textOf(uid as string);

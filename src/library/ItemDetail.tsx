@@ -147,7 +147,7 @@ function ParentLink({ parent, onSelect }: { parent: Parent | null; onSelect: (s:
 }
 
 /** 在 App 的阅读器里打开 PDF */
-/** EPUB / PDF 附件：解析成文本（v0.4 概念研究）；解析过的显示「在概念页里读」 */
+/** EPUB / PDF 附件：解析成文本（v0.4 概念研究）；解析过的显示「概念页」和「重新解析」 */
 function ParseButton({ id, title, contentType, status }: { id: number; title: string; contentType: string | null; status: string }) {
   const [open, setOpen] = useState(false);
   const ok = status !== "missing" && (contentType === "application/epub+zip" || contentType === "application/pdf");
@@ -157,9 +157,14 @@ function ParseButton({ id, title, contentType, status }: { id: number; title: st
   return (
     <>
       {parsed.data ? (
-        <button onClick={() => go(parsed.data!)} title="这个附件解析过了：在「概念」里读" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
-          概念页
-        </button>
+        <>
+          <button onClick={() => go(parsed.data!)} title="这个附件解析过了：在「概念」里读" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+            概念页
+          </button>
+          <button onClick={() => setOpen(true)} title="再解析一次：替换文本，旧卡片按引文重新找锚点" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+            重新解析
+          </button>
+        </>
       ) : (
         <button onClick={() => setOpen(true)} title="解析成带段落号的文本，在「概念」里读和分析" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
           解析成文本

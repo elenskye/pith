@@ -10,6 +10,7 @@ import { Badge, Notice, Page, SectionTitle } from "@/format/parts";
 import { money } from "@/research/labels";
 import { MODEL_NAME } from "@/concept/labels";
 import { RunConfirm, prepare, type Pending } from "@/concept/Confirm";
+import { ParseDialog } from "@/concept/ParseDialog";
 import { UnitScreen, type Focus } from "@/concept/Reader";
 import { RunScreen } from "@/concept/RunView";
 
@@ -144,6 +145,7 @@ function BookHome({ uid, onUnit }: { uid: string; onUnit: (unit: number) => void
   const ui = useUi();
   const v = useQuery({ queryKey: ["conceptText", uid], queryFn: () => api.conceptTextGet(uid) });
   const texts = useQuery({ queryKey: ["conceptTexts"], queryFn: api.conceptTextsList });
+  const [reparsing, setReparsing] = useState(false);
   if (v.error) return <p className="selectable m-6 text-xs text-destructive">{String(v.error)}</p>;
   if (!v.data) return <LoaderCircle size={16} className="m-6 animate-spin text-muted-foreground" />;
   const d = v.data;
@@ -169,8 +171,24 @@ function BookHome({ uid, onUnit }: { uid: string; onUnit: (unit: number) => void
       ui.notify(String(e), "error");
     }
   };
+  const attachment = d.summary.attachmentId;
   return (
-    <Page crumbs={[{ label: "概念" }, { label: d.summary.title || d.summary.itemTitle || "书" }]} actions={<button onClick={() => void remove()} className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-muted">删除这份文本…</button>}>
+    <Page
+      crumbs={[{ label: "概念" }, { label: d.summary.title || d.summary.itemTitle || "书" }]}
+      actions={
+        <span className="flex gap-2">
+          {attachment !== null && (
+            <button onClick={() => setReparsing(true)} title="从文献库里的附件再解析一次：替换文本，旧卡片按引文重新找锚点" className="rounded-md border px-2 py-1 text-xs hover:bg-muted">
+              重新解析…
+            </button>
+          )}
+          <button onClick={() => void remove()} className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-muted">
+            删除这份文本…
+          </button>
+        </span>
+      }
+    >
+      {reparsing && attachment !== null && <ParseDialog attachmentId={attachment} title={d.summary.title || d.summary.itemTitle || "书"} onClose={() => setReparsing(false)} />}
       <div className="text-xs text-muted-foreground">
         <p>
           {d.summary.itemTitle && <>文献库：{d.summary.itemTitle} · </>}

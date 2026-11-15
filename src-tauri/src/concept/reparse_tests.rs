@@ -230,7 +230,8 @@ fn reparsing_the_same_content_changes_nothing() {
     for uid in [CHAPTER, MID, OWN] {
         assert!(audit_of(&state, uid).is_empty());
     }
-    state.with_db(|c| Ok(assert_eq!((store::partner(c, &en)?, store::partner(c, &zh)?), (Some((zh.clone(), true)), Some((en.clone(), false)))))).unwrap();
+    let partners = state.with_db(|c| Ok((store::partner(c, &en)?, store::partner(c, &zh)?))).unwrap();
+    assert_eq!(partners, (Some((zh.clone(), true)), Some((en.clone(), false))));
 }
 
 #[test]
@@ -403,7 +404,7 @@ fn a_failed_reparse_rolls_everything_back() {
     assert!(reparse_with(&state, &en, &broken).is_err());
     assert!(everything(&state, &en, &zh) == before);
     // 文本、对齐、检索都换完了，存研究的时候出错
-    state.with_db(|c| Ok(c.execute_batch("CREATE TEMP TRIGGER reparse_fails BEFORE INSERT ON main.concept_anchors BEGIN SELECT RAISE(ABORT, 'boom'); END;").unwrap())).unwrap();
+    state.with_db(|c| c.execute_batch("CREATE TEMP TRIGGER reparse_fails BEFORE INSERT ON main.concept_anchors BEGIN SELECT RAISE(ABORT, 'boom'); END;").map_err(|e| e.to_string())).unwrap();
     for (uid, text) in [(&en, shifted(&before.bodies[0])), (&zh, before.bodies[1].clone())] {
         let e = reparse_with(&state, uid, &text).unwrap_err();
         assert!(e.contains("boom"), "{e}");
@@ -413,7 +414,7 @@ fn a_failed_reparse_rolls_everything_back() {
     assert!(reparse_with(&state, &en, &before.bodies[0]).is_err());
     assert!(state.with_db(|c| reparse::apply(c, &state.paths.backups, &shelf::snapshots(&state.paths.root), "NO-SUCH-TEXT", &before.bodies[0], &Default::default(), "x")).is_err());
     // 故障去掉以后照常能做
-    state.with_db(|c| Ok(c.execute_batch("DROP TRIGGER reparse_fails").unwrap())).unwrap();
+    state.with_db(|c| c.execute_batch("DROP TRIGGER reparse_fails").map_err(|e| e.to_string())).unwrap();
     let done = reparse_with(&state, &en, &shifted(&before.bodies[0])).unwrap();
     assert_eq!((done.lost, done.findings), (0, 0));
     assert!(everything(&state, &en, &zh) != before);
@@ -456,5 +457,25 @@ fn real_reparse() {
     }
     let after = all_runs(&state);
     println!("研究和重新解析之前{}", if after == before { "逐句一样" } else { "不一样" });
-    state.with_db(|c| Ok(println!("段落检索表{}；文本 {} 份", if search::ensure(c)? { "重建了（不该）" } else { "和主库对得上" }, store::texts_list(c)?.len()))).unwrap();
+    // `PITH_PERTURB=1`：假装解析器变了（每份 EPUB 文本每一章最前面多一段，段落号全部后移），再换回原来的解析结果
+    if std::env::var("PITH_PERTURB").as_deref() == Ok("1") {
+        for t in texts.iter().filter(|t| t.format == "epub") {
+            let old = state.with_db(|c| store::text_load(c, &t.uid)).unwrap();
+            let mut new = old.clone();
+            let firsts: Vec<String> = new.chapters().iter().filter_map(|u| new.body_of(u.index).next().map(|p| p.key.clone())).collect();
+            for (i, key) in firsts.iter().enumerate() {
+                let at = new.paragraphs.iter().position(|p| p.seq != usize::MAX && p.key == *key).unwrap();
+                let added = Paragraph { seq: usize::MAX, text: format!("Perturbation {i}."), attached: None, breaks: Vec::new(), marker: None, noterefs: Vec::new(), ..new.paragraphs[at].clone() };
+                new.paragraphs.insert(at, added);
+            }
+            fixture::reflow(&mut new);
+            let done = reparse_with(&state, &t.uid, &new).unwrap();
+            println!("{}：每章前面多一段（共 {} 段）→ 原位 {}，位置变了 {}，没挂上 {}，中译核不上了 {}，审计问题 {}", t.language, firsts.len(), done.kept, done.moved, done.lost, done.zh_lost, done.findings);
+            let done = reparse_with(&state, &t.uid, &old).unwrap();
+            println!("  换回原来的 → 原位 {}，位置变了 {}，没挂上 {}，审计问题 {}", done.kept, done.moved, done.lost, done.findings);
+        }
+        println!("换回之后研究和最开始{}", if all_runs(&state) == before { "逐句一样" } else { "不一样" });
+    }
+    let (rebuilt, count) = state.with_db(|c| Ok((search::ensure(c)?, store::texts_list(c)?.len()))).unwrap();
+    println!("段落检索表{}；文本 {count} 份", if rebuilt { "重建了（不该）" } else { "和主库对得上" });
 }
