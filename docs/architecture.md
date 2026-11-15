@@ -188,7 +188,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 
 ```
 文献库里一本书的 EPUB 附件 ─concept_text_prepare─▶ 解析（目录分单元 → 逐块认角色 → 段落号 → 页码）─▶ 结构预览 ─concept_text_save─▶ 存（导入前备份）
-   译本：连上原著，按章对齐（正文段数相同才一段对一段）；段落进 search.db
+   译本：连上原著，按章对齐（段数相同的一段对一段；不同的用章内单调对齐，允许一对多、多对一和落空，v0.5）；段落进 search.db
    PDF：concept_text_prepare 算页数和费用 ─concept_pdf_convert─▶ Mathpix v3/pdf（lines.json → 段落，页码 = 页序；用完 DELETE）或本机取文字
 入口（一章 / 划选的段落 / 问题 → 本地检索勾选 / 概念 → 中英检索词勾选 / 已有卡片）+ 技能 ─concept_run_prepare（不联网）─▶ 确认框（每步发什么、最坏费用）
    ─concept_run_execute（后台，事件 concept-progress / concept-done）─▶ 按技能的步骤：模型 / 查文献库 / 网页检索（v0.3 的下载器）
@@ -207,6 +207,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 ## v0.5 本机模型与语义检索（修 `0025` 的已知问题）
 
 - **本机模型**（`src-tauri/src/local/`）：用户的 `~/Documents/LLM`（和柚儿园共用）里的向量模型（8081，`/v1/embeddings`）和重排模型（8082，`/v1/rerank`）。Pith 只读清单 `config/models.json`（每类用第一个）、只经 `scripts/llmctl.sh` 启停，不改那个文件夹。用到时才启动（`ensure`：先看 `/health`，没开就 `start <key> --by pith`，最多等 45 秒）；只停自己启动的（`status` 里有 `By: pith`）：闲置 15 分钟停，退出 Pith 时停。只连 `127.0.0.1`，不走代理，不花钱。三种模式：`Real`、`Mock`（测试和 `PITH_LOCAL_MODELS=mock`：按字散列的 256 维向量）、`Off`（找不到文件夹或 `PITH_LOCAL_MODELS=off`）。`PITH_LLM_DIR` 可以另指位置。`AppState.local` 拿着它。
+- **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`，App 现在没喂，只用长度和锚点）。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
 - **向量是派生数据**：`search.concept_vecs(para_id, model, sig, vec)`，在 `search.db`，不写 migration。按模型的 key 分开存；`sig` 是段落文字的散列，段落换了（重新解析）就当作没有，重新算。归一化的 f32 小端连起来存，检索时整本书扫一遍算点积（一本书几千段，几十毫秒）。以后的内部知识库量大了再换存法。
 - **建索引**在后台线程（`concept::semantic`，命令 `concept_index_start` / `concept_index_status`，事件 `concept-index`），一批 16 段，读库和写库各拿一次锁、联本机服务时不拿锁。真实的两本《国富论》9265 段约 6 分钟。
 - **「问这本书」**（`concept_ask_search`）：问题的向量 → 原著里最像的 40 段 + 译本里最像的 24 段（按对齐映射回原著）+ 按词检索的命中 → 重排模型打分 → 按相关度给前几段，只给正文段（旁注、注释算到它挂的正文段，编者的导读不要）。中文问题、有对齐的中译时重排比的是中译。退路：本机模型用不了、或索引还一段都没有 → 按词检索并说明原因；重排用不了 → 按向量相似度排。「追踪概念」仍按词（要的就是这个词出现在哪）。
