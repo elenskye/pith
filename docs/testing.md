@@ -178,3 +178,19 @@ W5 用的是 `local/agent-acceptance-w4` 里规范 `01M748Z7NH0TZ0B5ATK3A4ZK0A` 
 
 - `cd poc/word-addin && pnpm check`（Office.js 路线保留待用）；`cargo test -p docx-engine`；`bash scripts/phase0-check.sh`（Phase 0 端到端，仍用 0-B 原型的旧格式）。
 - 真实论文：`RL_WORD_DOCX=<绝对路径> cargo test -p docx-engine --test format -- --ignored`。论文与规范在 `local/real-thesis/`，回归样例在 `local/samples/`，都不进 Git。
+
+## 本机模型与语义检索（v0.5）
+
+- **本机模型**（`src-tauri/src/local/`）：清单取每类第一个模型、坏清单拒绝；模拟和关闭两种模式不起进程；只停 Pith 自己启动的、闲置够久的服务；模拟向量有共同字词的更像；重排按分数排、丢掉低于下限的。
+- **语义检索**（`src-tauri/src/concept/semantic.rs`，模拟的本机模型）：向量只建一次、段落文字变了只重算那一段、文本删了向量跟着清；索引没建时按词检索并说明；建好后按相关度排、只给正文段、中文问题带着中译；重排用不了按相似度排；向量服务用不了退回按词；找不到本机模型时照常按词检索。
+- **挑片段**（`crates/concept-engine/src/excerpt.rs`）：切块合起来一字不差；相关的一段在长文靠后的位置也挑得到（只取开头拿不到）；片段都是原文里原样的连续文字；短的来源、没有字面重合的来源和以前一样；重排模型在字面相近的候选里定取舍，重排说都不相关就还按字面；发给模型的是片段，全文不动。
+- **真实的本机模型**（默认忽略；不联网、不花钱，会经 `llmctl.sh` 启动服务，标成 `--by pith`；测完用 `~/Documents/LLM/scripts/llmctl.sh stop embedding` / `stop rerank` 停）：
+
+```bash
+PITH_LOCAL_MODELS=real cargo test -p pith real_embedding -- --ignored --nocapture
+PITH_LOCAL_MODELS=real cargo test -p pith real_rerank -- --ignored --nocapture
+# 真实的书：PITH_ACCEPT_DIR 指一个数据目录的副本（里面有解析好的原著和译本），只打印段落号、分数和用时
+PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_QUESTIONS='问题一|问题二' cargo test -p pith real_semantic -- --ignored --nocapture
+# 真实的反方来源：看挑出来的片段比只取开头多带了多少提到目标概念的地方
+PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM='division of labour' cargo test -p pith real_excerpt -- --ignored --nocapture
+```

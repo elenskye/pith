@@ -283,6 +283,7 @@ CREATE INDEX metadata_lookups_item ON metadata_lookups(item_id, id);
 
 ## 不在主库里的
 
+- **语义检索的向量**（v0.5）也在 `search.db`：`concept_vecs(para_id INTEGER PRIMARY KEY, model TEXT, sig INTEGER, vec BLOB)`，`para_id` = `concept_paragraphs.id`，`model` 是本机向量模型的 key，`sig` 是段落文字的散列（对不上就重算），`vec` 是归一化的 f32（小端）。主库里没有的段落启动检索时清掉。
 - **搜索索引**放 `search.db`（派生数据，可删了重建，不写 migration，以 `search` 名 ATTACH 到主连接）：一张 FTS5 表 `docs(title, creators, tags, abstract, notes, other)`；中文用「重叠二元组 + 末字单字」改写后交给 unicode61（实测选定，`decisions/0010`）。
 - **Word 引文数据**存在 Word 文档自己的数据部件里（`decisions/0006`），主库只提供 `items.uid` 与 CSL-JSON 导出；v0.2 再加「文档 ↔ 文献」的引用记录表。
 - **备份文件**在 `backups/`，不进表。
