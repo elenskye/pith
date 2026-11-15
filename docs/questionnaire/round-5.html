@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pith v0.5 问卷</title>
+<script>
+// 明暗：Vermilion 的 tokens 按 data-theme 切。跟系统走；地址带 ?theme=dark / light 时照它。
+(() => {
+  const q = new URLSearchParams(location.search).get('theme');
+  const m = window.matchMedia('(prefers-color-scheme: dark)');
+  const set = () => { document.documentElement.dataset.theme = q === 'dark' || q === 'light' ? q : m.matches ? 'dark' : 'light'; };
+  set();
+  if (m.addEventListener) m.addEventListener('change', set);
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- vermilion:fonts -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap">
+<!-- /vermilion:fonts -->
+<style>
+/* visual-atelier 通用问卷模板（skills/questionnaire/template/survey.html），用 Design System「Vermilion 朱红」做的（站主 2026-11-13）。
+   版面：单栏，一次一页。暖纸的底；页码是一条漫游路径（点线连着时间线的空心圆，到了的那页圆心变朱红）；每道题一张卡，
+   说明是一张纸片。青绿管结构和建议，朱红只在悬停、选中、焦点和「没答」时出现。
+   下面 vermilion:tokens 那一段是 Vermilion 的 tokens，由 node skills/questionnaire/template/vermilion.mjs 从构建好的
+   Design System 写进来，别手改；别的样式不用改，要改的只有 <script> 开头「改这里」那一段。 */
+/* vermilion:tokens */
+/* Vermilion 朱红 — generated from tokens.json */
+:root, [data-theme="light"] {
+  --color-page: #f6efe2;
+  --color-surface: #fdf9f0;
+  --color-surface-cool: #ece0cb;
+  --color-text: #1b1d1c;
+  --color-muted: #686359;
+  --color-line: #ddd2bf;
+  --color-soft-line: #e6dfd3;
+  --color-accent: #2d6f6a;
+  --color-accent-strong: #28625d;
+  --color-accent-soft: #daddd1;
+  --color-ember: #bf2929;
+  --color-focus: var(--color-ember);
+  --shadow-soft: 0 18px 42px rgba(27, 29, 28, 0.08);
+}
+[data-theme="dark"] {
+  --color-page: #14201f;
+  --color-surface: #233230;
+  --color-surface-cool: #1d2b29;
+  --color-text: #f2ece0;
+  --color-muted: #c1b9ac;
+  --color-line: #384340;
+  --color-soft-line: #343e3b;
+  --color-accent: #77c8c2;
+  --color-accent-strong: #87cfc9;
+  --color-accent-soft: #263e3c;
+  --color-ember: #ffa196;
+  --color-focus: var(--color-ember);
+  --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.4);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+  --space-9: 96px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --width-chrome: 1320px;
+  --width-wide: 1240px;
+  --text-xs: 0.82rem;
+  --text-sm: 0.94rem;
+  --text-md: 1rem;
+  --text-lg: 1.18rem;
+  --text-xl: 1.5rem;
+  --text-display: 4.2rem;
+  --text-display-mobile: 2.9rem;
+  --font-sans: "Work Sans", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Source Serif 4", "Noto Serif SC", ui-serif, "Iowan Old Style", Georgia, "Times New Roman", "Songti SC", "Noto Serif CJK SC", serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+/* /vermilion:tokens */
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+body { margin: 0; background: var(--color-page); color: var(--color-text); font: var(--text-md)/1.7 var(--font-sans); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--color-accent-soft); color: var(--color-text); }
+b, strong { font-weight: 500; }
+code { font: 0.9em var(--font-mono); background: var(--color-surface-cool); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { width: 100%; max-width: 820px; margin: 0 auto; padding-inline: var(--space-5); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* 页头：横线只在页头底部 */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--color-page); border-bottom: 1px solid var(--color-line); }
+.bar .wrap { display: flex; align-items: center; gap: var(--space-2) var(--space-5); padding-block: var(--space-3); flex-wrap: wrap; }
+.bar h1 { margin: 0; font: 400 var(--text-lg)/1.3 var(--font-serif); white-space: nowrap; }
+.save { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
+.save.warn { color: var(--color-ember); }
+
+/* 页码：一条漫游路径，空心圆是时间线的节点 */
+.steps { position: relative; display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); min-width: 0; }
+.step {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 var(--space-1);
+  border: 0; background: none; color: var(--color-muted); font: var(--text-xs)/1 var(--font-sans); cursor: pointer;
+}
+.step + .step::before { content: ""; width: 18px; border-top: 2px dotted var(--color-line); margin-right: 3px; }
+.node { width: 13px; height: 13px; flex: none; border: 2px solid var(--color-accent); border-radius: 50%; background: var(--color-page); display: grid; place-items: center; }
+.node::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--color-ember); transform: scale(0); transition: transform 180ms ease; }
+.step.done .node { background: var(--color-accent); }
+.step[aria-current="step"] { color: var(--color-text); }
+.step[aria-current="step"] .node { border-color: var(--color-ember); background: var(--color-page); }
+.step[aria-current="step"] .node::after { transform: scale(1); }
+.step:hover { color: var(--color-text); }
+.step:hover .node { border-color: var(--color-ember); }
+.step .name { display: none; }
+.step[aria-current="step"] .name { display: inline; }
+
+/* 页的开头 */
+main { padding-block: var(--space-7) var(--space-9); }
+.page-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-5); }
+.eyebrow { margin: 0; font-size: var(--text-xs); color: var(--color-muted); }
+h2 { margin: 0; display: flex; align-items: flex-start; gap: var(--space-2); font: 400 clamp(1.55rem, 1.3rem + 1.1vw, 2rem)/1.3 var(--font-serif); text-wrap: balance; }
+h2 .glyph { width: 0.9em; height: 0.9em; margin-top: 0.22em; flex: none; color: var(--color-accent); }
+.lead { margin: 0; color: var(--color-muted); max-width: 62ch; }
+.fill-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-6); }
+.fill-info { font-size: var(--text-sm); color: var(--color-muted); }
+
+/* 纸片：给站主的背景 */
+.note { background: var(--color-surface-cool); color: var(--color-text); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); border-radius: var(--radius-md); }
+.note-t { margin: 0 0 var(--space-1); font: 400 var(--text-lg)/1.4 var(--font-serif); }
+.note ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: var(--text-sm); }
+.note code { background: var(--color-surface); }
+
+/* 一道题一张卡 */
+.frame { margin: 0 0 var(--space-6); min-width: 0; }
+.strip { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; margin: 0 0 6px 2px; font-size: var(--text-xs); line-height: 1.4; color: var(--color-muted); }
+.strip b { color: var(--color-accent-strong); font-weight: 500; letter-spacing: 0.04em; }
+.board { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-5); }
+.q-title { margin: 0; font: 400 var(--text-lg)/1.5 var(--font-serif); }
+.hint { margin: 4px 0 0; color: var(--color-muted); font-size: var(--text-sm); }
+.hint-list { padding-left: 1.1em; display: grid; gap: 4px; margin-top: var(--space-2); }
+
+/* 选项：悬停、选中是朱红的细边和圆点 */
+.opts { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.opts.cards { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.opt {
+  position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px var(--space-3); align-items: start;
+  min-height: 44px; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  background: var(--color-surface); cursor: pointer; transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.opt:hover { border-color: var(--color-ember); }
+.opt input { position: absolute; opacity: 0; pointer-events: none; }
+.mark { width: 16px; height: 16px; margin-top: 5px; border: 1.5px solid var(--color-muted); border-radius: 50%; display: grid; place-items: center; }
+.multi .mark { border-radius: 4px; }
+.mark::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--color-ember); transform: scale(0); transition: transform 180ms ease; }
+.multi .mark::after { border-radius: 2px; }
+.opt:has(input:checked) { border-color: var(--color-ember); box-shadow: 0 0 0 1px var(--color-ember); }
+.opt:has(input:checked) .mark { border-color: var(--color-ember); }
+.opt:has(input:checked) .mark::after { transform: scale(1); }
+.opt:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.opt-t { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); }
+.opt-t b { font-weight: 500; }
+.opt-d { grid-column: 2; color: var(--color-muted); font-size: var(--text-sm); }
+.opt-fig { grid-column: 1 / -1; margin-bottom: var(--space-2); min-width: 0; }
+.opt-fig img, .opt-fig svg { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.tag { font-size: 0.75rem; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--color-accent); color: var(--color-accent-strong); white-space: nowrap; }
+
+/* 矩阵：每行选一个 */
+.rows { display: grid; }
+.rowq { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-5); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--color-soft-line); }
+.rowq:first-child { border-top: 0; padding-top: 0; }
+.rowq:last-child { padding-bottom: 0; }
+.rowq-no { font-size: var(--text-xs); color: var(--color-accent-strong); margin-right: 6px; letter-spacing: 0.04em; }
+.rowq-t b { font-weight: 500; }
+.why { display: block; color: var(--color-muted); font-size: var(--text-sm); margin-top: 2px; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg label + label { border-left: 1px solid var(--color-line); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span.lb { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 5px var(--space-3); font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; transition: color 180ms ease, background 180ms ease; }
+.seg .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); flex: none; }
+.seg label:hover span.lb { color: var(--color-text); box-shadow: inset 0 -2px 0 var(--color-ember); }
+.seg input:checked + span.lb { background: var(--color-accent-soft); color: var(--color-text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--color-ember); }
+.seg input:focus-visible + span.lb { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.legend { margin: 0 0 var(--space-3); font-size: var(--text-xs); color: var(--color-muted); display: flex; align-items: center; gap: 6px; }
+.legend .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); display: inline-block; }
+
+textarea {
+  display: block; width: 100%; min-height: 80px; margin-top: var(--space-3); padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-page); color: var(--color-text); font: inherit;
+}
+textarea:hover { border-color: var(--color-accent); }
+.board > textarea:first-child { margin-top: 0; }
+
+/* 按钮：Design System 的 ButtonLink（青绿描边，悬停铺一层浅青）；往下走的那个实心 */
+.btn {
+  display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 var(--space-4);
+  border: 1px solid var(--color-accent); border-radius: var(--radius-sm); background: transparent; color: var(--color-accent-strong);
+  font: 500 var(--text-sm) var(--font-sans); cursor: pointer; transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+.btn:hover { border-color: var(--color-accent-strong); background: var(--color-accent-soft); color: var(--color-text); }
+.btn.primary { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-page); }
+.btn.primary:hover { background: var(--color-accent-soft); color: var(--color-text); }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-2); }
+.pager-info { font-size: var(--text-xs); color: var(--color-muted); }
+
+/* 核对与提交 */
+.review summary { cursor: pointer; font: 400 var(--text-lg) var(--font-serif); }
+.review h3 { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-5) 0 var(--space-1); font-size: var(--text-sm); font-weight: 500; }
+.review dl { margin: 0; display: grid; gap: var(--space-2); }
+.review dt { font-size: var(--text-xs); color: var(--color-muted); }
+.review dd { margin: 0; font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review dd.empty { color: var(--color-ember); }
+.review .go { min-height: 0; padding: 0; border: 0; background: none; color: var(--color-accent-strong); font: inherit; font-size: var(--text-xs); cursor: pointer; text-decoration: underline; text-underline-offset: 0.22em; }
+.review .go:hover { color: var(--color-ember); }
+.done-box { background: var(--color-surface-cool); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); }
+.done-box p { margin: 0; }
+.copy-row { margin-top: var(--space-4); display: grid; gap: 6px; }
+.copy-row .hint { margin: 0; }
+
+@media (max-width: 640px) {
+  .rowq { grid-template-columns: minmax(0, 1fr); }
+  .seg { display: grid; }
+  .wrap { padding-inline: var(--space-4); }
+  .board { padding: var(--space-4); }
+  .note { padding: var(--space-3) var(--space-4); }
+  .bar h1 { white-space: normal; }
+  .step + .step::before { width: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* 第五轮问卷的图样：只用 Vermilion 的颜色变量；画风样例（A3、A4）的颜色写在图里。 */
+.fig { display: block; width: 100%; height: auto; background: var(--color-surface-cool); border-radius: var(--radius-sm); }
+.fig.wide { max-width: 540px; margin-top: var(--space-4); }
+.opts.cards { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.opts.cards .opt { align-content: start; }
+.opts.cards:has(> .opt:nth-child(3):last-child) { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.fig text { font: 500 11px var(--font-sans); fill: var(--color-text); }
+.fig text.big { font-size: 13px; }
+.fig text.mu { fill: var(--color-muted); }
+.fig .s { fill: none; stroke: var(--color-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fig .sa { stroke: var(--color-accent); }
+.fig .se { stroke: var(--color-ember); }
+.fig .sm { stroke: var(--color-muted); }
+.fig .thin { stroke-width: 1.3; }
+.fig .w3 { stroke-width: 3.2; }
+.fig .dash { stroke-dasharray: 3 5; }
+.fig .ft { fill: var(--color-text); }
+.fig .fa { fill: var(--color-accent); }
+.fig .fe { fill: var(--color-ember); }
+.fig .fm { fill: var(--color-muted); }
+.fig .fp { fill: var(--color-page); }
+.fig .fs { fill: var(--color-surface); }
+.fig .fc { fill: var(--color-accent-soft); }
+.fig .ot { stroke: var(--color-text); stroke-width: 1.6; stroke-linejoin: round; }
+.fig .om { stroke: var(--color-muted); stroke-width: 1.3; stroke-linejoin: round; }
+.fig .oa { stroke: var(--color-accent); stroke-width: 2; stroke-linejoin: round; }
+.fig .oe { stroke: var(--color-ember); stroke-width: 2; stroke-linejoin: round; }
+.fig .cut { filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, 0.28)); }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <h1 id="title">问卷</h1>
+    <nav class="steps" id="steps" aria-label="页码"></nav>
+    <span class="save" id="save" role="status">连接存储中…</span>
+  </div>
+</header>
+<div class="wrap"><main id="main"></main></div>
+<!-- 漫游路径：Vermilion 的 marks/route-glyph.svg，放在每页大标题前 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="route-glyph" viewBox="0 0 32 32"><path d="M5 27c7-2 4-8 9-11s10-2 10-8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" stroke-dasharray="0.5 4.4"/><circle cx="24.5" cy="6" r="3.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/></symbol></svg>
+
+<script>
+// ==================== 改这里 ====================
+// Pith 第五轮问卷（v0.5 WonderLab，重出）。题型的写法见 visual-atelier 的 skills/questionnaire/template/survey.html。
+const SURVEY = {
+  title: 'Pith v0.5 问卷',
+  key: 'pith-round5-wonderlab',
+};
+
+// ---------- 图样：每个选项上面的示意图，只表示意思 ----------
+const svg = (b, w = 240, h = 136) => `<svg class="fig" viewBox="0 0 ${w} ${h}" aria-hidden="true">${b}</svg>`;
+const fillOf = (c) => (c[0] === '#' ? `fill="${c}"` : `class="${c}"`);
+const man = (x, y, c = 'ft', k = 1) => `<g transform="translate(${x} ${y}) scale(${k})"><circle cy="-19" r="5.5" class="${c}"/><path d="M-8 0v-5a8 8 0 0 1 16 0v5z" class="${c}"/></g>`;
+const pins = (x, y, n, gap = 6) => Array.from({ length: n }, (_, i) => `<path d="M${x + i * gap} ${y}v-10" class="s sa"/><circle cx="${x + i * gap}" cy="${y - 11}" r="1.8" class="fa"/>`).join('');
+const bench = (x, y, w = 28) => `<path d="M${x} ${y}h${w}M${x + 4} ${y}v10M${x + w - 4} ${y}v10" class="s"/>`;
+const chip = (x, y, w, t, c = 'fs') => `<rect x="${x}" y="${y}" width="${w}" height="20" rx="10" class="${c}"/><text x="${x + w / 2}" y="${y + 14}" text-anchor="middle">${t}</text>`;
+const box = (x, y, s, h, top = 'fs', l = 'fc', r = 'fa') => `<path d="M${x} ${y}l${s} ${s / 2}l${-s} ${s / 2}l${-s} ${-s / 2}z" ${fillOf(top)}/><path d="M${x - s} ${y + s / 2}l${s} ${s / 2}v${h}l${-s} ${-s / 2}z" ${fillOf(l)}/><path d="M${x + s} ${y + s / 2}l${-s} ${s / 2}v${h}l${s} ${-s / 2}z" ${fillOf(r)}/>`;
+const star = (x, y, r, c) => `<polygon class="${c}" points="${Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5; const q = i % 2 ? r * 0.45 : r; return (x + q * Math.cos(a)).toFixed(1) + ',' + (y + q * Math.sin(a)).toFixed(1); }).join(' ')}"/>`;
+const arrow = (x1, y1, x2, y2, c = 's sm') => { const a = Math.atan2(y2 - y1, x2 - x1); const p = (t) => `${(x2 - 6 * Math.cos(a + t)).toFixed(1)} ${(y2 - 6 * Math.sin(a + t)).toFixed(1)}`; return `<path d="M${x1} ${y1}L${x2} ${y2}M${p(0.55)}L${x2} ${y2}L${p(-0.55)}" class="${c}"/>`; };
+const scene = (dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy})">${man(84, 88)}${bench(110, 90, 46)}${pins(120, 88, 5, 7)}</g>`;
+const win = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" class="fs om"/><path d="M${x} ${y + 12}h${w}" class="s sm thin"/><circle cx="${x + 7}" cy="${y + 6}" r="1.8" class="fm"/><circle cx="${x + 13}" cy="${y + 6}" r="1.8" class="fm"/>`;
+const px = (rows, pal, x0, y0, s) => rows.map((r, j) => [...r].map((ch, i) => (pal[ch] ? `<rect x="${x0 + i * s}" y="${y0 + j * s}" width="${s}" height="${s}" fill="${pal[ch]}"/>` : '')).join('')).join('');
+const kite = (cx, by, h) => `<rect x="${cx - 9}" y="${by}" width="18" height="11" rx="2" class="ft"/><path d="M${cx} ${by}L${cx + 8} ${by - h + 7}" class="s sm thin"/><path d="M${cx + 8} ${by - h - 8}l7 8-7 8-7-8z" class="fe"/>`;
+const seg = (labels, sel) => { const w = 208 / labels.length; return labels.map((t, i) => { const x = 16 + i * w; return `<rect x="${x}" y="98" width="${w}" height="28" class="${i === sel ? 'fc' : 'fs'}"/>${i === sel ? `<path d="M${x + 2} 126h${w - 4}" class="s se"/>` : ''}<text x="${x + w / 2}" y="117" text-anchor="middle">${t}</text>${kite(x + w / 2 - 4, 76, 10 + i * (48 / (labels.length - 1)))}`; }).join('') + `<rect x="16" y="98" width="208" height="28" rx="4" fill="none" class="om"/>`; };
+const rows = (x, y, ws) => ws.map((w, i) => `<path d="M${x} ${y + i * 12}h${w}" class="s sm thin"/>`).join('');
+const fbox = (x, y, n, t, c) => `<rect x="${x}" y="${y}" width="104" height="40" rx="8" class="${c}"/><circle cx="${x + 18}" cy="${y + 20}" r="9" class="fp"/><text x="${x + 18}" y="${y + 24}" text-anchor="middle">${n}</text><text x="${x + 33}" y="${y + 25}" class="big">${t}</text>`;
+
+const FIG = {
+  // A1 设计模板
+  sim: svg(chip(10, 8, 66, '金币 120') + chip(126, 8, 104, '今天 4,800 针', 'fc')
+    + [20, 74, 128, 182].map((x, i) => man(x + 14, 78, i === 3 ? 'fa' : 'ft') + bench(x, 80)).join('')
+    + [20, 74, 128].map((x) => arrow(x + 33, 70, x + 49, 70)).join('')
+    + `<rect x="20" y="104" width="92" height="24" rx="6" class="fs"/><text x="66" y="120" text-anchor="middle">+ 拆一道工序</text>`
+    + `<rect x="128" y="104" width="92" height="24" rx="6" class="fs oe"/><text x="170" y="120" text-anchor="middle">+ 招一个人</text>`
+    + `<path d="M206 116v15l4-4 3 7 3-1.4-3-6.8h6z" class="ft" stroke="var(--color-surface)" stroke-width="1"/>`),
+  exp: svg(`<path d="M30 16v82h190" class="s sm thin"/><path d="M30 96C92 94 138 74 214 24" class="s sa w3"/><path d="M149 63v35" class="s se thin dash"/>`
+    + `<circle cx="149" cy="63" r="7.5" class="fe"/><circle cx="149" cy="63" r="3" class="fp"/>` + chip(84, 22, 68, '快 240 倍')
+    + `<path d="M30 116h190" class="s sm"/><path d="M30 116h119" class="s se"/><circle cx="149" cy="116" r="7.5" class="fe"/>` + arrow(162, 116, 178, 116, 's se thin')
+    + `<text x="30" y="133" class="mu">1 道工序</text><text x="220" y="133" text-anchor="end" class="mu">18 道</text>`),
+  scene: svg(`<path d="M120 34l96 44-96 44-96-44z" class="fs"/><path d="M72 56l96 44M168 56l-96 44" class="s sm thin" opacity=".4"/>`
+    + box(150, 60, 16, 12) + box(84, 56, 16, 12) + man(60, 86, 'ft', 0.8) + box(118, 82, 16, 12, 'fs', 'fc', 'fe') + man(172, 94, 'ft', 0.8)
+    + `<path d="M52 24c40-18 96-18 136 0" class="s se dash"/>` + arrow(182, 21, 190, 25, 's se')),
+  explode: svg(`<path d="M90 21v70M150 21v70" class="s sm thin dash"/>`
+    + box(120, 74, 30, 8, 'fs', 'fc', 'fa') + box(120, 40, 30, 8) + box(120, 6, 30, 8, 'fs', 'fc', 'fe')
+    + [21, 55, 89].map((y, i) => `<path d="M152 ${y}h32" class="s sm thin"/><circle cx="194" cy="${y}" r="9" class="fs"/><text x="194" y="${y + 4}" text-anchor="middle">${i + 1}</text>`).join('')
+    + `<path d="M74 118c28 12 64 12 92 0" class="s se dash"/>` + arrow(160, 121, 168, 117, 's se')),
+  story: svg(`<rect x="18" y="44" width="18" height="30" rx="9" class="s"/><path d="M27 51v6" class="s se"/><path d="M21 86l6 6 6-6M21 97l6 6 6-6" class="s sm thin"/>`
+    + `<g opacity=".45"><rect x="58" y="-10" width="150" height="40" rx="5" class="fs"/>${man(84, 26, 'ft', 0.8)}${pins(150, 26, 1)}</g>`
+    + `<rect x="52" y="40" width="162" height="56" rx="6" class="fs oe"/>` + man(78, 86) + man(100, 86) + man(122, 86) + pins(144, 86, 9, 7)
+    + `<g opacity=".45"><rect x="58" y="106" width="150" height="40" rx="5" class="fs"/>${[74, 90, 106, 122, 138].map((x) => man(x, 136, 'ft', 0.7)).join('')}</g>`
+    + `<path d="M228 12v112" class="s sm thin" opacity=".5"/><path d="M228 46v40" class="s w3"/>`),
+  world: svg(`<path d="M44 38L196 32M44 38L120 106M196 32L120 106" class="s sm thin dash"/>`
+    + [[34, 36], [186, 30], [110, 106]].map(([x, y]) => `<path d="M${x} ${y}l10-9 10 9v11h-20z" class="fs ot"/>`).join('')
+    + [[72, 37, 0], [100, 36, 0], [142, 34, 1], [166, 33, 0], [60, 56, 0], [78, 72, 1], [94, 88, 0], [172, 50, 0], [154, 70, 0], [138, 88, 1], [118, 60, 0], [90, 54, 0], [150, 50, 0], [200, 78, 0], [38, 86, 0]].map(([x, y, e]) => `<circle cx="${x}" cy="${y}" r="3.6" class="${e ? 'fe' : 'ft'}"/>`).join('')
+    + chip(150, 110, 82, '改一条规则')),
+  whatif: svg(`<rect width="120" height="136" class="fs"/><rect x="120" width="120" height="136" class="fc"/>`
+    + `<text x="34" y="26" text-anchor="middle" class="mu">不分工</text><text x="206" y="26" text-anchor="middle" class="mu">分工</text>`
+    + `<rect x="100" y="11" width="40" height="20" rx="10" class="ft"/><circle cx="130" cy="21" r="7" class="fe"/>`
+    + man(60, 80) + bench(46, 84) + [148, 180, 212].map((x) => man(x, 80, 'ft', 0.85) + bench(x - 12, 84, 24)).join('')
+    + `<text x="60" y="122" text-anchor="middle" class="big">20 针</text><text x="180" y="122" text-anchor="middle" class="big">48,000 针</text>`),
+  quest: svg(chip(46, 8, 148, '目标：10 人做 4 万针')
+    + `<path d="M26 106C60 106 60 68 96 68s40 32 76 32 20-40 44-46" class="s sm dash"/>`
+    + [[26, 106], [96, 68]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="10" class="fa"/><path d="M${x - 4} ${y}l3 3 6-6" class="s" style="stroke:var(--color-page)"/>`).join('')
+    + star(14, 86, 5, 'fe') + star(26, 83, 5, 'fe') + star(38, 86, 5, 'fe') + star(84, 48, 5, 'fe') + star(96, 45, 5, 'fe') + star(108, 48, 5, 'fm')
+    + `<circle cx="172" cy="100" r="10" class="fp oe"/><circle cx="172" cy="100" r="3.5" class="fe"/>`
+    + `<circle cx="216" cy="54" r="9" class="fm"/><path d="M216 54V30" class="s"/><path d="M216 30l14 5-14 5z" class="fe"/>`),
+  talk: svg(`<path d="M20 112v-8a26 26 0 0 1 52 0v8z" class="ft"/><circle cx="46" cy="54" r="15" class="fs ot"/>`
+    + `<path d="M29 52a17 17 0 0 1 34 0l-6-3-11-4-11 4z" class="fm"/>` + [[28, 58, 7], [64, 58, 7], [29, 70, 6], [63, 70, 6]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" class="fm"/>`).join('')
+    + `<path d="M88 20h130a6 6 0 0 1 6 6v36a6 6 0 0 1-6 6H104l-12 10v-10h-4a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6z" class="fs"/><path d="M96 36h112M96 50h84" class="s sm"/>`
+    + `<rect x="88" y="90" width="64" height="24" rx="6" class="fs oe"/><path d="M98 102h44" class="s sm thin"/><rect x="160" y="90" width="64" height="24" rx="6" class="fs"/><path d="M170 102h36" class="s sm thin"/>`),
+  // K 知识库
+  kbOwn: svg(`<rect x="8" y="34" width="58" height="68" rx="6" class="fs om"/><text x="37" y="27" text-anchor="middle" class="mu">文献库</text>`
+    + [18, 32, 46].map((x, i) => `<rect x="${x}" y="${48 + (i % 2) * 4}" width="10" height="${44 - (i % 2) * 4}" rx="1.5" class="${i === 1 ? 'fa' : 'fm'}"/>`).join('')
+    + arrow(70, 68, 92, 68, 's sa dash') + `<rect x="96" y="16" width="136" height="110" rx="8" class="fs oa"/>` + chip(108, 6, 70, '全球通史', 'fc')
+    + `<rect x="108" y="40" width="30" height="40" rx="3" class="fa"/><path d="M114 40v40" class="s thin" style="stroke:var(--color-page)"/><rect x="104" y="92" width="40" height="18" rx="4" class="fp om"/><text x="124" y="105" text-anchor="middle">EPUB</text>`
+    + `<rect x="150" y="40" width="72" height="34" rx="4" class="fc"/><text x="156" y="60" class="big">“</text><path d="M170 52h44M170 62h32" class="s sm thin"/><rect x="150" y="82" width="72" height="34" rx="4" class="fp om"/><path d="M158 94h52M158 104h36" class="s sm thin"/>`),
+  kbColl: svg(`<rect x="30" y="12" width="180" height="112" rx="8" class="fs om"/>`
+    + [[44, 26, 0], [58, 50, 1], [58, 74, 0], [44, 98, 0]].map(([x, y, on]) => `<path d="M${x} ${y}h8l3 3h13v13h-24z" class="${on ? 'fa' : 'fm'}"/><path d="M${x + 32} ${y + 9}h${on ? 52 : 70}" class="s sm thin"/>` + (on ? `<rect x="170" y="${y + 2}" width="28" height="14" rx="7" class="fa"/><circle cx="191" cy="${y + 9}" r="5" class="fp"/>` : '')).join('')),
+  kbBook: svg(`<rect x="88" y="22" width="64" height="92" rx="4" class="fa"/><path d="M98 22v92" class="s" style="stroke:var(--color-page)"/><path d="M108 44h34M108 56h26" class="s thin" style="stroke:var(--color-page)"/>`
+    + `<rect x="18" y="34" width="50" height="26" rx="4" class="fc"/><path d="M26 44h34M26 52h22" class="s sm thin"/><rect x="22" y="78" width="50" height="26" rx="4" class="fp om"/><path d="M30 88h34M30 96h22" class="s sm thin"/><rect x="172" y="52" width="50" height="26" rx="4" class="fc"/><path d="M180 62h34M180 70h22" class="s sm thin"/>`
+    + `<path d="M68 47h20M72 91h16M152 65h20" class="s sm thin dash"/>`),
+  citeIn: svg(`<rect x="14" y="8" width="212" height="56" rx="8" class="fs"/>` + rows(26, 24, [146, 172, 96])
+    + [[182, 24, 1], [208, 36, 2]].map(([x, y, n]) => `<circle cx="${x}" cy="${y}" r="7.5" class="fa"/><text x="${x}" y="${y + 4}" text-anchor="middle" style="fill:var(--color-page)">${n}</text>`).join('')
+    + `<path d="M182 32v40" class="s sa thin dash"/><rect x="56" y="72" width="170" height="54" rx="6" class="fp oa"/><text x="66" y="96" class="big">“</text>` + rows(82, 88, [130, 56]) + chip(150, 98, 68, '第 110 页', 'fc')),
+  citeList: svg(`<rect x="14" y="8" width="212" height="56" rx="8" class="fs"/>` + rows(26, 24, [176, 188, 96])
+    + `<rect x="14" y="72" width="212" height="54" rx="8" class="fs"/>` + [88, 108].map((y, i) => `<circle cx="30" cy="${y}" r="5" class="fa"/><path d="M44 ${y}h${i ? 110 : 150}" class="s sm thin"/>`).join('')),
+  citeNone: svg(`<rect x="14" y="20" width="212" height="96" rx="8" class="fs"/>` + rows(26, 40, [176, 188, 150, 180, 96])),
+  // G 对话
+  chatMain: svg(win(20, 10, 200, 116) + `<path d="M46 22v104" class="s sm thin"/>` + [0, 1, 2, 3, 4].map((i) => `<rect x="27" y="${30 + i * 17}" width="12" height="12" rx="3" class="${i ? 'fm' : 'fe'}" ${i ? 'opacity=".5"' : ''}/>`).join('')
+    + `<rect x="128" y="32" width="80" height="14" rx="5" class="fc"/><rect x="58" y="52" width="110" height="26" rx="5" class="fm" opacity=".35"/><rect x="148" y="84" width="60" height="12" rx="5" class="fc"/><rect x="58" y="104" width="150" height="16" rx="8" class="fp om"/>`),
+  chatSide: svg(win(20, 10, 200, 116) + rows(32, 36, [96, 104, 88, 100, 92, 70]) + `<rect x="150" y="22" width="70" height="104" class="fc"/><path d="M150 22v104" class="s sa thin"/>`
+    + `<rect x="170" y="34" width="42" height="10" rx="4" class="fp"/><rect x="158" y="50" width="46" height="20" rx="4" class="fs"/><rect x="176" y="76" width="36" height="10" rx="4" class="fp"/><rect x="158" y="106" width="54" height="13" rx="6" class="fp om"/>`),
+  chatBoth: svg(win(8, 22, 100, 94) + `<path d="M26 34v82" class="s sm thin"/>` + [0, 1, 2, 3].map((i) => `<rect x="13" y="${42 + i * 15}" width="9" height="9" rx="2" class="${i ? 'fm' : 'fe'}" ${i ? 'opacity=".5"' : ''}/>`).join('')
+    + `<rect x="58" y="42" width="42" height="10" rx="4" class="fc"/><rect x="34" y="58" width="50" height="20" rx="4" class="fm" opacity=".35"/><rect x="34" y="98" width="66" height="12" rx="6" class="fp om"/>`
+    + `<path d="M112 64h16M112 74h16" class="s se"/>` + win(132, 22, 100, 94) + rows(140, 46, [44, 50, 40, 48, 36])
+    + `<rect x="196" y="34" width="36" height="82" class="fc"/><rect x="204" y="44" width="22" height="8" rx="3" class="fp"/><rect x="200" y="58" width="24" height="16" rx="3" class="fs"/><rect x="200" y="100" width="28" height="10" rx="5" class="fp om"/>`),
+  pickBar: svg(win(20, 8, 200, 120) + `<rect x="120" y="28" width="88" height="12" rx="5" class="fc"/><rect x="32" y="46" width="110" height="22" rx="5" class="fm" opacity=".35"/>`
+    + [[32, 66, '全球通史', 1], [102, 58, '国富论', 1], [164, 44, '论文', 0]].map(([x, w, t, on]) => `<rect x="${x}" y="78" width="${w}" height="18" rx="9" class="${on ? 'fc oa' : 'fp om'}"/>${on ? `<path d="M${x + 7} 87l3 3 5-6" class="s sa thin"/>` : ''}<text x="${x + (on ? 19 : 8)}" y="91">${t}</text>`).join('')
+    + `<rect x="32" y="103" width="176" height="18" rx="9" class="fp om"/>`),
+  pickBind: svg(win(20, 8, 200, 120) + `<rect x="74" y="26" width="92" height="20" rx="10" class="fc oa"/><rect x="84" y="34" width="9" height="8" rx="1.5" class="fa"/><path d="M86 34v-3a2.5 2.5 0 0 1 5 0v3" class="s sa thin"/><text x="99" y="40">全球通史</text>`
+    + `<rect x="120" y="54" width="88" height="12" rx="5" class="fc"/><rect x="32" y="72" width="110" height="22" rx="5" class="fm" opacity=".35"/><rect x="32" y="103" width="176" height="18" rx="9" class="fp om"/>`),
+  pickAuto: svg(star(120, 26, 12, 'fe') + arrow(110, 40, 58, 78, 's sa') + arrow(120, 42, 120, 78, 's sa') + `<path d="M130 40l48 36" class="s sm thin dash"/>`
+    + [[20, '全球通史', 1], [88, '国富论', 1], [156, '论文', 0]].map(([x, t, on]) => `<rect x="${x}" y="82" width="64" height="36" rx="6" class="${on ? 'fc oa' : 'fs om'}" ${on ? '' : 'opacity=".6"'}/><text x="${x + 32}" y="104" text-anchor="middle" ${on ? '' : 'class="mu"'}>${t}</text>`).join('')),
+  taskCard: svg(win(30, 6, 180, 124) + `<rect x="110" y="26" width="88" height="12" rx="5" class="fc"/><rect x="42" y="46" width="140" height="48" rx="6" class="fp oa"/><path d="M52 60h70" class="s"/>` + chip(134, 50, 42, '后台', 'fc')
+    + `<path d="M52 80h120" class="s sm"/><path d="M52 80h66" class="s se w3"/><rect x="132" y="102" width="66" height="12" rx="5" class="fc"/><rect x="42" y="102" width="60" height="18" rx="5" class="fm" opacity=".35"/>`),
+  taskJump: svg(win(8, 24, 92, 88) + `<rect x="44" y="44" width="48" height="10" rx="4" class="fc"/><rect x="16" y="60" width="52" height="18" rx="4" class="fm" opacity=".35"/>` + arrow(106, 68, 126, 68, 's se') + win(132, 24, 100, 88)
+    + `<path d="M144 52h60M144 64h44" class="s sm thin"/><path d="M144 90h76" class="s sm"/><path d="M144 90h40" class="s se w3"/>`),
+  // A2 作品多大
+  one: svg(`<rect x="46" y="20" width="148" height="96" rx="8" class="fs ot"/>` + scene(16, -4)),
+  acts: svg([[10, '1'], [88, '2'], [166, '3']].map(([x, n]) => `<rect x="${x}" y="46" width="64" height="48" rx="6" class="fs ot"/><circle cx="${x + 32}" cy="30" r="9" class="fc"/><text x="${x + 32}" y="34" text-anchor="middle">${n}</text>`).join('')
+    + arrow(76, 70, 86, 70) + arrow(154, 70, 164, 70)
+    + `<path d="M20 60h30M20 70h44M20 80h36" class="s sm thin"/>`
+    + `<path d="M98 70h44" class="s sm"/><circle cx="126" cy="70" r="5.5" class="fe"/><path d="M98 84h44" class="s sm"/><circle cx="110" cy="84" r="5.5" class="fa"/>`
+    + `<path d="M190 84V58" class="s"/><path d="M190 58l16 6-16 6z" class="fe"/>`),
+  bigworld: svg(`<path d="M28 72c0-40 60-54 104-46s84 8 82 50-52 48-98 46S28 112 28 72z" class="fs"/>`
+    + `<path d="M62 62c20-16 40-20 62-14s40 22 52 26M62 62c8 24 30 36 52 38s40-10 62-26" class="s sm thin dash"/>`
+    + [[62, 62, 'fa'], [124, 48, 'fa'], [176, 74, 'fe'], [114, 100, 'fa'], [88, 84, 'fa']].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="8" class="${c}"/><circle cx="${x}" cy="${y}" r="2.8" class="fp"/>`).join('')),
+  // A3 2D 的图形语言：同一个画面的六种画法
+  sketch: svg(`<rect width="240" height="136" fill="#fbf6ea"/><g fill="none" stroke="#26221d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M61 46c-2-10 14-12 15-1 1 10-14 12-15 1z"/><path d="M54 110c-1-24 3-40 15-40s15 14 14 40"/><path d="M80 82c9 1 17 3 25 7"/>
+    <path d="M98 90c30-2 62-2 96-1M108 91c-1 9 1 14 0 19M184 90c1 8-1 14 0 20"/><path d="M22 111c50-2 130 1 198-1"/></g>
+    <g fill="none" stroke="#bf2929" stroke-width="2" stroke-linecap="round"><path d="M124 71l1 17M140 69l-1 19M156 71l1 17"/><path d="M121 68c2-3 5-3 7 0M136 66c2-3 5-3 7 0M153 68c2-3 5-3 7 0"/></g>
+    <g stroke="#8d857a" stroke-width="1.2" stroke-linecap="round"><path d="M114 123l7-6M126 123l7-6M138 123l7-6M150 123l7-6M162 123l7-6"/></g>`),
+  flat: svg(`<rect width="240" height="136" fill="#fde8c8"/><circle cx="196" cy="32" r="18" fill="#f5b700"/><rect y="108" width="240" height="28" fill="#2b3a55"/>
+    <path d="M50 108V80a18 18 0 0 1 36 0v28z" fill="#1f7a74"/><circle cx="68" cy="48" r="11" fill="#f2b880"/>
+    <rect x="104" y="82" width="96" height="8" fill="#2b3a55"/><rect x="112" y="90" width="7" height="18" fill="#2b3a55"/><rect x="185" y="90" width="7" height="18" fill="#2b3a55"/>`
+    + [128, 150, 172].map((x) => `<rect x="${x}" y="58" width="4" height="24" fill="#e4572e"/><circle cx="${x + 2}" cy="56" r="5" fill="#e4572e"/>`).join('')),
+  iso: svg(`<rect width="240" height="136" fill="#e3eeec"/><path d="M120 28l96 44-96 44-96-44z" fill="#f8fcfb"/>
+    <ellipse cx="86" cy="94" rx="13" ry="5" fill="#000" opacity=".1"/><ellipse cx="84" cy="92" rx="9" ry="4.5" fill="#235a56"/><rect x="75" y="70" width="18" height="22" fill="#2d6f6a"/><ellipse cx="84" cy="70" rx="9" ry="4.5" fill="#3f8d86"/><circle cx="84" cy="57" r="8" fill="#f2c9a0"/>`
+    + box(150, 54, 30, 12, '#f6d7a8', '#d9a55e', '#b9813f')
+    + [[136, 68], [150, 74], [164, 68]].map(([x, y]) => `<path d="M${x} ${y}v-14" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/><circle cx="${x}" cy="${y - 15}" r="3" fill="#c0392b"/>`).join('')),
+  cut: svg(`<rect width="240" height="136" fill="#efe4d0"/><g class="cut"><path d="M0 96l40-30 46 22 50-36 54 30 50-18v72H0z" fill="#7c9885"/></g>
+    <g class="cut"><path d="M0 111l240-6v31H0z" fill="#c9b38c"/></g><g class="cut"><path d="M52 111l3-31 12-10 14 9 4 32z" fill="#28666e"/></g>
+    <g class="cut"><path d="M58 52l8-8 10 1 6 9-3 10-10 4-9-5z" fill="#f2d0a4"/></g>
+    <g class="cut"><path d="M102 84l94-3 2 9-95 2zM110 91l8 0-1 18-6 0zM182 90l8 0 1 18-7 0z" fill="#c8553d"/></g>
+    <g class="cut">${[126, 148, 170].map((x) => `<path d="M${x} 83l1-20 4 0 1 20z" fill="#fffaf0"/><path d="M${x - 2} 62l5-7 5 7-5 4z" fill="#fffaf0"/>`).join('')}</g>`),
+  pixel: svg(`<g shape-rendering="crispEdges"><rect width="240" height="136" fill="#1d2b53"/><rect y="110" width="240" height="26" fill="#5f574f"/>
+    <rect x="200" y="20" width="5" height="5" fill="#ffec27"/><rect x="30" y="30" width="5" height="5" fill="#ffec27"/><rect x="150" y="15" width="5" height="5" fill="#fff1e8"/>`
+    + px(['..hhhh..', '.hhhhhh.', '.hsssss.', '.ssksks.', '..ssss..', '.bbbbbb.', 'bbbbbbbb', 'sbbbbbbs', '.bbbbbb.', '.pp..pp.', '.pp..pp.', '.kk..kk.'], { h: '#ab5236', s: '#ffccaa', k: '#000000', b: '#00e436', p: '#29adff' }, 50, 50, 5)
+    + `<rect x="110" y="85" width="90" height="5" fill="#ffa300"/><rect x="115" y="90" width="5" height="20" fill="#ab5236"/><rect x="190" y="90" width="5" height="20" fill="#ab5236"/>`
+    + [130, 150, 170].map((x) => `<rect x="${x}" y="65" width="5" height="20" fill="#c2c3c7"/><rect x="${x - 5}" y="60" width="15" height="5" fill="#ff004d"/>`).join('') + '</g>'),
+  blue: svg(`<rect width="240" height="136" fill="#1f4e8c"/><g stroke="#fff" stroke-opacity=".14" stroke-width="1">${Array.from({ length: 11 }, (_, i) => `<path d="M${20 + i * 20} 0v136"/>`).join('')}${Array.from({ length: 6 }, (_, i) => `<path d="M0 ${16 + i * 20}h240"/>`).join('')}</g>
+    <g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="68" cy="48" r="10"/><path d="M52 106V78a16 16 0 0 1 32 0v28z"/><path d="M104 82h96v7h-96zM112 89v17M192 89v17"/>`
+    + [128, 150, 172].map((x) => `<path d="M${x} 82V60"/><circle cx="${x}" cy="56" r="4"/>`).join('')
+    + `<path d="M104 118h96M104 114v8M200 114v8" stroke-width="1"/></g><text x="152" y="132" text-anchor="middle" style="fill:#fff;font-size:10px">96</text>`),
+  auto: svg(`<rect width="120" height="68" fill="#fbf6ea"/><rect x="120" width="120" height="68" fill="#fde8c8"/><rect y="68" width="120" height="68" fill="#1d2b53"/><rect x="120" y="68" width="120" height="68" fill="#1f4e8c"/>
+    <path d="M36 36c-2-12 18-14 19-1 1 12-18 14-19 1z" fill="none" stroke="#26221d" stroke-width="2"/><circle cx="196" cy="32" r="13" fill="#1f7a74"/>
+    <rect x="34" y="92" width="10" height="10" fill="#00e436"/><rect x="44" y="102" width="10" height="10" fill="#29adff"/><rect x="24" y="102" width="10" height="10" fill="#ff004d"/>
+    <circle cx="196" cy="104" r="13" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="120" cy="68" r="27" class="fs"/><text x="120" y="73" text-anchor="middle" class="big">模型挑</text>`),
+  // A4 3D 的样子
+  low: svg(`<path d="M24 102l96-24 4 50z" fill="#a9c9b9"/><path d="M120 78l96 22-92 28z" fill="#8fb5a3"/>
+    <path d="M84 68l28 8v30l-28-8z" fill="#ecd0aa"/><path d="M112 76l24-10v30l-24 10z" fill="#c9a274"/><path d="M84 68l28 8-2-32z" fill="#cf5f48"/><path d="M112 76l24-10-26-22z" fill="#a3402c"/>
+    <path d="M170 104h6V90h-6z" fill="#7a5a3a"/><path d="M156 92l17 4V52z" fill="#3f9274"/><path d="M173 96l17-6-17-38z" fill="#2d6f5a"/>
+    <path d="M52 108l8-10 9 6-3 10z" fill="#b9b2a6"/><path d="M60 98l9 6 5-7z" fill="#d6d0c5"/>`),
+  clay: svg(`<defs><radialGradient id="cg1" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fbe6cb"/><stop offset="1" stop-color="#d6a473"/></radialGradient>
+    <radialGradient id="cg2" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#f3a391"/><stop offset="1" stop-color="#c24d36"/></radialGradient>
+    <radialGradient id="cg3" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#a3dcc3"/><stop offset="1" stop-color="#37856a"/></radialGradient>
+    <radialGradient id="cg4" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#d9ece3"/><stop offset="1" stop-color="#9dbfb4"/></radialGradient></defs>
+    <ellipse cx="120" cy="106" rx="100" ry="22" fill="url(#cg4)"/><ellipse cx="102" cy="108" rx="32" ry="6" fill="#000" opacity=".12"/>
+    <rect x="74" y="64" width="50" height="44" rx="13" fill="url(#cg1)"/><path d="M66 70q33-44 66 0q-33 12-66 0z" fill="url(#cg2)"/>
+    <ellipse cx="174" cy="110" rx="18" ry="4" fill="#000" opacity=".12"/><rect x="169" y="82" width="10" height="28" rx="5" fill="#a5774e"/><circle cx="174" cy="66" r="23" fill="url(#cg3)"/>`),
+  wire: svg(`<g class="s thin"><path d="M62 60h48v48H62zM84 44h48v48"/><path d="M62 60l22-16M110 60l22-16M110 108l22-16"/><circle cx="182" cy="76" r="28"/><ellipse cx="182" cy="76" rx="28" ry="9"/><ellipse cx="182" cy="76" rx="9" ry="28"/></g>
+    <g class="s thin sm dash"><path d="M84 44v48h48M62 108l22-16"/></g>`),
+  auto3: svg(`<path d="M34 96l22-44 22 44z" fill="#3f9274"/><path d="M56 52l22 44-10 6z" fill="#2d6f5a"/>
+    <defs><radialGradient id="cg5" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#f3a391"/><stop offset="1" stop-color="#c24d36"/></radialGradient></defs><circle cx="120" cy="76" r="24" fill="url(#cg5)"/>
+    <g class="s thin"><path d="M162 62h36v36h-36zM176 50h36v36"/><path d="M162 62l14-12M198 62l14-12M198 98l14-12"/></g>` + chip(88, 108, 64, '模型挑')),
+  // A5 字的多少
+  t0: svg(`<rect x="14" y="12" width="212" height="112" rx="8" class="fs"/>` + scene(4, 2) + chip(150, 22, 62, '4,800', 'fc')),
+  t1: svg(`<rect x="14" y="12" width="212" height="112" rx="8" class="fs"/>` + scene(4, -16) + `<rect x="24" y="92" width="192" height="24" rx="5" class="fc"/><path d="M36 104h136" class="s sm"/>`),
+  t2: svg(`<rect x="14" y="12" width="212" height="112" rx="8" class="fs"/><path d="M28 32h70M28 46h78M28 60h62M28 74h76M28 88h54M28 102h70" class="s sm"/>` + `<g transform="translate(64 14) scale(.78)">${scene(0, 0)}</g>`),
+  // B 流程
+  flow: `<svg class="fig wide" viewBox="0 0 360 182" aria-hidden="true">`
+    + fbox(8, 10, 1, '你的问题', 'fs oe') + fbox(128, 10, 2, '选模板', 'fc') + fbox(248, 10, 3, '出点子', 'fc')
+    + fbox(248, 100, 4, '写作品', 'fc') + fbox(128, 100, 5, '试跑把关', 'fs oa') + fbox(8, 100, 6, '作品', 'fs oe')
+    + arrow(114, 30, 126, 30) + arrow(234, 30, 246, 30) + arrow(322, 52, 322, 98) + arrow(246, 120, 234, 120) + arrow(126, 120, 114, 120)
+    + `<path d="M180 98c0-24 100-24 100 0" class="s se dash"/>` + arrow(279, 91, 280, 98, 's se') + `<text x="230" y="72" text-anchor="middle">不行就改</text>`
+    + `<rect x="8" y="158" width="16" height="12" rx="3" class="fs oe"/><text x="30" y="168">你</text><rect x="54" y="158" width="16" height="12" rx="3" class="fc"/><text x="76" y="168">模型</text><rect x="112" y="158" width="16" height="12" rx="3" class="fs oa"/><text x="134" y="168">程序：工具箱、隔离框、监控</text></svg>`,
+  // C1 档位
+  l3: svg(seg(['严谨', '平衡', '自由'], 1)),
+  l4: svg(seg(['严谨', '平衡', '自由', '戏说'], 2)),
+  l100: svg([0, 1, 2, 3, 4].map((i) => `<g opacity="${0.3 + i * 0.175}">${kite(30 + i * 42, 76, 10 + i * 12)}</g>`).join('')
+    + `<path d="M22 110h196" class="s sm"/><path d="M22 110h136" class="s se"/><circle cx="158" cy="110" r="7.5" class="fe"/><text x="22" y="130" class="mu">0</text><text x="218" y="130" text-anchor="end" class="mu">100</text><text x="158" y="130" text-anchor="middle">70</text>`),
+  // C3 标注
+  quiet: svg(`<rect x="14" y="12" width="212" height="112" rx="8" class="fs"/>` + scene(-10, 12) + `<rect x="102" y="74" width="50" height="40" rx="4" fill="none" class="oa" stroke-dasharray="4 4"/><rect x="58" y="58" width="32" height="48" rx="4" fill="none" class="oe" stroke-dasharray="4 4"/>`
+    + `<rect x="148" y="20" width="70" height="22" rx="11" class="fc"/><text x="160" y="35">来源</text><rect x="188" y="25" width="24" height="12" rx="6" class="fa"/><circle cx="206" cy="31" r="4.5" class="fp"/>`),
+  always: svg(`<rect x="14" y="12" width="212" height="112" rx="8" class="fs"/>` + scene(-10, 12)
+    + `<rect x="150" y="60" width="40" height="18" rx="4" class="fp oa"/><text x="170" y="73" text-anchor="middle">原著</text><rect x="26" y="40" width="40" height="18" rx="4" class="fp oe"/><text x="46" y="53" text-anchor="middle">发挥</text><rect x="160" y="22" width="40" height="18" rx="4" class="fp oe"/><text x="180" y="35" text-anchor="middle">发挥</text>`),
+  end: svg(`<rect x="14" y="8" width="212" height="70" rx="8" class="fs"/><g transform="translate(40 -10) scale(.8)">${scene(0, 0)}</g>`
+    + `<rect x="14" y="84" width="212" height="46" rx="8" class="fs"/><circle cx="30" cy="100" r="4" class="fa"/><path d="M42 100h120" class="s sm thin"/><circle cx="30" cy="116" r="4" class="fe"/><path d="M42 116h92" class="s sm thin"/>`),
+  // D1 页面
+  gallery: svg(win(8, 22, 92, 94) + [[16, 42], [58, 42], [16, 78], [58, 78]].map(([x, y], i) => `<rect x="${x}" y="${y}" width="34" height="28" rx="3" class="${i === 1 ? 'fc oe' : 'fc'}"/>`).join('')
+    + arrow(106, 70, 124, 70, 's se') + win(132, 22, 100, 94)
+    + `<rect x="138" y="42" width="24" height="10" rx="3" class="fc"/><rect x="142" y="58" width="24" height="14" rx="3" class="fm" opacity=".5"/><rect x="138" y="78" width="20" height="10" rx="3" class="fc"/><rect x="138" y="98" width="30" height="12" rx="3" fill="none" class="om"/>`
+    + `<rect x="174" y="40" width="52" height="70" rx="4" class="fc"/>` + man(190, 92, 'ft', 0.7) + `<path d="M200 92h18M203 92v7M215 92v7" class="s thin"/>`),
+  side: svg(win(20, 14, 200, 108) + `<path d="M76 26v96" class="s sm thin"/><rect x="26" y="46" width="44" height="12" rx="3" class="fc"/><path d="M30 38h32M30 52h30M30 66h36M30 80h26M30 94h34" class="s sm thin"/>`
+    + `<rect x="86" y="36" width="124" height="76" rx="5" class="fc"/><g transform="translate(40 6)">${scene(0, 0)}</g>`),
+  chat: svg(win(50, 8, 140, 122) + `<rect x="112" y="28" width="68" height="12" rx="4" class="fc"/><rect x="60" y="46" width="78" height="12" rx="4" class="fm" opacity=".45"/>`
+    + `<rect x="60" y="64" width="100" height="42" rx="5" class="fc oe"/>` + man(84, 98, 'ft', 0.7) + `<path d="M98 98h30M102 98v6M124 98v6" class="s thin"/><rect x="112" y="112" width="68" height="12" rx="4" class="fc"/>`),
+  // D3 关系图
+  focus: svg([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => { const a = i * 0.7 + 0.2; return `<circle cx="${(120 + 96 * Math.cos(a)).toFixed(1)}" cy="${(68 + 56 * Math.sin(a)).toFixed(1)}" r="3.5" class="fm" opacity=".4"/>`; }).join('')
+    + [0, 1, 2, 3, 4].map((i) => { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; const x = (120 + 62 * Math.cos(a)).toFixed(1); const y = (68 + 40 * Math.sin(a)).toFixed(1); return `<path d="M120 68L${x} ${y}" class="s sm thin"/><circle cx="${x}" cy="${y}" r="9" class="fa"/>`; }).join('')
+    + `<circle cx="120" cy="68" r="16" class="fp oe"/><text x="120" y="72" text-anchor="middle">分工</text>`),
+  ladder: svg([[34, 100, '前提', 'fs om'], [136, 100, '前提', 'fs om'], [85, 58, '推论', 'fs om'], [85, 14, '结论', 'fs oe']].map(([x, y, t, c]) => `<rect x="${x}" y="${y}" width="70" height="24" rx="5" class="${c}"/><text x="${x + 35}" y="${y + 16}" text-anchor="middle">${t}</text>`).join('')
+    + arrow(80, 98, 104, 84) + arrow(160, 98, 136, 84) + arrow(120, 56, 120, 41)),
+  demand: svg([[20, 30], [28, 50], [36, 70]].map(([x, y]) => `<rect x="${x}" y="${y}" width="56" height="36" rx="5" class="fs om"/><path d="M${x + 8} ${y + 12}h34M${x + 8} ${y + 22}h24" class="s sm thin"/>`).join('')
+    + arrow(100, 68, 116, 68, 's se') + star(128, 52, 7, 'fe') + star(138, 40, 4, 'fe')
+    + `<rect x="146" y="32" width="80" height="72" rx="6" class="fc"/>` + man(166, 90, 'ft', 0.8) + `<path d="M180 90h34M184 90v8M210 90v8" class="s thin"/>` + pins(188, 88, 4, 6)),
+  keep: (() => {
+    const n = [[30, 22], [78, 18], [126, 24], [174, 18], [212, 26], [44, 68], [92, 72], [140, 64], [190, 70], [30, 114], [76, 110], [124, 116], [170, 110], [212, 114]];
+    const e = [[0, 5], [0, 6], [1, 5], [1, 7], [2, 6], [2, 8], [3, 6], [3, 7], [4, 7], [4, 8], [5, 10], [5, 11], [6, 9], [6, 12], [7, 10], [7, 13], [8, 11], [8, 12], [1, 8], [2, 5], [6, 13], [7, 9], [0, 7], [3, 5]];
+    return svg(e.map(([a, b]) => `<path d="M${n[a][0]} ${n[a][1]}L${n[b][0]} ${n[b][1]}" class="s sm thin" opacity=".7"/>`).join('') + n.map(([x, y]) => `<rect x="${x - 15}" y="${y - 7}" width="30" height="14" rx="3" class="fs om"/><path d="M${x - 9} ${y}h18" class="s sm thin"/>`).join(''));
+  })(),
+};
+
+const PAGES = [
+  {
+    name: '知识库', title: '内部知识库',
+    lead: '新加的核心功能，排在 WonderLab 前面做。例子：你读《全球通史》，把摘抄、笔记和整本书的 EPUB 都放进「全球通史」这个知识库，读完很久以后还能就书里的内容和 Agent 对话。',
+    note: { t: '已经定了，不用再答', items: [
+      '知识库和对话 Agent 同在 v0.5，先做它们，再做 WonderLab。',
+      '检索用本机 <code>~/Documents/LLM</code> 里的向量模型和重排模型：不花钱、不联网，用到时才启动，闲了自动停。Pith 只读那个文件夹，不改它。',
+      '对话的回答只用 API 模型。',
+      '对话时可以勾选基于哪几个知识库。',
+    ] },
+    items: [
+      { id: 'k1', type: 'single', layout: 'cards', title: '知识库和文献库是什么关系？', rec: 'own', options: [
+        { v: 'own', t: '独立的知识库', fig: FIG.kbOwn, d: '知识库是新的一层：你往里放书、摘抄、笔记。书是从文献库引用过来的，不复制；一本书可以放进好几个知识库。' },
+        { v: 'coll', t: '文献库的集合升级', fig: FIG.kbColl, d: '给一个集合打开「作为知识库」，集合里的东西就是这个知识库。少一个概念，但摘抄和笔记要先变成文献库的条目。' },
+        { v: 'book', t: '一本书一个知识库', fig: FIG.kbBook, d: '每本书自动带一个知识库，摘抄和笔记都挂在书上。最省事，但跨书的专题（「工业革命」）没处放。' },
+      ] },
+      { id: 'k2', type: 'rows', title: '能放进知识库的东西', hint: '放进去以后都能被检索、被对话引用',
+        scale: [{ v: 'now', t: 'v0.5 做' }, { v: 'later', t: '以后' }, { v: 'no', t: '不要' }], rows: [
+          { id: 'S1', t: '<b>文献库里的书和论文全文</b>', why: 'EPUB、PDF（PDF 要过 Mathpix，和概念研究一样）。', rec: 'now' },
+          { id: 'S2', t: '<b>摘抄</b>', why: '阅读时划的线、做的标注，带着出处。', rec: 'now' },
+          { id: 'S3', t: '<b>你写的笔记</b>', rec: 'now' },
+          { id: 'S4', t: '<b>概念卡、论证卡</b>', why: '概念研究做出来的。', rec: 'now' },
+          { id: 'S5', t: '<b>事实调查的报告</b>', why: '结论和核对过的证据。', rec: 'now' },
+          { id: 'S6', t: '<b>对话里的好回答</b>', why: '点一下存成笔记。', rec: 'now' },
+          { id: 'S7', t: '<b>网页</b>', why: '存一份快照，以后原网页没了也在。', rec: 'later' },
+          { id: 'S8', t: '<b>本机的文件</b>', why: 'Markdown、TXT、Word。', rec: 'later' },
+          { id: 'S9', t: '<b>扫描件和图片</b>', why: '要先认字（OCR），另算钱。', rec: 'later' },
+        ] },
+      { id: 'k3', type: 'multi', title: '摘抄和笔记怎么进来？', hint: 'Pith 现在的阅读器只能看 PDF 和做标注，还没有笔记编辑器。', rec: ['reader', 'editor', 'paste'], options: [
+        { v: 'reader', t: '阅读时划线', d: '在 Pith 里读 PDF、EPUB 时划一下，就成了一条摘抄，自动带上书名和页码。要给 EPUB 也做一个阅读器。' },
+        { v: 'editor', t: 'Pith 里写笔记', d: '一个简单的 Markdown 编辑器。' },
+        { v: 'paste', t: '粘贴一段文字', d: '在别处读到的，贴进来，填一下出处。' },
+        { v: 'md', t: '导入文件夹', d: '把一个放 Markdown、TXT 的文件夹整个导进来。' },
+        { v: 'hl', t: '导入别处的标注', d: '微信读书、Kindle、Apple Books 导出的划线。' },
+      ] },
+      { id: 'k4', type: 'text', title: '你现在的摘抄和笔记放在哪、是什么格式？', hint: '例如「微信读书里划线」「Obsidian 的 Markdown」「纸上」。我照这个安排导入。' },
+      { id: 'k5', type: 'single', layout: 'cards', title: '回答怎么带出处？', rec: 'in', options: [
+        { v: 'in', t: '句子后面带编号', fig: FIG.citeIn, d: '点编号看到原段落，再点能跳到书里那一页。对不上原文的句子不给编号。' },
+        { v: 'list', t: '回答下面列出来', fig: FIG.citeList, d: '回答是干净的，下面列出用到的几段。看不出哪句来自哪段。' },
+        { v: 'none', t: '不带', fig: FIG.citeNone, d: '像普通聊天。' },
+      ] },
+      { id: 'k6', type: 'single', title: '知识库里找不到的时候？', rec: 'say', options: [
+        { v: 'say', t: '明说没找到，再问你', d: '「知识库里没有讲这个。要我用自己的知识回答吗？」' },
+        { v: 'own', t: '直接用模型自己的知识答', d: '并标明「这段不是来自知识库」。' },
+        { v: 'stop', t: '只说没找到' },
+      ] },
+      { id: 'k7', type: 'multi', max: 3, title: '你最想拿知识库做什么？', hint: '用来排先后。', rec: ['recall', 'cross', 'write'], options: [
+        { v: 'recall', t: '想起书里讲过什么', d: '「全球通史怎么讲蒙古帝国的崩溃？」' },
+        { v: 'cross', t: '跨书对比', d: '「斯密和这本书对殖民地贸易的看法有什么不同？」' },
+        { v: 'write', t: '写东西时找论据', d: '找出能引用的原文，带页码，能插进 Word。' },
+        { v: 'quiz', t: '让它考我', d: '按我读过的内容出题、帮我复习。' },
+        { v: 'tidy', t: '整理摘抄', d: '把零散的摘抄归成几个专题，写成一篇笔记。' },
+        { v: 'link', t: '发现联系', d: '读到新东西时，提醒我以前哪本书里讲过相关的。' },
+      ] },
+    ],
+  },
+  {
+    name: '对话', title: '和 Agent 对话，在对话里启动模块',
+    lead: '对话不只是回答问题。你可以直接说「把第三章做一次整章分析」「查一下这个数据是不是真的」「把这段做成一件作品」，Agent 启动对应的模块，在后台跑。',
+    items: [
+      { id: 'g1', type: 'single', layout: 'cards', title: '对话放在哪？', rec: 'both', options: [
+        { v: 'both', t: '主页面 + 侧栏', fig: FIG.chatBoth, d: '有一个「对话」主页面，也是打开 Pith 看到的第一页；在别的页面看书、看卡片时，右边能拉出同一段对话。' },
+        { v: 'main', t: '只有主页面', fig: FIG.chatMain, d: '最左一列多一个「对话」。问问题要先切过去。' },
+        { v: 'side', t: '只有侧栏', fig: FIG.chatSide, d: '每个页面右边都能拉出来，没有单独的对话页。' },
+      ] },
+      { id: 'g2', type: 'single', layout: 'cards', title: '怎么选基于哪些知识库？', rec: 'bar', options: [
+        { v: 'bar', t: '输入框上面勾', fig: FIG.pickBar, d: '勾了哪几个，这一句就只在这几个里找；随时能改。' },
+        { v: 'bind', t: '一段对话绑定知识库', fig: FIG.pickBind, d: '新建对话时选好，中途不变。' },
+        { v: 'auto', t: '模型自己决定', fig: FIG.pickAuto, d: '看问题去相关的知识库里找，并告诉你它找了哪几个。' },
+      ] },
+      { id: 'g3', type: 'rows', title: '在对话里能启动什么', hint: 'Agent 听懂你的话，替你填好确认框',
+        scale: [{ v: 'now', t: 'v0.5 做' }, { v: 'later', t: '以后' }, { v: 'no', t: '不要' }], rows: [
+          { id: 'R1', t: '<b>概念研究</b>', why: '整章分析、读一段、追踪概念、反方、推演。', rec: 'now' },
+          { id: 'R2', t: '<b>事实调查</b>', rec: 'now' },
+          { id: 'R3', t: '<b>WonderLab 做作品</b>', why: 'WonderLab 做完以后接上。', rec: 'now' },
+          { id: 'R4', t: '<b>往知识库里加东西</b>', why: '「把这段回答存成笔记」「把这本书加进来」。', rec: 'now' },
+          { id: 'R5', t: '<b>文献库的操作</b>', why: '找文献、补信息、加标签。', rec: 'later' },
+          { id: 'R6', t: '<b>Word 的引用和排版</b>', rec: 'later' },
+          { id: 'R7', t: '<b>导出</b>', why: '把对话、卡片导成 Markdown 或 Word。', rec: 'later' },
+        ] },
+      { id: 'g4', type: 'single', title: '启动后台任务之前要你点头吗？', rec: 'confirm', options: [
+        { v: 'confirm', t: '每次都给确认框', d: '对话里出现一张卡：做什么、用哪些材料、估多少钱。你点了才跑，也能先改。和现在各模块的确认框是同一个。' },
+        { v: 'cheap', t: '便宜的直接跑', d: '低于一个金额（设置里定）的直接跑，贵的才问。' },
+        { v: 'free', t: '都直接跑', d: '只受每月上限约束。' },
+      ] },
+      { id: 'g5', type: 'single', layout: 'cards', title: '任务在后台跑的时候？', rec: 'card', options: [
+        { v: 'card', t: '对话里一张任务卡', fig: FIG.taskCard, d: '卡上实时显示进度，你可以接着聊别的。跑完，卡变成结果的入口（卡片、报告、作品），Agent 用一两句话说做出了什么。' },
+        { v: 'jump', t: '跳到那个模块去看', fig: FIG.taskJump, d: '对话里只留一行「已启动」，进度和结果在模块自己的页面。' },
+      ] },
+      { id: 'g6', type: 'single', title: '对话每一句都要确认花费吗？', hint: '别的模块现在是「每次发给模型之前都确认」，对话里这样就没法聊了。', rec: 'budget', options: [
+        { v: 'budget', t: '不逐句确认，每段对话一个预算', d: '默认 $0.5，花到了提醒你，要不要继续由你定；输入框旁边一直显示这段花了多少。月上限照旧。' },
+        { v: 'each', t: '每一句都确认' },
+        { v: 'month', t: '只看每月上限' },
+      ] },
+      { id: 'g7', type: 'single', title: '对话的记性', rec: 'each', options: [
+        { v: 'each', t: '每段对话各记各的', d: '历史对话都留着，能搜、能接着聊；新开的对话不知道以前聊过什么。' },
+        { v: 'memo', t: '跨对话记住你的偏好和结论', d: '把 v0.7 的记忆功能提前做一部分。记了什么你都看得到、能删。' },
+      ] },
+      { id: 'g8', type: 'text', title: '写两三句你会对它说的话', hint: '提问也好，让它做事也好。我照着这些话来调它听不听得懂。' },
+    ],
+  },
+  {
+    name: '作品', title: '作品长什么样',
+    lead: '从这一页起是 WonderLab。上一轮我把作品想成了「固定的画法，加时间轴和概念网络」，不对。这一页先对齐你想看到的东西。每个选项上面是一张示意图，只表示意思，不是最后的样子。',
+    note: { t: '已经定了，不用再答', items: [
+      '程序不定死作品，只给设计模板、工具箱和监控。模型看问题选模板和做法，调工具和素材，<b>自己写作品的代码</b>，在隔离的框里运行。',
+      '作品既有 2D 的也有 3D 的，都能动手玩；可以为此加依赖。',
+      '要有创造性、通俗、有趣。时间轴、概念网络这类字多的不做成模板。',
+      '忠实度能调，管 WonderLab 和概念研究（第 5 页）。',
+      '作品主要在 Pith 里看，也能导出（第 6 页）。',
+    ] },
+    items: [
+      { id: 'a1', type: 'multi', layout: 'cards', title: '首批放进哪些设计模板？',
+        hint: '模板不是固定的画法：它告诉模型「这类问题适合做成什么、骨架怎么搭、用哪些工具」，模型照着写出每次都不一样的作品。这里勾的是 v0.5 自带的，以后你和模型都能再加。',
+        rec: ['sim', 'exp', 'scene', 'story', 'whatif'], options: [
+          { v: 'sim', t: '经营模拟', fig: FIG.sim, d: '你来当针厂老板：拆工序、招人、买机器，看产量和成本怎么变。玩几分钟，道理自己冒出来。' },
+          { v: 'exp', t: '能动手的图解', fig: FIG.exp, d: '一张会动的图，字很少。拖一下滑块、点一下零件，画面里的因果马上跟着变。' },
+          { v: 'scene', t: '3D 场景', fig: FIG.scene, d: '一个立体的小场景（针厂、集市、码头），能转、能走近、能点开里面的人和东西。' },
+          { v: 'story', t: '滚动的故事', fig: FIG.story, d: '往下滚，画面一幕幕变，像一支自己控制节奏的动画短片；中途能停下来动手试。' },
+          { v: 'whatif', t: '假如……', fig: FIG.whatif, d: '两个世界并排：一边照原样，一边改掉一个条件（假如没有分工、假如市场只有一个村）。' },
+          { v: 'world', t: '小人世界', fig: FIG.world, d: '几十个小人按简单的规则过日子：生产、交换、搬家。你改一条规则，看整个世界变成什么样。' },
+          { v: 'explode', t: '3D 拆解', fig: FIG.explode, d: '把一台机器、一个结构拆开、转着看，再一层层装回去。适合「它到底怎么运转」这类问题。' },
+          { v: 'quest', t: '闯关', fig: FIG.quest, d: '一关一个小目标（用 10 个人做出 4 万枚针），过关要用上刚明白的道理；有星级，能重来。' },
+          { v: 'talk', t: '和人物对话', fig: FIG.talk, d: '和书里的人物（斯密、针厂工人）聊天、辩论、替他做决定。字比较多。' },
+        ] },
+      { id: 'a2', type: 'single', layout: 'cards', title: '一件作品多大？', rec: 'acts', options: [
+        { v: 'one', t: '一个场景', fig: FIG.one, d: '只讲一个点子，一两分钟玩完。做得快，花得少。' },
+        { v: 'acts', t: '几幕连起来', fig: FIG.acts, d: '三到五幕，每幕可以用不同的模板：先用故事引入，再放手模拟，最后一关挑战。' },
+        { v: 'bigworld', t: '一个可以逛的世界', fig: FIG.bigworld, d: '一件大作品里有好几个地点，每个地点讲一件事。做得最慢，花得最多。' },
+      ] },
+      { id: 'a3', type: 'multi', max: 2, layout: 'cards', title: '2D 作品默认用哪种图形语言？',
+        hint: '同一个画面（工人在工作台前做针）的六种画法。这是给模型的默认画风，写在工具箱的样式里，以后换画风不用改作品；正式的视觉打磨仍在 v0.7 之后。',
+        rec: ['flat', 'sketch'], options: [
+          { v: 'flat', t: '扁平几何', fig: FIG.flat, d: '大色块、简单的形状。干净醒目，用代码最容易画好。' },
+          { v: 'sketch', t: '手绘线稿', fig: FIG.sketch, d: '像在纸上随手画的：线有点抖，颜色很少。亲切，适合图解。' },
+          { v: 'iso', t: '等距微缩', fig: FIG.iso, d: '斜着俯视的小方块世界，像桌面上的模型。适合场景和模拟。' },
+          { v: 'cut', t: '剪纸拼贴', fig: FIG.cut, d: '一层层纸片叠出来，带一点阴影。有手工的感觉。' },
+          { v: 'pixel', t: '像素', fig: FIG.pixel, d: '老游戏机的样子。游戏感最强，但画不了细节。' },
+          { v: 'blue', t: '蓝图', fig: FIG.blue, d: '工程图纸：细线、标尺寸。适合机器和结构。' },
+          { v: 'auto', t: '让模型按题材挑', fig: FIG.auto, d: '不设默认，模型看问题自己定画风。更多样，但作品之间不统一。' },
+        ] },
+      { id: 'a4', type: 'single', layout: 'cards', title: '3D 作品默认是什么样子？', rec: 'low', options: [
+        { v: 'low', t: '低多边形', fig: FIG.low, d: '棱角分明的小模型，面数少。跑得快，这台机器没有压力。' },
+        { v: 'clay', t: '圆润黏土', fig: FIG.clay, d: '圆滚滚、软软的，像捏出来的玩具。更可爱，光影要多算一些。' },
+        { v: 'wire', t: '线框', fig: FIG.wire, d: '只有线，没有面。最轻，像结构图，适合讲几何和机械。' },
+        { v: 'auto3', t: '让模型按题材挑', fig: FIG.auto3, d: '不设默认，模型看问题自己定。' },
+      ] },
+      { id: 'a5', type: 'single', layout: 'cards', title: '作品里放多少字？', rec: 't1', options: [
+        { v: 't0', t: '几乎没字', fig: FIG.t0, d: '只有标签和数字，全靠画面和动手。' },
+        { v: 't1', t: '每幕一两句', fig: FIG.t1, d: '画面为主，配一两句短的旁白；想深入时点开看。' },
+        { v: 't2', t: '图文各半', fig: FIG.t2, d: '一边讲一边演示，像带演示的文章。' },
+      ] },
+      { id: 'a6', type: 'multi', max: 3, title: '趣味主要从哪来？', rec: ['surprise', 'sandbox', 'goal'], options: [
+        { v: 'surprise', t: '意外的结果', d: '先让你猜，再演给你看，结果和直觉不一样。' },
+        { v: 'sandbox', t: '随便摆弄', d: '没有对错，什么都能拖、能改，看会发生什么。' },
+        { v: 'goal', t: '目标和挑战', d: '有分数、星级、关卡，让人想再试一次。' },
+        { v: 'role', t: '角色和故事', d: '有名字的小人，有头有尾的情节。' },
+        { v: 'humor', t: '俏皮的文案和彩蛋', d: '旁白会开玩笑，角落里藏着小惊喜。' },
+        { v: 'feel', t: '手感', d: '弹一下、晃一下的小动画，按下去有反馈。' },
+      ] },
+    ],
+  },
+  {
+    name: '做法', title: '模型怎么把作品做出来',
+    lead: '程序只做三件事：给模板、给工具箱、把关。一件作品从问题到成品走下面这条路。' + FIG.flow,
+    items: [
+      { id: 'b1', type: 'single', title: '动手做之前，先给你看点子吗？', rec: 'pick', options: [
+        { v: 'pick', t: '先给 2–3 个点子，你挑', d: '每个点子一句话加一张小草图，例如「针厂老板」「一枚针的旅行」「假如全村只有一个铁匠」。多花几秒和一点钱，但不容易做偏。' },
+        { v: 'direct', t: '模型自己定，直接做', d: '最快。不满意再让它改，或者重做。' },
+        { v: 'mix', t: '小的直接做，大的先给点子', d: '「一个场景」直接做，「几幕」以上先让你挑。' },
+      ] },
+      { id: 'b2', type: 'rows', title: '工具箱里放什么', hint: '模型写作品时能用的能力；每加一样，多一个依赖、多一份测试',
+        scale: [{ v: 'now', t: 'v0.5 做' }, { v: 'later', t: '以后' }, { v: 'no', t: '不要' }], rows: [
+          { id: 'T1', t: '<b>2D 画图和动画</b>', why: '所有 2D 作品的底子：形状、路径、会动的过渡。', rec: 'now' },
+          { id: 'T2', t: '<b>3D 场景</b>', why: 'Three.js：模型、灯光、镜头，能转、能走近。', rec: 'now' },
+          { id: 'T3', t: '<b>物理</b>', why: '重力、碰撞、弹簧，东西会掉、会撞、会弹。', rec: 'now' },
+          { id: 'T4', t: '<b>小人世界的内核</b>', why: '很多个体各自按规则行动，由 Pith 来算，结果能重放。', rec: 'now' },
+          { id: 'T5', t: '<b>图表</b>', why: '把模拟里的数字实时画成曲线、柱子。', rec: 'now' },
+          { id: 'T6', t: '<b>滚动和分幕</b>', why: '滚到哪演到哪，一幕接一幕。', rec: 'now' },
+          { id: 'T7', t: '<b>存档和分数</b>', why: '记住玩到哪一关、最高分。', rec: 'now' },
+          { id: 'T8', t: '<b>声音</b>', why: '音效和简单的背景声。', rec: 'later' },
+          { id: 'T9', t: '<b>旁白朗读</b>', why: '把旁白读出来，用系统自带的语音，不花钱。', rec: 'later' },
+          { id: 'T10', t: '<b>地图</b>', why: '真实的地理底图；离线用要先装地图数据。', rec: 'later' },
+        ] },
+      { id: 'b3', type: 'multi', title: '作品里的素材从哪来？', rec: ['kit', 'code', 'mine'], options: [
+        { v: 'kit', t: '工具箱自带的一套', d: '小人、房子、工具、图标、3D 的基本形状，画风统一。' },
+        { v: 'code', t: '模型用代码现画', d: '自带的不够时，按题材画出新的形状和模型。' },
+        { v: 'mine', t: '你放进素材库的', d: '图片、SVG、3D 模型。' },
+        { v: 'open', t: '开源素材库', d: '装进 App，离线可用；要逐个登记许可证。' },
+        { v: 'gen', t: '调图像模型画插画', d: '每张另算钱，画风难统一。' },
+      ] },
+      { id: 'b4', type: 'multi', title: '监控要把哪些关？',
+        hint: '隔离是必有的，不用选：作品只能用工具箱，不能联网，不能读你的文件。',
+        rec: ['fix', 'look', 'click', 'perf', 'cost', 'faith'], options: [
+          { v: 'fix', t: '报错自动修', d: '跑不起来或者控制台报错，就把错误交回模型改，最多三轮。' },
+          { v: 'look', t: '看一眼画面', d: '截一张图给模型自己看：空白、重叠、字太多就改。' },
+          { v: 'click', t: '自动点一遍', d: '程序把能点、能拖的都试一下，确认真的会动。' },
+          { v: 'perf', t: '帧率和内存', d: '太卡或者太占内存，就要求简化（这台机器 18 GB）。' },
+          { v: 'cost', t: '费用和步数', d: '每件作品有上限，到了停下来问你。' },
+          { v: 'faith', t: '忠实度检查', d: '按当前的档位查有没有越界，例如严谨档里出现了编出来的数字。' },
+          { v: 'fun', t: '趣味和易懂的自评', d: '模型按「有趣、好懂」给作品打分，不够再改一轮。每件多一次调用。' },
+        ] },
+      { id: 'b5', type: 'single', title: '做出来以后怎么改？', rec: 'talk', options: [
+        { v: 'talk', t: '说一句话让模型改', d: '「把工人换成机器人」「第二幕太长」。每次改动存一个版本，能退回。' },
+        { v: 'code', t: '再加一个代码编辑器', d: '上面这些，另外能直接改作品的代码。' },
+        { v: 'redo', t: '只能整件重做' },
+      ] },
+      { id: 'b6', type: 'multi', title: '新的设计模板从哪来？',
+        hint: '模板沿用 v0.4 的技能格式：一个文件夹，里面写「适合什么问题、骨架、用哪些工具、范例」。',
+        rec: ['builtin', 'mine', 'save', 'improv'], options: [
+          { v: 'builtin', t: '自带一批', d: '上一页勾的那些。' },
+          { v: 'mine', t: '你自己加', d: '在「技能」里新建或者改一个模板。' },
+          { v: 'save', t: '好作品存成模板', d: '某件作品你喜欢，点一下，模型把它的做法提炼成新模板，你确认后收进来。' },
+          { v: 'improv', t: '没有合适的就现场设计', d: '问题和哪个模板都不贴时，模型自己拼一个新的做法，做完告诉你它是怎么想的。' },
+        ] },
+      { id: 'b7', type: 'single', title: '用哪个 API 模型？', hint: '对话 Agent 和 WonderLab 都照这一题。', rec: 'cmp', options: [
+        { v: 'cmp', t: '我先对比，再定默认', d: '设置里「对话、选模板、出点子、写作品、看画面」各自能选模型。默认值由我在真实验收里拿同一道题比两三个模型后定，结果记进验收文件。' },
+        { v: 'gpt', t: '全用 GPT-6.1 Sol', d: 'v0.4 一直在用。' },
+        { v: 'claude', t: '全用 Claude', d: 'Opus 5.5 或 Fable 5.2。' },
+      ] },
+    ],
+  },
+  {
+    name: '忠实度', title: '什么时候严谨，什么时候放开',
+    lead: '上一轮我把所有作品都按学术的标准来要求，太紧了。改成一个能调的档位，管 WonderLab 的作品，和概念研究里的解释、推演。对话管不管，见 C8。',
+    note: { t: '不受档位影响，一直严格', items: [
+      '标成「原文」的句子逐字核对，对不上就不当原文显示。',
+      'Word 里的引用和排版。',
+      '事实调查的证据核对和可信度。',
+    ] },
+    items: [
+      { id: 'c1', type: 'single', layout: 'cards', title: '分几档？', hint: '图里的书是原著，风筝是模型的发挥，线越长放得越开。', rec: 'l3', options: [
+        { v: 'l3', t: '三档', fig: FIG.l3, d: '严谨、平衡、自由。好懂，够用。' },
+        { v: 'l4', t: '四档', fig: FIG.l4, d: '再加一档「戏说」：整件作品可以是虚构的故事，只借原著的道理。' },
+        { v: 'l100', t: '连续的滑杆', fig: FIG.l100, d: '0 到 100 随意拖。更细，但 60 和 70 差在哪说不清。' },
+      ] },
+      { id: 'c2', type: 'rows', title: '每种发挥，从哪一档起允许', hint: '按三档来问；选了四档或滑杆，我照这里的意思对应过去',
+        scale: [{ v: 'strict', t: '严谨也行' }, { v: 'mid', t: '平衡起' }, { v: 'free', t: '只在自由' }, { v: 'never', t: '都不要' }], rows: [
+          { id: 'L1', t: '<b>用自己的话重讲、打比方</b>', why: '「分工就像一支球队，各守各的位置。」', rec: 'strict' },
+          { id: 'L2', t: '<b>为演示设的数字和规则</b>', why: '原著没给的数，例如「每多拆一道工序快 20%」；标明是设定。', rec: 'strict' },
+          { id: 'L3', t: '<b>换成今天的例子</b>', why: '把针厂换成奶茶店、外卖站。', rec: 'mid' },
+          { id: 'L4', t: '<b>用模型自己的知识补背景</b>', why: '原著没说的：当时的英国，后来的流水线。', rec: 'mid' },
+          { id: 'L5', t: '<b>和原著相反的「假如」</b>', why: '假如没有分工，假如没有货币。', rec: 'mid' },
+          { id: 'L6', t: '<b>虚构的人物和情节</b>', why: '给工人起名字，编一段他的一天。', rec: 'mid' },
+          { id: 'L7', t: '<b>让真实的人说他没说过的话</b>', why: '「斯密」陪你聊天，点评你的工厂。', rec: 'free' },
+          { id: 'L8', t: '<b>夸张、玩笑、玩梗</b>', rec: 'free' },
+        ] },
+      { id: 'c3', type: 'single', layout: 'cards', title: '放开以后，怎么让你分得清哪些是原著、哪些是发挥？', rec: 'quiet', options: [
+        { v: 'quiet', t: '平时不打扰，想看再开', fig: FIG.quiet, d: '作品是干净的。角落有一个「来源」开关，打开后原著的部分和发挥的部分各亮一种颜色，点原著的能跳回原文。' },
+        { v: 'always', t: '一直带小标记', fig: FIG.always, d: '每一处都有「原著」「发挥」的小标签。一眼清楚，但画面碎。' },
+        { v: 'end', t: '只在最后列出来', fig: FIG.end, d: '作品里不标，结尾有一页「哪些来自原著，哪些是编的」。' },
+      ] },
+      { id: 'c4', type: 'multi', title: '在哪里调？', rec: ['global', 'each'], options: [
+        { v: 'global', t: '设置里的默认档' },
+        { v: 'each', t: '每次开始时能临时改', d: '做作品、做概念研究的确认框里有这个档位。' },
+        { v: 'coll', t: '按文献库的集合分别设', d: '「毕业论文」集合严谨，「闲书」集合自由。' },
+        { v: 'auto', t: '模型看问题自己判断', d: '并在开始前告诉你它选了哪一档。' },
+      ] },
+      { id: 'c5', type: 'rows', title: '默认档位', scale: [{ v: 'strict', t: '严谨' }, { v: 'mid', t: '平衡' }, { v: 'free', t: '自由' }], rows: [
+        { id: 'M1', t: '<b>WonderLab 的作品</b>', rec: 'free' },
+        { id: 'M2', t: '<b>概念研究的解释</b>', why: '概念卡、论证卡里「AI 解释」的部分。', rec: 'mid' },
+        { id: 'M3', t: '<b>概念研究的推演</b>', why: '「假设推演」的部分。', rec: 'mid' },
+      ] },
+      { id: 'c6', type: 'multi', title: '一件作品可以从哪里开始？', rec: ['ask', 'book', 'cards'], options: [
+        { v: 'ask', t: '直接问一个问题，没有文献也行', d: '「复利为什么可怕」「月亮为什么有圆缺」。模型按问题选模板。' },
+        { v: 'book', t: '一本书的一章，或者划选的一段' },
+        { v: 'cards', t: '几张概念卡、论证卡' },
+        { v: 'fact', t: '一次事实调查的结论', d: '把调查出的数据做成能动手的图。' },
+        { v: 'data', t: '一份数据表', d: 'CSV 或 XLSX；以后和 v0.6 的学术研究接上。' },
+      ] },
+      { id: 'c7', type: 'single', title: '没有文献的时候，内容靠什么？', rec: 'own', options: [
+        { v: 'own', t: '模型自己的知识，标明「未查证」', d: '作品页上有一个「查证」按钮，想核实时再用 v0.3 的事实调查查一遍。' },
+        { v: 'search', t: '先联网查一轮再做', d: '更可靠，但每件都慢一些，多花一次调查的钱。' },
+        { v: 'askme', t: '每次问你' },
+      ] },
+      { id: 'c8', type: 'single', title: '忠实度的档位也管对话吗？', rec: 'yes', options: [
+        { v: 'yes', t: '管', d: '严谨：只按知识库里有的回答，每句带出处。平衡：知识库为主，模型补充的部分标出来。自由：可以放开聊，联想、打比方、唱反调。' },
+        { v: 'fixed', t: '不管，对话固定一种', d: '一直是「知识库为主，补充的标出来」。' },
+      ] },
+    ],
+  },
+  {
+    name: '查看', title: '在 Pith 里看、导出，还有关系图',
+    lead: '作品主要在 Pith 里看和玩，也能带走。顺便定一下 v0.4 那张关系图怎么办。',
+    items: [
+      { id: 'd1', type: 'single', layout: 'cards', title: 'WonderLab 页面怎么排？', rec: 'gallery', options: [
+        { v: 'gallery', t: '画廊 + 对话', fig: FIG.gallery, d: '首页是一格一件的作品封面。点开或者新建时，左边和模型说话，右边是作品，说一句改一处；能全屏。' },
+        { v: 'side', t: '侧栏 + 预览', fig: FIG.side, d: '和文献库、概念页一个样：左边列表，右边作品。新建用一个确认框。' },
+        { v: 'chat', t: '只有对话', fig: FIG.chat, d: '所有作品都出现在对话流里，往回翻着找。' },
+      ] },
+      { id: 'd2', type: 'multi', title: '导出成什么？', rec: ['html', 'png'], options: [
+        { v: 'html', t: '单文件 HTML', d: '离线能打开、能玩；带 3D 的会有几 MB。' },
+        { v: 'png', t: '截图', d: '当前的画面存成 PNG。' },
+        { v: 'video', t: '录成视频或 GIF', d: '程序自动演示一遍并录下来，方便发给别人。' },
+        { v: 'embed', t: '嵌进个人网站的包', d: '一个文件夹，放到网站上就能用。' },
+        { v: 'src', t: '源代码文件夹', d: '想自己接着改的时候用。' },
+      ] },
+      { id: 'd3', type: 'single', layout: 'cards', title: '概念页那张关系图怎么办？',
+        hint: '现在是一张把所有概念和关系都摆出来的分层图：节点多，线交叉，字密。要改的话，交给云端在 v0.5 期间做。',
+        rec: 'focus', options: [
+          { v: 'focus', t: '聚焦图', fig: FIG.focus, d: '一次只看一个概念和它直接连着的几个；点谁，谁到中间。永远不超过十来个节点。' },
+          { v: 'ladder', t: '论证阶梯', fig: FIG.ladder, d: '不画网。一条论证画一条：前提在下，结论在上。' },
+          { v: 'demand', t: '不常驻，要看再做', fig: FIG.demand, d: '概念页只留卡片。想看关系时，让 WonderLab 现做一件作品。' },
+          { v: 'keep', t: '先不动', fig: FIG.keep, d: '留到 v0.7 之后和视觉一起改。' },
+        ] },
+    ],
+  },
+  {
+    name: '范围', title: '做到哪、怎么验收、花多少',
+    lead: '开发方式你已经定了，这一页只问范围和钱。v0.5 先做知识库和对话，再做 WonderLab。',
+    note: { t: '开发方式（你已经定的）', items: [
+      '云端和本地并行，和 v0.3、v0.4 一样。',
+      'Git 都由我做：每轮做完自己提交、推送；云端的分支验收通过后直接合并。',
+      'v0.4 的四个已知问题（旧卡片重找锚点、全书对齐、反方读全文、语义检索）我正在本地修，不用等问卷。其余的见 E2。',
+    ] },
+    items: [
+      { id: 'e1', type: 'single', title: 'WonderLab 里 2D 和 3D 怎么排？', rec: 'staged', options: [
+        { v: 'staged', t: '先 2D 后 3D', d: '先把工具箱、隔离框、监控和 2D 的模板走通，再加 3D；都做完才算 v0.5 完成。' },
+        { v: 'together', t: '一起做', d: '从第一期就 2D、3D 都有。出了问题不好分清是哪一边的。' },
+        { v: 'split', t: '3D 单独一版', d: 'v0.5 只做 2D，3D 放到 v0.5.5。' },
+      ] },
+      { id: 'e2', type: 'multi', title: '「前几版留下的问题」还算上哪些？', hint: '勾上的都排进 v0.5–v0.7，尽量交给云端，我在本地验收。', rec: ['minor'], options: [
+        { v: 'minor', t: 'v0.4 剩下的小问题', d: '打开一次研究要读整本书，没测过时间；评论来源下载失败时没有改用 Claude 网页抓取；确认框的估价偏高。' },
+        { v: 'v01', t: 'v0.1.x 的候选功能', d: 'PDF 全文搜索、目录和缩略图、标注导出到笔记、笔记编辑器、拖放整理、Zotero 增量导入、撤销、附件导入、合并式导入导出。原来排在 v0.7 之后，量不小。' },
+        { v: 'word', t: '替你在 Word 里点一遍', d: '验收清单里「Word 里插入卡片原文」这一条由我用电脑操控来点；要你同意一次 Word 的操控权限。' },
+      ] },
+      { id: 'e0', type: 'single', title: '知识库和对话用什么验收？', hint: '我用真实的书和模型跑一遍：加进知识库、建索引、问十来个问题、在对话里各启动一次模块。', rec: 'both', options: [
+        { v: 'both', t: '《国富论》和《全球通史》', d: '《国富论》的两本 EPUB 和 v0.4 的卡片是现成的。《全球通史》要你把 EPUB 和几十条摘抄放到 <code>local/</code> 下，我只读副本。' },
+        { v: 'wn', t: '只用《国富论》', d: '不用你准备东西；但试不到「一本很厚的书加一堆摘抄」。' },
+        { v: 'other', t: '换一本', d: '写在这一页的补充里。' },
+      ] },
+      { id: 'e3', type: 'multi', title: 'WonderLab 的真实验收用哪些题？', hint: '我用真实的模型各做一件，结果和花费记进验收文件。', rec: ['pin', 'free', 'd3'], options: [
+        { v: 'pin', t: '《国富论》的分工', d: '有 v0.4 的卡片，能验「从书出发」和忠实度的各档。' },
+        { v: 'free', t: '一个没有文献的问题', d: '我来挑，例如「复利」「排队为什么越排越长」。' },
+        { v: 'd3', t: '一个 3D 才讲得清的', d: '例如「月相」「蒸汽机怎么转」。' },
+        { v: 'yours', t: '你出的题', d: '写在下一题。' },
+      ] },
+      { id: 'e4', type: 'text', title: '你想让它做的题，或者你见过、喜欢的例子', hint: '网站、游戏、视频都行，说名字就够；我照着它的感觉调模板。' },
+      { id: 'e5', type: 'single', title: '真实验收，这一版最多花多少不用问你？', hint: 'v0.4 整个验收花了 $0.69。这一版有对话，模型还要写代码、反复修，会贵不少。', rec: '10', options: [
+        { v: '5', t: '$5' }, { v: '10', t: '$10' }, { v: '20', t: '$20' }, { v: 'none', t: '不单设', d: '只受每月 $30 的总上限约束。' },
+      ] },
+      { id: 'e6', type: 'single', title: '以后你自己用的时候，一件作品最多花多少？', hint: '开始前照旧先估价、让你确认。这是做到一半超了就停下的上限，设置里能改。', rec: '1', options: [
+        { v: '0.5', t: '$0.5' }, { v: '1', t: '$1' }, { v: '2', t: '$2' }, { v: 'none', t: '不设', d: '只看每月的总上限。' },
+      ] },
+      { id: 'e7', type: 'text', title: 'v0.5「做完」的标准', hint: '下面是我的建议，不同意的地方写出来：', list: [
+        '一本很厚的书连同摘抄加进知识库后，能就书里的内容对话；回答带出处，能跳回原段落；知识库里没有的不乱编；',
+        '在对话里各启动一次概念研究、事实调查和 WonderLab，都在后台跑完，结果回到对话里；',
+        'WonderLab 的验收题各做出一件能玩的作品，2D、3D 都有；',
+        '同一道题换一个模板，或者换一档忠实度，做出来明显不一样；',
+        '作品在隔离框里运行，联不了网、读不到文件，有自动测试；',
+        '监控的每一关都有自动测试，也都在真实验收里触发过；',
+        '单文件 HTML 离线能打开、能玩；',
+        '前几版留下的问题，按 E2 的回答做完或排好了期。',
+      ] },
+    ],
+  },
+];
+// ==================== 下面不用改 ====================
+
+// 最后一页是核对
+PAGES.push({ name: '核对', title: '核对一遍再提交', lead: '下面是全部答案。没选的点「去改」回到那一页；也可以一次按建议填完。提交以后还能改，改了自动更新。', items: [], review: true });
+
+// ---------- 状态 ----------
+const DOC = 'survey/answers';
+let state = { answers: {}, page: 0, submitted: false, submittedAt: null, updatedAt: null };
+try { const s = JSON.parse(localStorage.getItem(SURVEY.key) || 'null'); if (s && s.answers) state = Object.assign(state, s); } catch (e) {}
+if (!(state.page >= 0 && state.page < PAGES.length)) state.page = 0;
+let db = null; let dbState = 'pending';
+const saveEl = document.getElementById('save');
+const main = document.getElementById('main');
+const stepsEl = document.getElementById('steps');
+document.title = SURVEY.title;
+document.getElementById('title').textContent = SURVEY.title;
+function setSave(text, warn) { saveEl.textContent = text; saveEl.classList.toggle('warn', !!warn); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function plain(s) { return String(s).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'); }
+function groupsOf(q) { return q.groups || [{ label: q.title || '', sub: q.hint, rows: q.rows || [] }]; }
+
+// 所有要答的项：选择题、文字题，矩阵摊成一行一项
+function itemsOf(pi) {
+  const out = [];
+  PAGES[pi].items.forEach((q) => {
+    if (q.type === 'rows') groupsOf(q).forEach((g) => g.rows.forEach((r) => out.push({ id: r.id, label: plain(r.t), scale: q.scale, rec: r.rec })));
+    else out.push({ id: q.id, label: plain(q.title), q, rec: q.rec });
+  });
+  return out;
+}
+function allItems() { return PAGES.flatMap((_, i) => itemsOf(i).map((it) => Object.assign({ page: i }, it))); }
+function answered(it) { const v = state.answers[it.id]; return !(v == null || v === '' || (Array.isArray(v) && !v.length)); }
+function required(it) { return !(it.q && it.q.type === 'text'); }
+function answerText(it) {
+  if (!answered(it)) return '';
+  const v = state.answers[it.id];
+  if (it.scale) return (it.scale.find((s) => s.v === v) || {}).t || v;
+  if (it.q.type === 'text') return v;
+  const pick = (x) => { const o = it.q.options.find((o) => o.v === x); return o ? plain(o.t) : x; };
+  return Array.isArray(v) ? v.map(pick).join('；') : pick(v);
+}
+function left(pi) { return itemsOf(pi).filter((it) => required(it) && !answered(it)).length; }
+function summary() {
+  const s = {};
+  allItems().forEach((it) => { s[it.id + ' ' + it.label] = answerText(it) || '（未答）'; });
+  PAGES.forEach((p, i) => { const n = state.answers['note' + (i + 1)]; if (n) s['第 ' + (i + 1) + ' 页补充'] = n; });
+  return s;
+}
+function summaryText() { return SURVEY.title + '\n' + Object.entries(summary()).map(([k, v]) => k + '：' + v).join('\n'); }
+
+// ---------- 保存 ----------
+let saveTimer = null; let writing = false; let dirty = false;
+function persist(immediate) {
+  state.updatedAt = new Date().toISOString();
+  saveLocal();
+  renderSteps();
+  clearTimeout(saveTimer);
+  if (!db) { if (dbState === 'none') setSave('答案只存在这台设备上'); return; }
+  setSave('保存中…');
+  saveTimer = setTimeout(writeDb, immediate ? 0 : 500);
+}
+function saveLocal() { try { localStorage.setItem(SURVEY.key, JSON.stringify(state)); } catch (e) {} }
+async function writeDb(retry) {
+  if (writing) { dirty = true; return; }
+  writing = true;
+  const body = { answers: state.answers, summary: summary(), submitted: state.submitted, submittedAt: state.submittedAt, updatedAt: state.updatedAt };
+  try {
+    await db.doc(DOC).set(body);
+    setSave('已保存 · ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    if (e && e.code === 'unavailable' && !retry) { writing = false; setTimeout(() => writeDb(true), 800 + Math.random() * 800); return; }
+    setSave('保存失败，答案暂存在这台设备上', true);
+  }
+  writing = false;
+  if (dirty) { dirty = false; writeDb(); }
+}
+
+// ---------- 渲染 ----------
+function strip(no, kind) { return `<p class="strip"><b>${no}</b><span>${kind}</span></p>`; }
+function kindOf(q) {
+  if (q.type === 'multi') return q.max ? `可多选，最多 ${q.max} 个` : '可多选';
+  if (q.type === 'text') return '可不填';
+  if (q.type === 'rows') return '每行选一个';
+  return '单选';
+}
+function optHtml(q, o) {
+  const type = q.type === 'multi' ? 'checkbox' : 'radio';
+  const isRec = Array.isArray(q.rec) ? q.rec.includes(o.v) : q.rec === o.v;
+  return `<label class="opt">${o.fig ? `<span class="opt-fig">${o.fig}</span>` : ''}
+    <input type="${type}" name="${q.id}" value="${o.v}" id="${q.id}-${o.v}"><span class="mark" aria-hidden="true"></span>
+    <span class="opt-t"><b>${o.t}</b>${isRec ? '<span class="tag">建议</span>' : ''}</span>
+    ${o.d ? `<span class="opt-d">${o.d}</span>` : ''}</label>`;
+}
+function rowsHtml(q) {
+  const hasRec = groupsOf(q).some((g) => g.rows.some((r) => r.rec));
+  return groupsOf(q).map((g, gi) => `<section class="frame" aria-label="${esc(plain(g.label || q.id))}">
+    <p class="strip"><b>${g.label || q.id.toUpperCase()}</b><span>${g.sub ? g.sub + ' · ' : ''}${kindOf(q)}</span></p>
+    <div class="board">${hasRec && gi === 0 ? '<p class="legend"><i class="rec-dot" aria-hidden="true"></i>带圆点的是建议</p>' : ''}<div class="rows">${g.rows.map((r) => `<div class="rowq" role="radiogroup" aria-labelledby="${r.id}-t">
+      <div class="rowq-t" id="${r.id}-t"><span class="rowq-no">${r.id}</span>${r.t}${r.why ? `<span class="why">${r.why}</span>` : ''}</div>
+      <div class="seg">${q.scale.map((s) => `<label><input type="radio" name="${r.id}" value="${s.v}" id="${r.id}-${s.v}"><span class="lb">${r.rec === s.v ? '<i class="rec-dot" aria-hidden="true"></i>' : ''}${s.t}${r.rec === s.v ? '<span class="sr">（建议）</span>' : ''}</span></label>`).join('')}</div>
+    </div>`).join('')}</div></div></section>`).join('');
+}
+function qHtml(q) {
+  if (q.type === 'rows') return rowsHtml(q);
+  const no = q.id.toUpperCase();
+  const head = `<p class="q-title" id="${q.id}-t">${q.title}</p>${q.hint ? `<p class="hint">${q.hint}</p>` : ''}`;
+  if (q.type === 'text') {
+    return `<section class="frame">${strip(no, kindOf(q))}<div class="board">${head}
+      ${q.list ? `<ul class="hint hint-list">${q.list.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
+      <textarea id="${q.id}" name="${q.id}" aria-labelledby="${q.id}-t"></textarea></div></section>`;
+  }
+  const multi = q.type === 'multi';
+  return `<section class="frame ${multi ? 'multi' : ''}" role="${multi ? 'group' : 'radiogroup'}" aria-labelledby="${q.id}-t">${strip(no, kindOf(q))}
+    <div class="board">${head}<div class="opts ${q.layout === 'cards' ? 'cards' : ''}">${q.options.map((o) => optHtml(q, o)).join('')}</div></div></section>`;
+}
+function renderSteps() {
+  stepsEl.innerHTML = PAGES.map((p, i) => {
+    const done = p.review ? state.submitted : left(i) === 0;
+    return `<button type="button" class="step ${done ? 'done' : ''}" data-page="${i}" ${i === state.page ? 'aria-current="step"' : ''} aria-label="第 ${i + 1} 页：${p.name}${done ? '，已完成' : ''}"><span class="node" aria-hidden="true"></span>${i + 1}<span class="name">${p.name}</span></button>`;
+  }).join('');
+}
+function missingAll() { return allItems().filter((it) => required(it) && !answered(it)).length; }
+function recLeft(all) { return (all ? allItems() : itemsOf(state.page)).filter((it) => it.rec && !answered(it)).length; }
+function fillInfo(pi) {
+  if (PAGES[pi].review) { const n = missingAll(); return n ? `全卷还差 ${n} 项` : '全卷都选完了'; }
+  const n = left(pi); return n ? `这一页还差 ${n} 项` : '这一页选完了';
+}
+function reviewHtml() {
+  const missing = missingAll();
+  const body = PAGES.map((p, pi) => {
+    if (p.review) return '';
+    const items = itemsOf(pi); const note = state.answers['note' + (pi + 1)];
+    if (!items.length && !note) return '';
+    return `<h3>第 ${pi + 1} 页 · ${esc(p.name)}<button type="button" class="go" data-page="${pi}">去改</button></h3><dl>${items.map((it) => `<div><dt>${esc(it.id.toUpperCase())} ${esc(it.label)}</dt><dd class="${answered(it) || !required(it) ? '' : 'empty'}">${answered(it) ? esc(answerText(it)) : (required(it) ? '未答' : '没填')}</dd></div>`).join('')}${note ? `<div><dt>这一页想补充的</dt><dd>${esc(note)}</dd></div>` : ''}</dl>`;
+  }).join('');
+  return `<details class="review" open><summary>全部答案${missing ? `（还有 ${missing} 项没选）` : '（都选完了）'}</summary>${body}</details>`;
+}
+function doneHtml() {
+  if (!state.submitted) return '';
+  const when = state.submittedAt ? new Date(state.submittedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div class="done-box"><p>已提交（${when}）。回到对话告诉 Agent「问卷填好了」。${db ? '之后改答案会自动更新。' : '这个页面连不上存储，请点下面的「复制答案」，贴回对话。'}</p></div>`;
+}
+function submitBoard() {
+  return `<section class="frame">${strip('提交', '')}<div class="board" id="review-board">${doneHtml()}${reviewHtml()}
+    <div class="copy-row"><p class="hint">${db ? '答案自动存进了页面存储，Agent 能直接读。' : '连不上存储时，复制答案贴回对话。'}</p>
+    <div><button type="button" class="btn" id="copy">复制答案</button></div><textarea id="copy-text" readonly aria-label="答案文本"></textarea></div></div></section>`;
+}
+function render() {
+  const p = PAGES[state.page]; const pi = state.page; const last = pi === PAGES.length - 1;
+  main.innerHTML = `<section aria-labelledby="ph">
+    <div class="page-head"><p class="eyebrow">第 ${pi + 1} 页，共 ${PAGES.length} 页</p><h2 id="ph"><svg class="glyph" aria-hidden="true"><use href="#route-glyph"></use></svg><span>${p.title}</span></h2>${p.lead ? `<p class="lead">${p.lead}</p>` : ''}</div>
+    ${p.note ? `<aside class="note"><p class="note-t">${p.note.t}</p><ul>${p.note.items.map((x) => `<li>${x}</li>`).join('')}</ul></aside>` : ''}
+    ${(p.review ? recLeft(true) : itemsOf(pi).some((it) => it.rec)) ? `<div class="fill-row"><button type="button" class="btn" id="fill">${p.review ? '全卷没选的都按建议填' : '没选的都按建议填'}</button><span class="fill-info" id="fill-info" role="status">${fillInfo(pi)}</span></div>` : `<div class="fill-row"><span class="fill-info" id="fill-info" role="status">${fillInfo(pi)}</span></div>`}
+    ${p.items.map(qHtml).join('')}
+    ${p.review ? submitBoard() : `<section class="frame">${strip('这一页想补充的', '可不填')}<div class="board"><textarea id="note${pi + 1}" name="note${pi + 1}" aria-label="这一页想补充的"></textarea></div></section>`}
+    <div class="pager">
+      ${pi > 0 ? '<button type="button" class="btn" id="prev">上一页</button>' : '<span></span>'}
+      <span class="pager-info">${pi + 1} / ${PAGES.length}</span>
+      ${last ? `<button type="button" class="btn primary" id="submit">${state.submitted ? '更新提交' : '提交问卷'}</button>` : '<button type="button" class="btn primary" id="next">下一页</button>'}
+    </div></section>`;
+  main.querySelectorAll('input').forEach((inp) => {
+    const v = state.answers[inp.name];
+    inp.checked = Array.isArray(v) ? v.includes(inp.value) : v === inp.value;
+  });
+  main.querySelectorAll('textarea[name]').forEach((t) => { t.value = state.answers[t.name] || ''; });
+  const ct = document.getElementById('copy-text');
+  if (ct) ct.value = summaryText();
+  renderSteps();
+}
+function afterChange() {
+  const info = document.getElementById('fill-info'); if (info) info.textContent = fillInfo(state.page);
+}
+function go(i) { state.page = Math.max(0, Math.min(PAGES.length - 1, i)); saveLocal(); render(); window.scrollTo(0, 0); }
+function fillRec() {
+  const all = !!PAGES[state.page].review;
+  let n = 0;
+  (all ? allItems() : itemsOf(state.page)).forEach((it) => {
+    if (it.rec && !answered(it)) { state.answers[it.id] = Array.isArray(it.rec) ? it.rec.slice() : it.rec; n += 1; }
+  });
+  const y = window.scrollY;
+  persist(); render(); window.scrollTo(0, y);
+  const info = document.getElementById('fill-info');
+  if (info) info.textContent = (n ? `按建议填了 ${n} 项，随时能改。` : '没有可以按建议填的了。') + fillInfo(state.page);
+}
+
+main.addEventListener('change', (e) => {
+  const t = e.target; if (!t.name || t.tagName !== 'INPUT') return;
+  if (t.type === 'checkbox') {
+    const q = PAGES.flatMap((p) => p.items).find((x) => x.id === t.name);
+    let arr = Array.isArray(state.answers[t.name]) ? state.answers[t.name].slice() : [];
+    if (t.checked) {
+      if (q && q.max && arr.length >= q.max) {
+        t.checked = false;
+        const info = document.getElementById('fill-info');
+        if (info) info.textContent = `${t.name.toUpperCase()} 最多选 ${q.max} 个，先取消一个。`;
+        return;
+      }
+      arr.push(t.value);
+    } else arr = arr.filter((x) => x !== t.value);
+    state.answers[t.name] = arr;
+  } else state.answers[t.name] = t.value;
+  persist(); afterChange();
+});
+main.addEventListener('input', (e) => {
+  if (e.target.tagName === 'TEXTAREA' && e.target.name) { state.answers[e.target.name] = e.target.value; persist(); afterChange(); }
+});
+main.addEventListener('click', async (e) => {
+  const id = e.target.id;
+  if (id === 'next') go(state.page + 1);
+  if (id === 'prev') go(state.page - 1);
+  if (id === 'fill') fillRec();
+  if (e.target.classList.contains('go')) go(Number(e.target.dataset.page));
+  if (id === 'submit') {
+    state.submitted = true; state.submittedAt = new Date().toISOString();
+    persist(true); render();
+    const rb = document.getElementById('review-board'); if (rb) rb.scrollIntoView({ block: 'start' });
+  }
+  if (id === 'copy') {
+    const ta = document.getElementById('copy-text');
+    try { await navigator.clipboard.writeText(ta.value); e.target.textContent = '已复制'; }
+    catch (err) { ta.focus(); ta.select(); e.target.textContent = '请按 ⌘C 复制已选中的文字'; }
+  }
+});
+stepsEl.addEventListener('click', (e) => { const b = e.target.closest('.step'); if (b) go(Number(b.dataset.page)); });
+
+render();
+
+// ---------- 连接存储 ----------
+// 云端的运行时比页面脚本晚一点才把 window.claude 放上来：每 100ms 看一次，等满 10 秒还没有才算没有存储。
+async function connectDb() {
+  for (let i = 0; i < 100; i += 1) {
+    // 照字面写 window.claude.use(：本地 dw serve 看到这几个字才注入本地版存储
+    if (window.claude && typeof window.claude.use === 'function') { try { return await window.claude.use('db'); } catch (e) { return null; } }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
+}
+(async () => {
+  db = await connectDb();
+  if (!db) { dbState = 'none'; setSave('答案只存在这台设备上'); render(); return; }
+  dbState = 'ok';
+  try {
+    const snap = await db.doc(DOC).get();
+    if (snap.exists) {
+      const d = snap.data();
+      if (!state.updatedAt || (d.updatedAt && d.updatedAt > state.updatedAt)) {
+        state.answers = JSON.parse(JSON.stringify(d.answers || {}));
+        state.submitted = !!d.submitted; state.submittedAt = d.submittedAt || null; state.updatedAt = d.updatedAt || null;
+        saveLocal();
+      } else if (state.updatedAt && (!d.updatedAt || state.updatedAt > d.updatedAt)) writeDb();
+    } else if (Object.keys(state.answers).length) writeDb();
+    setSave('已连接 · 答案自动保存');
+  } catch (e) { setSave('暂时连不上存储，答案先存在这台设备上', true); }
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+})();
+</script>
+</body>
+</html>
