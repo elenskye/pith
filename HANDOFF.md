@@ -2,73 +2,74 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。云端 Claude 的交接在 `HANDOFF-cloud.md`。
 
-## 现在：v0.4 的四个已知问题修完了；v0.5 的问卷加了「知识库与对话」，等你填（2026-11-15）
+## 现在：改了计划，视觉先做、v0.5 延后；正式版装了 0.4.1（2026-11-16）
 
-### 本轮（v0.5 Refine）
+### 本轮
 
-1. **修掉 v0.4 的四个已知问题**（细节和真实数字在 `docs/decisions/0025`「2026-11-15：修掉四个已知问题」，做法在 `docs/architecture.md`「v0.5 本机模型与语义检索」）：
-   - **语义检索**：「问这本书」按意思找段落。接上了本机 `~/Documents/LLM` 的向量模型和重排模型（你在 ASK 里定的）：Pith 只读那个文件夹、用 `llmctl.sh` 启停，用到时才启动，闲置 15 分钟自己停，只停自己启动的。本机模型用不了时退回按词检索并说明。真实的两本《国富论》：建索引约 6 分钟（只建一次），提问 3–6 秒；整句中文、英文问题都找得到对的段落（同样的整句按词一条都搜不到）。
-   - **反方读全文**：长来源不再只发前 1.2 万字，改成按目标卡片挑最相关的片段（字面初筛 + 本机重排），核对引文仍用全文。v0.4 那次反方的三个网页：其中一篇 7.7 万字的，开头 1.2 万字一次都没提到 division of labour，挑出来的片段提到 25 次。
-   - **全书中英对齐**：段数不同的章不再整章放弃。先修解析（编者导读、书名页、挂错层的篇、数据表格每格算一段），再做章内单调对齐（一对多、多对一、落空）。两本《国富论》：36 个单元全部有结果，原著 2118 段正文里 2096 段有中译（v0.4 是 561 段）；只有附录标「对齐存疑」。加了 migration 0009。
-   - **重新解析**：附件再解析一次不再存第二份，而是就地替换，旧卡片按内容重新找锚点，找不到的如实标「没挂上原文」，中途出错整个回滚。用新解析器把两本《国富论》重新解析：9 次研究、46 张卡片的 245 句全部原位跟过去，审计 0 个问题。
-   - 做法：语义检索和反方我自己做；全书对齐、重新解析交给两个子任务在各自的工作树里做，我审过、合并、改了互相影响的测试，再用真实数据把四项串起来跑了一遍。
-2. **Git 以后都由我做**（你定的）：每轮做完自己提交并推送 `main`；提交信息 `v0.x.0: <xxx> improve`，不署名；不 force push、不改写历史、不删分支。写进了 `CLAUDE.md` 规则 4、7 和 `decisions/0026`。
-3. **问卷更新**：https://claude.ai/artifact/Xau2yf4Mpcu7RHYkytuKnE （同一个链接，`docs/questionnaire/round-5.html`）。
-   - 现在 7 页 47 题，约 20 分钟。最前面新加两页：
-     - 第 1 页 知识库：和文献库的关系、能放什么、摘抄和笔记怎么进来、你现在的摘抄在哪、回答怎么带出处、找不到时怎么办、最想拿它做什么。
-     - 第 2 页 对话：放在哪、怎么选知识库、能在对话里启动什么、启动前要不要确认、后台任务怎么显示、花费怎么确认、记性。
-   - 后面五页是原来的 WonderLab、忠实度、查看、范围，改了几处：忠实度多一题「管不管对话」；范围页多一题「知识库和对话用什么验收」；「前几版留下的问题」去掉了已经修的四条。
-   - 已按 ASK 定下、问卷里不再问的：知识库和对话同在 v0.5、先做；检索用本机向量 + 重排；对话的回答只用 API 模型。
-   - 发布时问卷还没人填过，所以新页直接插在了最前面。
+1. **正式版装了 0.4.1**：11-15 修的四个问题（语义检索、反方读全文、全书对齐、重新解析）都在里面。版本号从 0.4.0 改成 0.4.1，跟 0.1.1 一样用补丁号。`pnpm app:install` 打包、签名、换掉了「应用程序」里的旧版。我没打开它，因为一打开就会读写 `~/Pith/`（规则 4）。
+2. **计划改了**（`decisions/0027`，`0005` 加了一行）：
+   - 视觉方案现在做，就是 Atelier v1.0 的 Phase 5。Claude、Codex、Argon 各做一版，你挑一版。
+   - v0.5 延后，内容不变。
+   - 两套设计系统：App 用 `pith`；WonderLab 每种图形语言一套 `pith-wonder-<名字>`。用别的项目的设计系统就复制一份另起名字，例：「Pith Wonder - Pomelo」，原来那份不动。
+   - 视觉期分两步：V1 在 Atelier 里出方案，V2 接进 Pith。V2 做完升 0.4.2。
+3. **第五轮问卷留着**：云端页没动，答案还在页面里（前 3 页填了一部分，没提交）。快照在 `docs/questionnaire/round-5-answers-partial.md`。
+4. **文档更新、精简**：
+   - Pith 这边：
+     - `CLAUDE.md` 加了规则 9（和 Visual Atelier 联动）。规则 4 不再把 Atelier 当只读。删了重复的一条（规则 3 和规则 8 都写了问卷）和过时的说法。
+     - `ROADMAP.md`「现在」换成视觉期，「已完成」压短了，v0.5 挪进「以后」。
+     - `README.md`、`docs/requirements.md`、`HANDOFF-cloud.md` 跟着改。
+   - Atelier 这边（照它的规矩，没提交）：
+     - 新文件 `canvases/v1-phase56-questionnaire/pith-app.md`，给三家看的 Pith 背景：App 是什么、现在的界面、接进 Pith 要对上的变量名、三家都画「文献库」那一屏。
+     - `phase5-brief.md` 让三家先读 `pith-app.md`，颜色角色要对得上那几个变量。
+     - 验收问卷第 1 页：开头写清这一轮只做 App；「主要用在哪」换成 Pith 的三处。
+     - `CLAUDE.md`「几个会话怎么分」加了 Pith 的会话。
+     - `ROADMAP.md` 加了方案一行、「和 Pith 联动」的决定、授权记录。
+     - `README.md`、`docs/adoption.md`、`CHANGELOG.md` 跟着改。
 
 ## 等你
 
-1. **填问卷**，填完回对话说一声「填好了」。
-2. **《全球通史》的材料**（问卷 E0 选了它才需要）：EPUB 和几十条摘抄放到 `local/` 下（例如 `local/global-history/`），我只读副本。
-3. **正式版**现在还是 0.4.0，这轮的修复没装进去。要装的话说一声（`pnpm app:install`）；装完给两本《国富论》各点一次「重新解析」，才用上新的归类和全书对齐。看什么、怎么看记在 `ROADMAP.md`「v0.7 之后：用户验收清单」。
+1. **打开一次正式版**：第一次打开会先备份，再把数据库升到 v9。打开以后：
+   - 到「设置 › Word 与引文」点一次「更新」。
+   - 给两本《国富论》各点一次「重新解析」，才用上新的归类和全书对齐（怎么看在 `ROADMAP.md` 的验收清单）。
+2. **提交 Atelier**：Atelier 的 `CLAUDE.md` 写着 commit 由你来做，所以我没提交。三家的 worktree 要从 `main` 建，得先提交。只加我改的文件：
+   ```bash
+   git -C ~/Documents/GitHub/visual-atelier add CHANGELOG.md CLAUDE.md README.md ROADMAP.md docs/adoption.md canvases/v1-phase56-questionnaire/README.md canvases/v1-phase56-questionnaire/phase5-brief.md canvases/v1-phase56-questionnaire/survey.html canvases/v1-phase56-questionnaire/pith-app.md
+   ```
+   `canvases/peck-mcp-pomelo/` 那两个改动不是我的，是 Peck 那边的。你要是想让我以后自己提交 Atelier 的部分，说一声，我写进它的 `CLAUDE.md`。
+3. **开工 V1**：
+   - 在本地 bench 打开 http://127.0.0.1:4321/#/v1-phase56-questionnaire ，填第 1 页（pith 的简报）并提交，连同 `db.json` 一起提交。
+   - 再照第 2 页建三个 worktree、开三个会话，让它们读 `phase5-brief.md`。
+4. **v0.5 开工时**：接着填第五轮问卷（同一个链接 https://claude.ai/artifact/Xau2yf4Mpcu7RHYkytuKnE ）。《全球通史》的材料，问卷 E0 选了它才要。
 
 ## 已知的、没做的
 
-- 对齐现在只用长度和锚点，没喂向量相似度：这本书上两种做法 99.1% 相同，只用长度是完全确定的；相似度的接口留好了，做知识库时一起接。
-- 重新解析后段落换了编号，语义索引要重建（约 6 分钟，打开提问框时自动开始）。
-- PDF 的重新解析要重新过 Mathpix（花钱），没验证。
-- 没花钱重跑真实的反方（看评论卡有没有变多）；留到 v0.5 的真实验收。
-- 这些修复只过了自动测试、真实数据的命令行验证和浏览器预览（模拟数据），没在真实的 Pith 窗口里点过。
-- 更细的见 `decisions/0025` 每一小节的「没做的」。
+- 正式版装好了，但没在真实窗口里点过：数据库升级、Word 模板更新、重新解析都要你打开以后做。
+- 11-15 那四个修复留下的没做的照旧，见 `decisions/0025`：
+  - 对齐还没喂向量相似度。
+  - 重新解析以后语义索引要重建（约 6 分钟）。
+  - PDF 的重新解析没验证。
+  - 没花钱重跑真实的反方。
+- 组件里写死的颜色还在：状态色 amber、emerald 约 90 处，阅读器标注色在 `src/reader/colors.ts`。V2 会收进变量。
 
 ## 下一轮
 
-- 收到问卷回答后：
-  - 写 `decisions/0027`（v0.5 计划：知识库的数据结构和索引、对话 Agent 和后台任务、WonderLab 的模板与工具箱、隔离框、监控、忠实度、分期）；
-  - `ROADMAP.md` 定分期，版本号改 0.5.0；加 migration 0010 之前先冻结 v9 样本库；
-  - 重写 `HANDOFF-cloud.md` 的任务；
-  - 然后直接开工（规则 8）。
-- 知识库直接建在这轮的本机模型和向量存储上（`src-tauri/src/local/`、`concept::semantic`）；量大了要换向量的存法（现在是整本书扫一遍）。
+- **V2 的准备，不用等方案**：把写死的状态色收成语义变量（`--success`、`--warning`，四类句子的记号色）。标注色和 Zotero 一致，不改值，只集中起来。用 `?mock` 预览看明暗两种都不变样。
+- **V1 交了以后**：
+  - 在 Atelier 主工作区只读地看三条分支，并排评估（照 Atelier 的 `canvases/v1-phase56-questionnaire/README.md`）。
+  - 你挑定以后，按 V2 接进 Pith：同步进 `src/vendor/pith/`，改 `src/index.css`，换 App 图标，升 0.4.2。
+- **用的时候发现 Atelier 哪里不顺**，就照规则 9 去 Atelier 里改。
 
 ## 本轮改动
 
-- 新：
-  - `src-tauri/src/local/`（本机模型：清单、启停、向量、重排）；
-  - `src-tauri/src/concept/semantic.rs`（向量索引、按意思找段落）；
-  - `crates/concept-engine/src/excerpt.rs`（长来源挑片段）；
-  - `crates/concept-engine/src/reanchor.rs`、`src-tauri/src/concept/reparse.rs`（重新解析、重找锚点）和它们的测试；
-  - `src-tauri/migrations/0009_alignment.sql`。
-- 改：
-  - 引擎：`align.rs`（重写）、`epub.rs`、`text.rs`、`prompts.rs`、`verify.rs`、`render.rs`、`audit.rs`、`flow.rs`、`fixture.rs`；
-  - App：`concept/{commands,store,library,mod,tests}.rs`、`lib.rs`、`db.rs`、`transfer.rs`；
-  - 前端：`src/concept/`（提问框、阅读页、侧栏、解析对话框、研究页）、`src/settings/ConceptSettings.tsx`、`src/library/ItemDetail.tsx`、`src/shared/ipc.ts`、`src/dev/mockConcept.*`；
-  - 文档：`CLAUDE.md`、`ROADMAP.md`、`README.md`、`docs/{architecture,testing,schema,requirements}.md`、`docs/decisions/{0025,0026}`、`docs/questionnaire/round-5.html`、本文件。
-- 没加第三方依赖。版本号还是 0.4.0（v0.5 的计划定下时改）。
+- Pith：
+  - 版本号：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`Cargo.lock`。
+  - 新文件：`docs/decisions/0027-visual-first-with-atelier.md`、`docs/questionnaire/round-5-answers-partial.md`。
+  - 改了：`CLAUDE.md`、`ROADMAP.md`、`README.md`、`HANDOFF-cloud.md`、`docs/requirements.md`、`docs/decisions/0005-version-order.md`、本文件。
+- Atelier（没提交）：上面「等你」第 2 条列的 9 个文件。
+- 没加第三方依赖，代码没改。
 
 ## 测试
 
-- `pnpm check` 全过：`pith` 281 通过、25 项默认忽略；`concept-engine` 等各包全过；前端类型检查和测试通过。`cargo clippy --workspace --all-targets` 没有警告。
-- 真实验证（都在验收数据目录的副本上，不联网、不花钱，做完副本已删）：
-  - `real_semantic`：两本书建索引、六个问题；
-  - `real_excerpt`：三个真实的反方来源；
-  - `real_reparse`：新解析器重新解析两本书，再查库里的对齐；
-  - 子任务跑的 `real_epubs_full_alignment`（全书对齐、改乱再找回）。
-  - 命令见 `docs/testing.md`「本机模型与语义检索」「概念研究」。
-- 浏览器预览（模拟数据）：提问框、设置页的「本机模型」、书页的「重新解析」和对齐徽标、阅读页的多对一分组都看过；控制台只有一条原来就有的（预览里没有引文排版器）。
-- 本机的向量和重排服务测试时由 Pith 启动过，测完已停；`~/Documents/LLM` 里的文件没有改动。
-- 问卷：脚本语法检查通过，本机预览看过新加的两页，已重新发布；还没有回答。
+- `pnpm app:install`：打包成功，签名验证通过，「应用程序」里的 Pith 是 0.4.1。
+- `pnpm check` 全过：`pith` 281 通过、25 项默认忽略；其余各包全过；前端类型检查通过，前端测试 29 + 17 通过。
+- Atelier：`dw check v1-phase56-questionnaire` 全过，截图看过第 1 页。没跑 `npm test`、`npm run all`：bench 和 tooling 没改。

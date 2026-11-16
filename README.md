@@ -10,12 +10,13 @@
 2. **日常调查**：现成 Deep Research 漏来源、报告冗长、事实与推测混在一起
 3. **阅读学习**：读书摘抄难以沉淀为有出处、可复习的知识作品
 
-顺序：Library（v0.1）→ Word 引用与排版（v0.2）→ 事实调查（v0.3）→ 概念研究（v0.4）→ WonderLab（v0.5）→ 学术研究（v0.6）→ Adaptive Agent（v0.7），见 `docs/decisions/0005`。
+顺序：Library（v0.1）→ Word 引用与排版（v0.2）→ 事实调查（v0.3）→ 概念研究（v0.4）→ 视觉方案（和 Visual Atelier 一起做）→ 知识库与对话 + WonderLab（v0.5）→ 学术研究（v0.6）→ Adaptive Agent（v0.7），见 `docs/decisions/0005`、`0027`。
 
 ## 当前状态
 
-- 0.4.0：v0.4 Concept Research 做完（`docs/decisions/0024`、`0025`）；v0.5（知识库与对话 + WonderLab）在出计划问卷；v0.4 的四个已知问题（语义检索、反方读全文、全书对齐、重新解析）已在 2026-11-15 修掉。v0.7 之前在建雏形，用户验收和打磨放在 v0.7 之后（`docs/decisions/0026`）。文献库里的 EPUB / PDF 解析成带段落号和页码的文本，用技能做出概念卡、论证卡、关系图、反方与推演，每句原文逐字核对；Word 里能把卡片原文插成引文。
-- 已经能用：v0.1 文献库（Zotero 迁移、搜索管理、PDF 阅读标注、联网补全、备份恢复）、v0.2 Word（顶栏「Pith」选项卡里的引用、排版 Agent）、v0.3 事实调查。
+- 0.4.1（正式版 2026-11-16 装上）：v0.1 文献库、v0.2 Word（顶栏「Pith」选项卡里的引用和排版 Agent）、v0.3 事实调查、v0.4 概念研究都能用；v0.4 的四个已知问题已修（`docs/decisions/0025`）。
+- 现在做视觉方案：在 Visual Atelier 里出（它 v1.0 的 Phase 5），挑定后接进 Pith；v0.5（知识库与对话 + WonderLab）延后（`docs/decisions/0027`）。
+- v0.7 之前在建雏形，用户验收和打磨功能放在 v0.7 之后（`docs/decisions/0026`）。
 - 交接看 `HANDOFF.md`，计划看 `ROADMAP.md`。
 
 ## 运行
@@ -62,13 +63,13 @@ pnpm check
 | `HANDOFF.md` / `HANDOFF-cloud.md` | 最近一轮交接 / 给云端 Claude 的任务与它的记录 |
 | `ROADMAP.md` | 现在 / 已完成 / 以后 |
 | `docs/requirements.md` | 已定需求 |
-| `docs/decisions/` | 决策记录（一事一文；v0.4 计划 `0024`、验收 `0025`） |
+| `docs/decisions/` | 决策记录（一事一文；视觉与 Atelier 联动 `0027`） |
 | `docs/architecture.md` | 目录、规则、各模块的流程 |
 | `docs/schema.md` | 数据库结构 |
 | `docs/testing.md` | 测试约定与真实验收命令 |
 | `THIRD_PARTY.md` | 第三方依赖与许可证 |
 
-参考（做完的阶段留下的）：`docs/brief-digest.md`（原始 Brief 压缩版）、`docs/questionnaire/`（三轮问卷与回答）、`docs/feasibility.md`（Phase 0 验证）、`docs/open-source-evaluation.md`、`docs/zotero-mapping.md`、`docs/zotero-copy-guide.md`、`crates/*/README.md`、`poc/word-addin/README.md`。
+参考（做完的阶段留下的）：`docs/brief-digest.md`（原始 Brief 压缩版）、`docs/questionnaire/`（各轮问卷与回答；第五轮填了一部分）、`docs/feasibility.md`（Phase 0 验证）、`docs/open-source-evaluation.md`、`docs/zotero-mapping.md`、`docs/zotero-copy-guide.md`、`crates/*/README.md`、`poc/word-addin/README.md`。
 
 ## 本机环境（2026-11-08）
 
