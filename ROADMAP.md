@@ -9,10 +9,11 @@
 
 | 步 | 在哪做 | 做什么 | 状态 |
 | --- | --- | --- | --- |
-| V1 出方案 | `../visual-atelier` | 用户填 Atelier 验收问卷第 1 页（pith 的简报）→ Claude、Codex、Argon 各在自己的分支上做一版 `schemes/pith/` 和 `canvases/pith-explore/` → Atelier 的会话并排评估 → 用户挑一版，记 `0.1.0`，打 `pith-v0.1.0` | 说明已备好，等用户填简报、开三个会话 |
-| V2 接进 Pith | 本仓库 | 同步进 `src/vendor/pith/`；`src/index.css` 改用方案的变量（仍用 shadcn 命名）；组件里写死的状态色、标注色收进变量；换 App 图标；做完升 0.4.2 | 等 V1。写死的颜色可以先收成语义变量，不等方案 |
+| V1 出方案 | `../visual-atelier` | 用户填 Atelier 验收问卷第 1 页（pith 的简报）→ Claude、Codex、Argon 各在自己的分支上做一版 `schemes/pith/` 和 `canvases/pith-explore/` → Atelier 的会话并排评估 → 用户挑一版，记 `0.1.0`，打 `pith-v0.1.0` | 简报填了，三个 worktree 建好了（11-17）；等用户开三个会话、三家交 |
+| V2 接进 Pith | 本仓库 | 同步进 `src/vendor/pith/`；`src/index.css` 改用方案的变量（仍用 shadcn 命名）；组件里写死的状态色、标注色收进变量；接上方案的动效；换 App 图标；做完升 0.4.2 | 等 V1。写死的颜色可以先收成语义变量，不等方案 |
 
-- 三家的说明在 Atelier 的 `canvases/v1-phase56-questionnaire/phase5-brief.md`，Pith 的背景在同目录的 `pith-app.md`。
+- 三家的说明在 Atelier 的 `canvases/v1-phase56-questionnaire/phase5-brief.md`，Pith 的背景在同目录的 `pith-app.md`，简报摘要在 `decisions/0027` 末尾：数字花园；淡雅、简约、灵动；动效是亮点。
+- 三个 worktree：`../visual-atelier-claude`、`-codex`、`-argon`，分支 `agent/<claude|codex|argon>/pith`。
 - 这一轮只做 App 的方案。WonderLab 的设计系统（`pith-wonder-*`）在 v0.5 做 WonderLab 时起（`0027`）。
 
 ## 已完成
