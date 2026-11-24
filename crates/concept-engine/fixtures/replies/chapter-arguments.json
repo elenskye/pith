@@ -1,0 +1,77 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "argument",
+   "title": "分工靠三种情况提高产量",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "This great increase in the quantity of work, which, in consequence of the division of labour, the same number of people are capable of performing, is owing to three different circumstances;",
+     "paragraph": "I.i.5",
+     "quote": "This great increase in the quantity of work, which, in consequence of the division of labour, the same number of people are capable of performing, is owing to three different circumstances;",
+     "zh": "分工之后，同样数目的人能完成的工作量大大增加，这要归于三种不同的情况。",
+     "source": null
+    },
+    {
+     "category": "original",
+     "text": "First, the improvement of the dexterity of the workmen, necessarily increases the quantity of the work he can perform;",
+     "paragraph": "I.i.6",
+     "quote": "First, the improvement of the dexterity of the workmen, necessarily increases the quantity of the work he can perform;",
+     "zh": "第一，工人熟练程度的提高，必然增加他能完成的工作量。",
+     "source": null
+    },
+    {
+     "category": "original",
+     "text": "Secondly, the advantage which is gained by saving the time commonly lost in passing from one sort of work to another, is much greater than we should at first view be apt to imagine it.",
+     "paragraph": "I.i.7",
+     "quote": "Secondly, the advantage which is gained by saving the time commonly lost in passing from one sort of work to another, is much greater than we should at first view be apt to imagine it.",
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "original",
+     "text": "Thirdly, and lastly, everybody must be sensible how much labour is facilitated and abridged by the application of proper machinery.",
+     "paragraph": "I.i.8",
+     "quote": "Thirdly, and lastly, everybody must be sensible how much labour is facilitated and abridged by the application of proper machinery.",
+     "zh": "第三，每个人都会感到，使用适当的机械能大大便利和节省劳动。",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "三条依据是并列的：熟练、省时、机械，任何一条都能单独说明分工为什么让同样多的人做出更多的活。",
+     "paragraph": "I.i.5",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c2",
+   "kind": "argument",
+   "title": "分工带来一直扩展到最下层人民的普遍富裕",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "It is the great multiplication of the productions of all the different arts, in consequence of the division of labour, which occasions, in a well-governed society, that universal opulence which extends itself to the lowest ranks of the people.",
+     "paragraph": "I.i.10",
+     "quote": "It is the great multiplication of the productions of all the different arts, in consequence of the division of labour, which occasions, in a well-governed society, that universal opulence which extends itself to the lowest ranks of the people.",
+     "zh": "正是由于分工，各种工艺的产品成倍增加，一个治理良好的社会才会出现普遍的富裕",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "论证的关键一步是交换：每个工人做出的远多于自己所需，多出的部分换回别人的产品。",
+     "paragraph": "I.i.10",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

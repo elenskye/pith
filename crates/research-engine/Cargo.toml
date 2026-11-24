@@ -1,0 +1,10 @@
+[package]
+name = "research-engine"
+version = "0.3.0"
+edition.workspace = true
+publish.workspace = true
+description = "Pith 的事实调查引擎：流程、提示词与解析、事实核对、数值与计算、可信度、重查对比、报告渲染（纯逻辑，不联网）"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

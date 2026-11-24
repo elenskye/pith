@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* 颜色用 shadcn 命名的 CSS 变量；v0.1 只求简约，跟随系统浅色 / 深色。 */
+:root {
+  --background: #ffffff;
+  --foreground: #1f2328;
+  --sidebar: #f6f7f9;
+  --card: #ffffff;
+  --border: #e3e6ea;
+  --muted: #f1f3f5;
+  --muted-foreground: #6b7280;
+  --primary: #2f4f6f;
+  --primary-foreground: #ffffff;
+  --accent: #e8eef5;
+  --accent-foreground: #1f3a56;
+  --destructive: #c2410c;
+  --ring: #7aa2c8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1b1d21;
+    --foreground: #e6e8eb;
+    --sidebar: #22252a;
+    --card: #1f2226;
+    --border: #33373d;
+    --muted: #2a2e34;
+    --muted-foreground: #9aa1ab;
+    --primary: #8fb3d9;
+    --primary-foreground: #10161d;
+    --accent: #2c3946;
+    --accent-foreground: #dbe7f3;
+    --destructive: #f59e6b;
+    --ring: #5f88b0;
+  }
+}
+
+@theme inline {
+  --font-sans: "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 13px;
+    line-height: 1.6;
+    overscroll-behavior: none;
+    cursor: default;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* 文献内容可以选中复制 */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  * {
+    border-color: var(--border);
+  }
+}

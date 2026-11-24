@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pith ribbon tab for Word. All labels are English (decision 0006). Callbacks are in the PithMain module.
+     Images are PNGs in customUI/images (src-tauri/word/images, made from Lucide icons by scripts/word-icons.mjs). -->
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui">
+  <ribbon>
+    <tabs>
+      <tab id="PithTab" label="Pith">
+        <group id="PithCitations" label="Citations">
+          <button id="PithAddCitation" label="Add/Edit Citation" size="large" image="citation"
+                  onAction="PithMain.PithRibbonAction"
+                  supertip="Insert a citation from your Pith library. With the cursor in a Pith citation: change its references and page numbers, or remove it."/>
+          <button id="PithAddBibliography" label="Bibliography" size="large" image="bibliography"
+                  onAction="PithMain.PithRibbonAction"
+                  supertip="Insert the bibliography below the current paragraph."/>
+          <button id="PithRefresh" label="Refresh" size="large" image="refresh"
+                  onAction="PithMain.PithRibbonAction"
+                  supertip="Update all Pith citations and the bibliography in this document."/>
+        </group>
+        <group id="PithDocument" label="Document">
+          <dynamicMenu id="PithStyle" label="Style" size="large" image="style"
+                       getContent="PithMain.PithStyleMenu" invalidateContentOnDrop="true"
+                       supertip="Choose the citation style of this document. Styles imported in Pith are listed too."/>
+          <button id="PithFromZotero" label="Convert Zotero" size="large" image="zotero"
+                  onAction="PithMain.PithRibbonAction"
+                  supertip="Turn the Zotero citations and bibliography in this document into Pith citations."/>
+        </group>
+        <group id="PithApp" label="Pith">
+          <button id="PithOpen" label="Open Pith" size="large" image="open"
+                  onAction="PithMain.PithRibbonAction"
+                  supertip="Bring the Pith window to the front."/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

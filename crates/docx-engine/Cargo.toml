@@ -1,0 +1,24 @@
+[package]
+name = "docx-engine"
+version = "0.2.0"
+edition.workspace = true
+publish.workspace = true
+description = "Pith 的 Word 文档引擎：只改格式的排版器、独立校验器、引文写入、VBA 工程生成"
+
+[dependencies]
+zip = { version = "9", default-features = false, features = ["deflate"] }
+quick-xml = "0.42"
+regex = "1"
+roxmltree = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+cfb = "0.16.0"
+
+[dev-dependencies]
+docx-rs = "0.4"
+docx-rust = "0.1"
+
+[[bin]]
+name = "docx-engine"
+path = "src/main.rs"

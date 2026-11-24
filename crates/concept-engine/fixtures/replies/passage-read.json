@@ -1,0 +1,45 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "argument",
+   "title": "制针的例子说明分工把产量提高到几百倍",
+   "about": [],
+   "sentences": [
+    {
+     "category": "original",
+     "text": "To take an example, therefore, from a very trifling manufacture, but one in which the division of labour has been very often taken notice of, the trade of a pin-maker:",
+     "paragraph": "I.i.3",
+     "quote": "To take an example, therefore, from a very trifling manufacture, but one in which the division of labour has been very often taken notice of, the trade of a pin-maker:",
+     "zh": "以制针业为例",
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "一个人一天做不出二十枚针，十个人分工后一天能做四万八千枚以上：例子把抽象的「分工提高生产力」变成了能数的数字。",
+     "paragraph": "I.i.3",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c2",
+   "kind": "note",
+   "title": "pin-maker / 制针工",
+   "about": [],
+   "sentences": [
+    {
+     "category": "explanation",
+     "text": "制针业是斯密有意挑的「很不起眼的制造业」：工序全在一个作坊里，分工一眼就看得见。",
+     "paragraph": "I.i.3",
+     "quote": "the trade of a pin-maker",
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

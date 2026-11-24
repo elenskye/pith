@@ -1,0 +1,72 @@
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture","type":"message","role":"assistant","model":"claude-opus-5-5","content":[],"stop_reason":null,"usage":{"input_tokens":9100,"output_tokens":1}}}
+
+event: ping
+data: {"type":"ping"}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"先看有哪些官方和非官方的来源。"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EqQBCkYIBhgCKkA"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"我先搜一下示例市的数据来源。"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"server_tool_use","id":"srvtoolu_fixture1","name":"web_search","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"query\":\"示例"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"市 青年失业率 统计公报\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2}
+
+event: content_block_start
+data: {"type":"content_block_start","index":3,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_fixture1","content":[{"type":"web_search_result","url":"https://stats.example.invalid/bulletin-2024","title":"示例市 2024 年统计公报","encrypted_content":"EqgfCioIARgBIiQ3YTAw","page_age":"2025-02-20"},{"type":"web_search_result","url":"https://news.example.invalid/relay","title":"示例日报","encrypted_content":"Eqgf2","page_age":null}]}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":3}
+
+event: content_block_start
+data: {"type":"content_block_start","index":4,"content_block":{"type":"text","text":"","citations":null}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":4,"delta":{"type":"citations_delta","citation":{"type":"web_search_result_location","url":"https://stats.example.invalid/bulletin-2024","title":"示例市 2024 年统计公报","encrypted_index":"Eo8BCioIAhgB","cited_text":"2024 年，全市 16–24 岁城镇青年调查失业率为 12.3%"}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":4,"delta":{"type":"text_delta","text":"{\"summary\":\"先看示例市官方口径的青年失业率、工资和求人倍率，再用独立调查和招聘平台的数据对照，最后和样本市比较。官方数字与其他来源的口径不同，比较时分开写。\",\"sub_questions\":[{\"text\":\"示例市 16–24 岁青年的调查失业率近几年是多少？\",\"metric\":\"16–24 岁城镇青年调查失业率\",\"definition\":\"城镇调查失业率，不含在校学生\",\"population\":\"16–24 岁城镇青年\",\"region\":\"示例市\",\"period\":\"2022–2024 年\",\"angle\":\"official\",\"source_types\":[\"统计局公报\",\"统计年鉴表格\",\"官方媒体\"],\"queries\":[\"示例市 青年失业率 统计公报\",\"示例市 16-24岁 调查失业率\"]},{\"text\":\"示例市城镇单位就业人员的平均工资是多少（非私营、私营）？\",\"metric\":\"城镇单位就业人员年平均工资\",\"definition\":\"分非私营单位、私营单位\",\"population\":\"城镇单位就业人员\",\"region\":\"示例市\",\"period\":\"2024 年\",\"angle\":\"official\",\"source_types\":[\"统计局公报\"],\"queries\":[\"示例市 2024 平均工资 非私营 私营\"]},{\"text\":\"示例市的求人倍率是多少？\",\"metric\":\"求人倍率\",\"definition\":\"公共就业服务机构的岗位数与求职人数之比\",\"population\":\"\",\"region\":\"示例市\",\"period\":\"2022–2024 年\",\"angle\":\"official\",\"source_types\":[\"人社部门数据\"],\"queries\":[\"示例市 求人倍率\"]},{\"text\":\"独立调查或学术研究估计的示例市青年失业率是多少？\",\"metric\":\"青年失业率（独立估计）\",\"definition\":\"看各自的口径，例如是否包含放弃找工作的人\",\"population\":\"16–24 岁青年\",\""}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":4}
+
+event: content_block_start
+data: {"type":"content_block_start","index":5,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":5,"delta":{"type":"text_delta","text":"region\":\"示例市\",\"period\":\"2024 年\",\"angle\":\"alternative\",\"source_types\":[\"高校与研究机构的调查\",\"独立调查机构\"],\"queries\":[\"示例市 青年就业调查 大学\"]},{\"text\":\"招聘平台上示例市的岗位数和招聘薪资是多少？\",\"metric\":\"新发布岗位数、平均招聘月薪\",\"definition\":\"平台自己的业务数据\",\"population\":\"\",\"region\":\"示例市\",\"period\":\"2024 年\",\"angle\":\"alternative\",\"source_types\":[\"招聘平台数据\"],\"queries\":[\"示例招聘 示例市 岗位数 薪资\"]},{\"text\":\"样本市同一口径的青年失业率是多少？\",\"metric\":\"16–24 岁城镇青年调查失业率\",\"definition\":\"城镇调查失业率\",\"population\":\"16–24 岁城镇青年\",\"region\":\"样本市\",\"period\":\"2024 年\",\"angle\":\"official\",\"source_types\":[\"统计局公报\"],\"queries\":[\"样本市 青年失业率 2024\"]}],\"alt_dimensions\":[{\"name\":\"独立调查与学术估计\",\"why\":\"口径由研究者自己定，可以检验官方调查失业率是否偏低\",\"sources\":\"高校、研究机构的抽样调查\"},{\"name\":\"招聘平台的岗位数与薪资\",\"why\":\"反映企业实际的招聘需求和开价，不依赖登记或调查口径\",\"sources\":\"招聘平台发布的季度数据\"},{\"name\":\"社保参保人数\",\"why\":\"反映有正式劳动关系的就业规模，可以和就业人员总数对照\",\"sources\":\"人社部门、社保基金年报\"}],\"caveats\":[\"城镇调查失业率不含在校学生，独立调查的宽口径把放弃找工作的人也算作失业，两者不能直接比大小。\",\"招聘平台的数据只覆盖在该平台招聘的企业。\",\"不同城市的统计公报发布时间不同，比较时要看是不是同一年。\"]}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":5}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":1480,"server_tool_use":{"web_search_requests":1}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

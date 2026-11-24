@@ -1,0 +1,97 @@
+[
+  {
+    "id": "rl-item-0001",
+    "type": "article-journal",
+    "title": "Civic attitudes in synthetic panels",
+    "author": [
+      { "family": "Lindqvist", "given": "Mara" },
+      { "family": "Okafor", "given": "Daniel" }
+    ],
+    "container-title": "Journal of Synthetic Social Science",
+    "volume": "12",
+    "issue": "3",
+    "page": "45-67",
+    "issued": { "date-parts": [[2021, 6]] },
+    "DOI": "10.5555/rl.0001",
+    "language": "en"
+  },
+  {
+    "id": "rl-item-0002",
+    "type": "book",
+    "title": "The architecture of evidence",
+    "author": [{ "family": "Halvorsen", "given": "Ingrid" }],
+    "publisher": "Northbridge University Press",
+    "publisher-place": "Northbridge",
+    "issued": { "date-parts": [[2018]] },
+    "ISBN": "9780000000002",
+    "language": "en"
+  },
+  {
+    "id": "rl-item-0003",
+    "type": "article-journal",
+    "title": "合成数据中的政治效能感测量",
+    "author": [
+      { "family": "王", "given": "晓明" },
+      { "family": "李", "given": "华" }
+    ],
+    "container-title": "社会科学方法",
+    "volume": "8",
+    "issue": "2",
+    "page": "15-29",
+    "issued": { "date-parts": [[2020]] },
+    "language": "zh-CN"
+  },
+  {
+    "id": "rl-item-0004",
+    "type": "book",
+    "title": "证据与写作",
+    "author": [{ "family": "张", "given": "伟" }],
+    "publisher": "示例出版社",
+    "publisher-place": "北京",
+    "issued": { "date-parts": [[2019]] },
+    "language": "zh-CN"
+  },
+  {
+    "id": "rl-item-0005",
+    "type": "chapter",
+    "title": "Measuring trust without surveys",
+    "author": [{ "family": "Lindqvist", "given": "Mara" }],
+    "editor": [{ "family": "Park", "given": "Jiwon" }],
+    "container-title": "Methods for synthetic research",
+    "publisher": "Northbridge University Press",
+    "publisher-place": "Northbridge",
+    "page": "101-120",
+    "issued": { "date-parts": [[2021]] },
+    "language": "en"
+  },
+  {
+    "id": "rl-item-0006",
+    "type": "report",
+    "title": "Open data for local labour markets",
+    "author": [{ "family": "Lindqvist", "given": "Mara" }],
+    "publisher": "Northbridge Policy Lab",
+    "publisher-place": "Northbridge",
+    "issued": { "date-parts": [[2021, 11, 2]] },
+    "URL": "https://example.org/reports/open-data-labour",
+    "accessed": { "date-parts": [[2026, 11, 7]] },
+    "language": "en"
+  },
+  {
+    "id": "rl-item-0007",
+    "type": "article-journal",
+    "title": "Four authors and a footnote",
+    "author": [
+      { "family": "Moreau", "given": "Claire" },
+      { "family": "Sato", "given": "Kenji" },
+      { "family": "Abebe", "given": "Hana" },
+      { "family": "Novak", "given": "Petr" }
+    ],
+    "container-title": "Synthetic Methods Review",
+    "volume": "3",
+    "issue": "1",
+    "page": "1-9",
+    "issued": { "date-parts": [[2023]] },
+    "DOI": "10.5555/rl.0007",
+    "language": "en"
+  }
+]

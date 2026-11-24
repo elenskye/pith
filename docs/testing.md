@@ -1,0 +1,210 @@
+# 测试
+
+## 一条命令
+
+```bash
+pnpm check
+```
+
+= `tsc --noEmit` + 前端引文排版的测试（`node --test 'src/**/*.test.ts'`，单跑：`pnpm test:web`）+ `cargo test --workspace`（App 后端、Zotero 读取、文档引擎）+ `poc/word-addin` 的检查。每轮结束前必须通过；另跑 `cargo clippy --workspace --all-targets`，0 警告。
+
+## 约定
+
+- 全部用合成数据：Zotero 合成夹具 `zotero_import::fixture`、各格式的合成样例、`transfer::tests::rich_library`（夹具导入 + 各种 App 里产生的数据）。
+- 临时目录 `db::tests::temp_dir`（`<tmp>/researchlab-test-<pid>-<名称>`，离开作用域删除）；内存库 `db::tests::memory_db`（带内存搜索索引）。
+- 联网的测试不联网：假的 HTTP 回放合成的响应。
+- 浏览器预览：`pnpm dev` → http://localhost:1430/?mock（`src/dev/mockIpc.ts`）。新增 Rust 命令时同步 mock。调阅读器时把真实副本里的某个 PDF 复制到 `local/` 下，用 `?mock&pdf=/local/<文件名>.pdf` 打开（所有附件都打开它）。真实 App：`pnpm app:dev`（数据在 `~/Pith Dev/`）。开发版、测试、用 `PITH_DATA_DIR` 另指数据目录的打包版里，排版 Agent 用模拟模型（不联网、不花钱、不碰钥匙串）；试用时选 `src-tauri/fixtures/agent/示例规范.txt`，出处才核对得上。
+
+## 各模块测什么
+
+| 模块 | 测试 | 要点 |
+| --- | --- | --- |
+| 数据库、备份、启动 | `db.rs`、`backup.rs`、`lib.rs` | 新库 / 升级（升级前备份、失败整步回滚）、比 App 新就拒绝；daily 每天一次与清理规则；数据库损坏时报告不崩溃 |
+| 导入 | `import/*/tests.rs` | 夹具里的每种边界（缺失文件、MD5 不符、快照、内嵌图片、回收站、群组库……）；重复导入被拒、失败整批回滚并删掉新复制的文件；写入核对的「故意写错」检验 |
+| 编辑、回收站、去重 | `edit/tests.rs` | 字段 / 作者 / 换类型、批量一条失败整批不改、集合防成环；永久删除先备份、文件留到没有备份用到；合并 |
+| 搜索 | `search/tests.rs` | 中文二元组、西文前缀、子笔记命中父文献、FTS 特殊字符、索引跟着改动更新 |
+| 阅读 | `reader/tests.rs`、`protocol.rs` | 矩形合并、排序键与位置 JSON 与 Zotero 逐字符一致、只读的标注；协议的 Range / 拒绝路径穿越 |
+| 联网补全 | `metadata/tests.rs` | 认 DOI / ISBN、Crossref / Open Library 换成 Zotero 字段、只填空字段、待确认 / 撤销、后台队列 |
+| 恢复与导出 | `transfer/tests.rs`、`lib.rs` | 见下 |
+| Word 集成（v0.2） | `word/*.rs` | 本机服务：没令牌 / 令牌错 401、带 Origin 403、分块 411、超大 413、`Expect: 100-continue`、service.json 0600、停止时只删自己那份；宏协议：新文档第一处引文、旧名换新、复制粘贴重复、缺数据、切换样式、比 App 新的数据、搜索窗（新插入 / 编辑预填 / 删除 / 取消）、编辑保留 ID 与创建时间、Style 菜单清单、Word 里的 Zotero 转换；搜索窗：搜索、预填（库里 / 文档快照 / 找不到 / 回收站）、一次只有一个会话；样式：内置清单与 CSL 文件一致、导入 / 替换 / 依赖样式 / 删除；Zotero 条目 key 对应；CSL 映射（含印刷品文章不出网址、「额外」字段换算）；模板含全部按钮的回调与图片；装进临时「家目录」再卸载（真跑 osacompile）、写不进时由用户选中的文件夹写入 |
+| 排版 Agent（v0.2 W3） | `agent/*.rs`、`agent/tests.rs` | 整条流程用模拟模型和合成文档（提炼 → 合成规范 → 计划 → 排版 → 报告，原文件不变、不覆盖）；预算按最坏情况拦、上月不算；截断 / 拒答 / 格式不对照样记账且不存结果；中途停止按估计记账；流（SSE）解析用录好的文本；出处摘录核对、数值换算表、冲突取确定度高的；计划里不存在的样式 / 编不过的正则 / 越界的分节被丢掉；存档编号防路径穿越；测试不碰钥匙串、不联网 |
+| 事实调查（v0.3） | `crates/research-engine`（各模块单元测试、`tests/flow.rs`）、`src-tauri/src/research/*.rs`、`research/tests.rs` | 见下「事实调查」 |
+| 概念研究（v0.4） | `crates/concept-engine`（单元测试、`tests/text.rs`、`tests/flow.rs`）、`src-tauri/src/concept/tests.rs`、`src/cite/concept-locator.test.ts` | 见下「概念研究」 |
+| W5 版面（文档引擎） | `crates/docx-engine/tests/w5_layout.rs` | 已经另起一页的段落不再加段前分页（分节符后隔空段落、上一段以分页符结尾、一个标题分两段写）；新一节第一段、前面是正文的照样分页；受保护分节不动；表格里参考文献样式的段落换成表格文字；自带悬挂缩进的样式和列表段落写明 0 字符，参考文献保持原对齐；**改坏**（去掉段前不分页、去掉 0 字符）核对都查得出 |
+| 结构类排版（文档引擎，W4） | `crates/docx-engine/tests/structure.rs` | 「像论文」的合成文档上六类结构（分区与分节、页眉、页码、奇数页起、三线表、脚注编号、标题紧跟）；单面 / 双面；已有分节符后隔着空段落不多切一节；重复执行不重复加；表格可跳过、受保护分节不动；没给正文起点时如实标出；过期的分界点被拒绝；**把排好的文档逐项改坏，校验器都查得出**（含多一个部件、多一条关系、子元素顺序挪乱） |
+| 结构摘要与检查（文档引擎） | `crates/docx-engine/tests/outline.rs`、`src/checks.rs` | 分节的数法与排版器一致；计划预览的命中数 = 排版器实际改的段落数；页面设置缺省的项不动；摘要字数（Word 的算法）、关键词、参考文献条数与外文占比、题注是否按章编号 |
+| 引文（文档引擎） | `crates/docx-engine/tests/cite.rs`、`src/cite/`、`src/vba.rs`、`src/template.rs` | 合成文档刷新 → 引文 / 书目 / 数据部件 / 悬挂缩进；独立核对（另一套解析器）查出手改；0-B 旧格式迁移；控件以外的文字、域、其他部件不变（含 0-C 的合成论文）；中文姓名合成全名；Zotero：域代码与文档设置解析、按 key 对应、合成 Zotero 文档转换（页码、多条、库里没有的、修订里的不动、书目跨段带分页符、别的域不动）、样式对应、已有 Pith 数据的文档；.csl 检查；VBA 压缩（含规范样例）、加密、工程读回；模板确定（含图片） |
+| 引文排版（前端） | `src/cite/*.test.ts` | citeproc-js：APA / GB/T / Chicago 的引文与书目、全部内置样式能排、交给 Rust 的结构；GB/T 顺序编码页码在方括号外「[2]17」（2015、2025）；前后缀、不显示作者；中文全名；HTML → 带格式片段 |
+
+## 恢复、导出与升级（Phase 6，`decisions/0013`）
+
+- **导出**：文件夹内容、自检、`library.json` 能被普通 JSON 工具读、同一秒不覆盖、文件库里缺的文件照常报告。
+- **从导出恢复**：恢复到另一个新库后**每张表逐行一模一样**；改过的、截断的、缺表的、格式 / 数据库版本比 App 新的、不是我们的导出都拒绝；导出里缺失或改坏的附件只报告不中断。
+- **从备份恢复**（`lib.rs`，走真实的 AppState）：改动后恢复 → 数据回到备份时、永久删除的 PDF 还能打开、搜索跟着变；再恢复「恢复前」→ 改动回来；坏备份不动主库；**主库损坏时也能恢复**，坏库挪进备份目录；恢复之前开始的后台补全不写新库。
+- **升级流程**（每次加 migration 都靠它）：
+  1. `migrations_only_add`：migration 只建表、加列、建索引。若以后有要改数据的 migration，这条测试会失败，提醒为它单独写升级测试。
+  2. `every_old_version_upgrades_without_loss`：合成的完整库投影到第 1 … N-1 版 → 升到最新 → 旧数据逐表一致、App 的读取全部能用（`exercise`）。
+  3. `frozen_fixtures_upgrade_to_latest`：`src-tauri/fixtures/library-vN.json`（当时的代码生成）恢复 → 升级 → 同样检查。**加新 migration 之前**先冻结当前版本（生成后提交，用过的不改）：
+
+```bash
+cargo test -p pith freeze_fixture -- --ignored
+```
+
+## 事实调查（v0.3，`decisions/0020`、`0022`）
+
+- **引擎**（`crates/research-engine`，模拟接口）：认数（千分位、万 / 亿、% / ‰ / 百分点、负数、区间，日期和编号不当数）、文字折叠（只容忍空白和全半角）、计算（单位不一致、除数为 0、未核实的都拒绝）、结论核对（含占位符后面又写一遍单位）、可信度、重查对比（含同一格两次写法不同、不同指标 / 年龄段不误对）、渲染；`tests/flow.rs` 整条流程、取消后接着做、超预算、单个来源失败、全都读不了。夹具是虚构的「示例市」，故意带一条摘录写错的事实、一个 404、一个扫描件 PDF、一段注入文字和一段 `hidden` 文字。
+- **改坏**：摘录改一个字、数字改一位、单位错、结论里多一个对不上的数、低可信来源排到前面，流程里拦一次，`audit` 对存下来的结果再查一次（另查：没核实的标成已核实、计算结果被改、可信度被抬高、正文被换）。
+- **下载失败时改用 Claude 网页抓取**（`decisions/0023`）：引擎 `tests/flow.rs` 的来源标记、费用记成一步、报告写明；`anthropic.rs` 用本地假网站（403 / 412）和假 Anthropic 测网页文字、base64 的 PDF、Claude 也打不开、内网地址和关掉时不改用、请求形状与账本。
+- **App 一侧**（`src-tauri/src/research/`）：取正文（类型判断、编码、HTML / CSV / XLSX / PDF / DOCX、扫描件）、快照、本机下载（本地 `TcpListener` 假服务器：字节一致、跳转、各种失败、内网拦截、限速与取消）、三类接口（录制的回复、请求形状、`pause_turn` 原样发回、拒答、错误不回显密钥、重试、预算、流断开按估计记账）、存取（fresh / v5 升级）、Word 导出、加入文献库；`research/tests.rs` 端到端：真实的接口实现连本地假 Anthropic / DeepSeek / Tavily / 网站，每一笔费用对上账本。
+- **浏览器**：`?mock` 里调查页全流程能点通；`?mock&research=real` 假装真接口（确认框里显示缺密钥等）。mock 数据由引擎生成，改了引擎的输出结构就重新生成：
+
+```bash
+cargo run -q -p research-engine --example mock_data > src/dev/mockResearch.json
+```
+
+- **真实验收**（默认忽略，会联网花钱，事先问用户上限）：和 App 的命令走同一套接口与设置，结果存进指定的数据目录，打包版用 `PITH_DATA_DIR` 指过去就能在 App 里看。密钥文件每行一把（Anthropic、DeepSeek、Tavily 按形状认；别放 OpenAI 等其他 `sk-` 开头的密钥，会被当成 DeepSeek 的）。
+
+```bash
+PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=plan cargo test -p pith real_research_run -- --ignored --nocapture
+```
+
+  打印计划、uid 和下一步的预计费用；接着 `PITH_STAGE=execute PITH_RUN=<uid> PITH_EXPORT_DIR=<目录>` 做完（审计、导出三种、结论用到的来源加入文献库）；重查是 `PITH_STAGE=rerun PITH_RUN=<上一次的 uid>`，再按 execute 做新的这一次；`PITH_STAGE=export PITH_RUN=<uid>` 只重新审计、导出，不联网；`PITH_STAGE=fetch PITH_URLS=<网址,网址>` 只试下载（本机下载失败的改用 Claude 网页抓取，`decisions/0023`）。
+- **把调查导进另一个数据目录**（默认忽略；v0.3 验收时把测试目录的两次真实调查导进了正式数据目录）：先做「导入前」备份，问题按文字认、调查按 uid 认（已有就跳过），快照逐个复制并核对 SHA-256，来源与文献的对应不带过去，账本里的真实调用补进目标账本，导完重新审计。目标是正式数据目录时先退出正式版，先用 `PITH_DRY_RUN=1` 看一遍：
+
+```bash
+PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith import_research_runs -- --ignored --nocapture
+```
+
+## 概念研究（v0.4，`decisions/0024`、`0025`）
+
+- **引擎**（`crates/concept-engine`）：EPUB 2 / 3 夹具（现拼，不放二进制；英文是 Project Gutenberg #3300 的第一篇第 1–3 章，中文是合成的）上的单元、角色、段落号、页码、对齐；合成的两种目录（平铺的篇章和脚注小目录、书名页、编者的导读、挂错层的第五编）的归类，数据表格整张算一段；对齐（`align.rs` 的单元测试）：合成的中英两章含合并、拆分、多出一段，结果确定；段数相同的章照旧按顺序对；**改坏**（把一段挪走：两边各落空一次，别的段不跟着错位；两边差得太远：不硬对）；锚点和调用方给的相似度各能定下长度定不了的对法；表格段落空不扣分；v0.4 存的 JSON 照样读；`SKILL.md` 的格式检查；录制回复跑四种入口、反方（文献库 / 上网）、推演、自由；**改坏**：引文改一个字、挂错段落、不存在的段落号、标成原文却没有锚点、推演混进原文类、旁注或导读被标成原文、他人观点没有来源，都拦下；`audit` 查出存下的结果被改。
+- **App 一侧**（`src-tauri/src/concept/tests.rs`）：附件 → 解析 → 存（导入前备份）→ 对齐（新库：一对多、多对一存进 `concept_aligned_pairs` 再原样读回；升级：把存下的对齐改回 v0.4 的样子，读书时按新算法重算、存回去；冻结的样本库和各版本的投影升级后，`transfer::tests::exercise` 逐份对齐都重算过、每章有结果）；段落检索（中文词映射回原著）、检索表自动重建；从 v7 升级；OpenAI Responses 与网页搜索、Mathpix（本地假服务器）；端到端整章分析 + 反方，费用合计 = 账本；Word 搜索窗的原文。
+- **重新解析**：引擎 `tests/reanchor.rs`（同样的文本原位跟过去；段落号后移时短引文也跟着原来那一段走；一段拆成两段按引文找；段落被删标「没挂上原文」、下次解析回来了重新挂上；多处命中取同一单元、再取最近的；角色不对的不算；译本重新解析后中译重新核对；整章入口的范围、关系的说明、入口选的卡片跟着换；挂来源的他人句不动；**改坏**位置和段落号审计查得出）。App `concept/reparse_tests.rs`（从附件重新解析同样的内容：uid、id、关联、对齐、研究、检索都不变；段落号后移：库里的锚点行、对齐、检索表都是新的；拆段、删段、译本重新解析；换到一半出错、存研究时出错（临时触发器）都整个回滚；**改坏**库里重找的位置审计查得出；同一个附件不存第二份）。夹具文本用 `fixture::insert_before` / `split` / `remove` / `reflow` 改出「解析器变了」的样子。真实数据（默认忽略，不联网不花钱；**用数据目录的副本**，会被改）：
+
+```bash
+PITH_ACCEPT_DIR=<验收数据目录的副本> PITH_EXPECT_SAME=1 PITH_PERTURB=1 cargo test -p pith real_reparse -- --ignored --nocapture
+```
+
+  每份 EPUB 文本从它的附件重新解析一遍，只打印聚合数字；`PITH_EXPECT_SAME=1` 要求每句原位跟过去、审计 0 个问题（解析器没变时）；`PITH_PERTURB=1` 再假装解析器变了（每章最前面多一段）、然后换回来，看研究是不是和最开始逐句一样。
+- **Word**：`word/bridge.rs` 的 `pick_card_quote_adds_a_quote_line`（选了卡片原文时多一行 `Q`）；`src/cite/concept-locator.test.ts`（页码 + 段落号、只有段落号在 GB/T 与 APA 下的写法）。
+- **两本真实 EPUB**（默认忽略，只打印聚合数字）：解析与归类（`real_epubs_first_three_chapters`）、全书对齐（`real_epubs_full_alignment`：每个单元都有结果、段数相同的章和按顺序对完全一样、顺序不交叉、结果确定；在段数相同的章上按固定规则合并、删段，看算法找回多少）。
+
+```bash
+PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p concept-engine --test real_books -- --ignored --nocapture
+```
+
+  再给本机向量服务的地址，就多比一遍「长度、锚点加语义相似度」和一组不同的权重（用 `curl` 调，引擎本身不联网；向量缓存在 `target/tmp/`，只有哈希和数字）。第一次要算四千多段，约 5 分钟：
+
+```bash
+# 先把本机的向量服务起起来（OpenAI 兼容的 /v1/embeddings）
+PITH_EMBED_URL=http://127.0.0.1:8081/v1/embeddings PITH_EMBED_MODEL=qwen3-embedding-0.6b PITH_BOOK_EN=… PITH_BOOK_ZH=… cargo test -p concept-engine --test real_books real_epubs_full_alignment -- --ignored --nocapture
+```
+
+- **mock 数据**由引擎生成，改了输出结构就重新生成：
+
+```bash
+cargo run -q -p concept-engine --example mock_data > src/dev/mockConcept.json
+```
+
+- **真实验收**（默认忽略；会联网花钱，事先问用户上限）：和 App 走同一条路（确认框的内容 → 建研究 → 执行），结果存进 `PITH_ACCEPT_DIR`，打包版用 `PITH_DATA_DIR` 指过去就能看。密钥文件每行 `名字=密钥`（`openai=…`、`mathpix=app_id:app_key`）。分几步：
+  - `PITH_STAGE=books`（不联网）：`PITH_BOOK_EN`、`PITH_BOOK_ZH` 两本 EPUB 进文献库、解析、存、对齐；
+  - `PITH_STAGE=pdf`：`PITH_PDF` 经 Mathpix 转文字后存（`PITH_EXPORT_DIR` 里留下 `lines.json` 和 `.mmd`）；
+  - `PITH_STAGE=run`：`PITH_TEXT=en|zh|pdf`，`PITH_REQUEST` 是页面发的请求（如 `{"skill":"chapter","entry":"chapter","unit":"I.i"}`；问题和概念不给段落时先本地检索，`PITH_SEARCH` 换检索词、`PITH_LIMIT` 取几段）。先打印确认框，加 `PITH_GO=1` 才发送；做完打印卡片、核对、审计，导出到 `PITH_EXPORT_DIR`；
+  - `PITH_STAGE=search PITH_SEARCH=<词>`：只看本地检索的结果（不联网）；`PITH_STAGE=export PITH_RUN=<uid>`：只重新审计、导出；`PITH_STAGE=quotes`：Word 搜索窗里的「卡片里的原文」。
+- **把概念研究导进另一个数据目录**（默认忽略；v0.4 验收时把测试目录的结果导进了正式数据目录）：书和附件在目标里新建（附件按 SHA-256 核对），文本和研究的 uid 不变、已有的跳过，评论来源的快照逐个核对 SHA-256，文献库里的编号不带过去，账本里的真实调用补进目标，导完重新审计；先做「导入前」备份。目标是正式数据目录时先退出正式版。`PITH_DRY_RUN=1` 只列出要导的东西、不打开目标（打开会把目标库升到最新版本），想完整演练就先把目标目录复制一份导进副本：
+
+```bash
+PITH_FROM=<源数据目录> PITH_TO=<目标数据目录> cargo test -p pith import_concept_runs -- --ignored --nocapture
+```
+
+- **在 Word 里试原文插入**：同上面「Word 端到端」，数据目录换成 `PITH_ACCEPT_DIR` 那个（里面有做好的研究）；Word 里 Add/Edit Citation → 选书 → 「卡片里的原文」选一句。
+
+```bash
+PITH_REAL_MODEL=1 PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<数据目录> PITH_BUDGET=<月上限> PITH_STAGE=run PITH_REQUEST='<请求>' PITH_GO=1 cargo test -p pith real_concept_run -- --ignored --nocapture
+```
+
+## 真实数据（默认忽略，只读，只打印汇总数字）
+
+都用 `~/ResearchLab-test/zotero-copy`（副本），导入到临时目录；绝不读写 `~/Zotero/` 与 `~/Pith/`。写进 `docs/` 的只能是聚合数字。
+
+命令格式（换掉 `<测试名>`）：
+
+```bash
+ZOTERO_COPY_DIR=~/ResearchLab-test/zotero-copy cargo test -p pith <测试名> -- --ignored --nocapture
+```
+
+| 测试名 | 看什么 |
+| --- | --- |
+| `real_copy` | 导入 + 写入核对 |
+| `real_copy_tokenizers` | 两种中文分词的对比 |
+| `real_copy_lookup`（另需 `RL_CONTACT_EMAIL`，会联网） | 联网补全 |
+| `real_copy_export` | 整库导出 → 恢复到另一个库，逐表一致 |
+| `real_copy_csl` | 每条文献都能换成 CSL-JSON（类型、语言等聚合数字） |
+| `real_thesis_zotero`（论文默认 `local/real-thesis/src/毕业论文_终稿.docx`，`PITH_THESIS=<路径>` 换） | 真实论文的 Zotero 引文 Word 外转换：对应到文献库的数量、与 Zotero 原来显示的逐处比（引文、书目）、Zotero 的 itemData 与 Pith 的 CSL-JSON 逐字段比、再切 APA；两份都独立核对。排版用 Node 里的 `src/cite`（`scripts/cite-render.ts`）。输出写到 `local/real-thesis/out/` |
+| `prepare_e2e_library`（另需 `PITH_E2E_DIR=<空目录>`） | 把副本导入这个目录并留着，给端到端验收用 |
+
+Zotero 读取层与审计：`cargo test -p zotero-import -- --ignored`（同样要 `ZOTERO_COPY_DIR`）。
+
+另有：`bench_rebuild`（索引重建耗时）、`real_network_samples`（公开样例核对真实接口，会联网）、`node scripts/pdf-check.mjs ~/ResearchLab-test/zotero-copy/storage`（PDF 兼容性）。
+
+## Word 端到端（v0.2，`decisions/0016`）
+
+不碰 `~/Pith/`：先准备一个临时数据目录，再让 Pith 用它。
+
+1. `ZOTERO_COPY_DIR=~/ResearchLab-test/zotero-copy PITH_E2E_DIR=<空目录> cargo test -p pith prepare_e2e_library -- --ignored --nocapture`
+2. 开发版：`pnpm dev` 开着，`PITH_DATA_DIR=<目录> ./target/debug/pith`；正式版：`pnpm app:build` 后 `open --env PITH_DATA_DIR=<目录> target/release/bundle/macos/Pith.app`。
+3. 不经 Word 先测服务（端口、令牌在 `<目录>/service.json`）：`curl -H "Authorization: Bearer <令牌>" http://127.0.0.1:<端口>/v1/ping`；宏协议 `POST /v1/word`（请求格式见 `src-tauri/src/word/bridge.rs` 文件头）；Word 外刷新 / 核对 `POST /v1/docx/refresh`、`/v1/docx/verify`。
+4. 先备份用户自己的桥接脚本（`~/Library/Application Scripts/com.microsoft.Word/Pith-bridge.sh`、`Pith.scpt`；测试用的 Pith 安装时会改连测试数据目录）。设置 › Word › 安装到 Word。macOS 不让 Pith 写 Word 启动文件夹时，会弹出已经打开那个文件夹的对话框，点「打开」就写进去（选过一次以后「更新」直接写入）。只是测试也可以直接用 Word 打开 `<目录>/word/Pith.dotm`。
+5. 用 Word 打开一份论文副本（`open -a "Microsoft Word" <副本>`）：Convert Zotero、Add/Edit Citation（插入、编辑、删除）、Style（切 APA 再切回）、Bibliography、Refresh、Open Pith；存盘后用 `/v1/docx/verify` 核对。要测「Pith 没开时自动启动」，先退出 Pith 再点按钮。用自动化点选项卡时先移动鼠标再点（Word 会忽略紧跟在别处点击之后的一下）。
+6. 测完：退出 Word 与测试用的 Pith，把第 4 步备份的桥接脚本放回去（或从自己平时用的 Pith 重新安装）。
+
+调试模板：`cargo run -p docx-engine -- dotm <输出.dotm> --bas <模块.bas> --ribbon <customUI.xml>` 生成后直接用 Word 打开（不用装）；`cargo run -p docx-engine -- vba-dump <vbaProject.bin>` 对照 Word 自己存的工程（比如 Zotero 安装包里的 Zotero.dotm）。
+
+## 在 Word 里看排版结果（v0.2 W5，`decisions/0021`）
+
+用 Mac Word 把排好的副本导出 PDF，再逐页渲染、列出每页页眉页脚文字、找出空白页（只用 macOS 自带的 PDFKit）：
+
+```bash
+bash scripts/word-pdf.sh <排好的.docx> <输出目录>
+```
+
+输出目录里有 `<名字>.pdf`、`<名字>-pages/pNNN.png`（每页一张图）、`<名字>-pages.txt`（每页一行：页眉区、页脚区文字；空白页标 BLANK-BODY）。文档先复制到输出目录再打开，原件不动，关闭时不保存。Word 是沙盒应用：第一次往某个目录写 PDF 时会弹「Grant File Access」，要用户点一次授权，所以固定用一个输出目录。只渲染已有的 PDF：`swift scripts/pdf-pages.swift <in.pdf> <输出目录> [倍数]`。
+
+不花钱地复查（引擎改了以后）：用存下来的模型计划在论文副本上按 App 的同一条路径重排，结果写到 `PITH_OUT_DIR`（存下来的计划不动；同名输出不覆盖，另存「（Pith 排版 2）」）。路径用绝对路径（测试在 `src-tauri` 下运行）：
+
+```bash
+PITH_ACCEPT_DIR=<存计划的目录> PITH_RULESET=<规范 id> PITH_RUN=<计划 id> PITH_THESIS=<原论文.docx> PITH_OUT_DIR=<输出目录> cargo test -p pith real_agent_reapply -- --ignored --nocapture
+```
+
+W5 用的是 `local/agent-acceptance-w4` 里规范 `01M748Z7NH0TZ0B5ATK3A4ZK0A` 的 4 份计划，输出在 `local/real-thesis/out/agent-w5/`。排好的论文再做引文转换和切换 APA：`PITH_THESIS=<排好的.docx>` 跑上面「真实数据」里的 `real_thesis_zotero`。
+
+## 排版 Agent 的真实模型验收（v0.2 W3，`decisions/0018`）
+
+联网、花钱（一轮提炼约 $0.5，一份论文的计划约 $0.1–0.3），**每一期都要用户重新同意**（W3 上限 $5、实际 $1.86；W4 上限 $3、实际 $1.63），密钥放在用户给的文件里（测试代码从不读钥匙串）。账本记在 `PITH_ACCEPT_DIR` 里，合计超过 `PITH_ACCEPT_BUDGET`（默认 5 美元）就拒绝调用。
+
+1. 不联网，先看两种方式各要发多少：`PITH_THESIS=<论文.docx> cargo test -p pith real_thesis_digest -- --ignored --nocapture`（加 `PITH_SHOW=1` 打印「结构和片段」发出的文字）。
+2. 提炼：`PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=<目录> PITH_REQ_DOCS=<文档 1>:<文档 2>… [PITH_HUMAN_SPEC=<人工规范.json>] cargo test -p pith real_agent_extract -- --ignored --nocapture`：打印清单、核对不上的摘录、合成的规范，并与人工规范逐项对比。
+3. 计划：`PITH_API_KEY_FILE=… PITH_ACCEPT_DIR=… PITH_RULESET=<第 2 步打印的规范 id> PITH_THESIS=<论文.docx> PITH_MODE=brief|full [PITH_HUMAN_PLAN=<人工计划.json>] cargo test -p pith real_agent_plan -- --ignored --nocapture`：在目录里的副本上生成计划并排版，再与人工计划逐段比较最后用的样式、比较各部分的起点。
+   - 不联网地试引擎（手写规范和计划）：`cargo run -p docx-engine -- apply <论文.docx> --spec <规范.json> --plan <计划.json> --out <新文件.docx> --report <新文件.md>`；W4 用的手写规范与计划在 `local/agent-acceptance-w4/manual/`。
+4. 在 App 里用真模型但不碰正式数据：`pnpm app:build` 后 `open --env PITH_DATA_DIR=<临时目录> --env PITH_REAL_MODEL=1 --env PITH_API_KEY_FILE=<密钥文件> target/release/bundle/macos/Pith.app`。
+
+## PoC 与 v0.2 素材
+
+- `cd poc/word-addin && pnpm check`（Office.js 路线保留待用）；`cargo test -p docx-engine`；`bash scripts/phase0-check.sh`（Phase 0 端到端，仍用 0-B 原型的旧格式）。
+- 真实论文：`RL_WORD_DOCX=<绝对路径> cargo test -p docx-engine --test format -- --ignored`。论文与规范在 `local/real-thesis/`，回归样例在 `local/samples/`，都不进 Git。
+
+## 本机模型与语义检索（v0.5）
+
+- **本机模型**（`src-tauri/src/local/`）：清单取每类第一个模型、坏清单拒绝；模拟和关闭两种模式不起进程；只停 Pith 自己启动的、闲置够久的服务；模拟向量有共同字词的更像；重排按分数排、丢掉低于下限的。
+- **语义检索**（`src-tauri/src/concept/semantic.rs`，模拟的本机模型）：向量只建一次、段落文字变了只重算那一段、文本删了向量跟着清；索引没建时按词检索并说明；建好后按相关度排、只给正文段、中文问题带着中译；重排用不了按相似度排；向量服务用不了退回按词；找不到本机模型时照常按词检索。
+- **挑片段**（`crates/concept-engine/src/excerpt.rs`）：切块合起来一字不差；相关的一段在长文靠后的位置也挑得到（只取开头拿不到）；片段都是原文里原样的连续文字；短的来源、没有字面重合的来源和以前一样；重排模型在字面相近的候选里定取舍，重排说都不相关就还按字面；发给模型的是片段，全文不动。
+- **真实的本机模型**（默认忽略；不联网、不花钱，会经 `llmctl.sh` 启动服务，标成 `--by pith`；测完用 `~/Documents/LLM/scripts/llmctl.sh stop embedding` / `stop rerank` 停）：
+
+```bash
+PITH_LOCAL_MODELS=real cargo test -p pith real_embedding -- --ignored --nocapture
+PITH_LOCAL_MODELS=real cargo test -p pith real_rerank -- --ignored --nocapture
+# 真实的书：PITH_ACCEPT_DIR 指一个数据目录的副本（里面有解析好的原著和译本），只打印段落号、分数和用时
+PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_QUESTIONS='问题一|问题二' cargo test -p pith real_semantic -- --ignored --nocapture
+# 真实的反方来源：看挑出来的片段比只取开头多带了多少提到目标概念的地方
+PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM='division of labour' cargo test -p pith real_excerpt -- --ignored --nocapture
+```

@@ -1,0 +1,37 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "note",
+   "title": "术语表：第一章",
+   "about": [],
+   "sentences": [
+    {
+     "category": "explanation",
+     "text": "division of labour（分工）：一件工作拆成许多道工序、由不同的人专做。",
+     "paragraph": "I.i.1",
+     "quote": null,
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "dexterity（熟练）：做一种简单操作做久了以后的手艺。",
+     "paragraph": "I.i.6",
+     "quote": null,
+     "zh": null,
+     "source": null
+    },
+    {
+     "category": "explanation",
+     "text": "machinery（机械）：便利和节省劳动的工具。",
+     "paragraph": "I.i.8",
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": []
+}

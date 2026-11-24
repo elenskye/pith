@@ -1,0 +1,8 @@
+{
+  "publisher": "示例招聘平台",
+  "published": "",
+  "facts": [
+    { "sub_question": "Q5", "metric": "新发布岗位数", "value": "48200", "unit": "个", "region": "示例市", "population": "", "period": "2024 年第四季度", "definition": "平台自己的业务数据", "producer": "示例招聘平台", "producer_kind": "platform_data", "relayed": false, "quote": "示例市\t2024Q4\t48200\t8520", "unit_quote": "新发布岗位数（个）" },
+    { "sub_question": "Q5", "metric": "平均招聘月薪", "value": "8520", "unit": "元", "region": "示例市", "population": "", "period": "2024 年第四季度", "definition": "平台自己的业务数据", "producer": "示例招聘平台", "producer_kind": "platform_data", "relayed": false, "quote": "示例市\t2024Q4\t48200\t8520", "unit_quote": "平均招聘月薪（元）" }
+  ]
+}

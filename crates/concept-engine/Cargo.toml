@@ -1,0 +1,12 @@
+[package]
+name = "concept-engine"
+version = "0.4.0"
+edition.workspace = true
+publish.workspace = true
+description = "Pith 的概念研究引擎：EPUB / Mathpix 文本层、段落号与页码、中英对齐、技能与工作流、卡片核对与审计、关系图、渲染（纯逻辑，不联网）"
+
+[dependencies]
+research-engine = { path = "../research-engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = { version = "9", default-features = false, features = ["deflate"] }

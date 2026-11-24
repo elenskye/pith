@@ -1,0 +1,57 @@
+{
+ "cards": [],
+ "relations": [
+  {
+   "from": "K1",
+   "to": "K5",
+   "kind": "premise",
+   "note": {
+    "category": "explanation",
+    "text": "「三种情况」的论证以分工这个概念为前提。",
+    "paragraph": "I.i.5",
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  },
+  {
+   "from": "K5",
+   "to": "K2",
+   "kind": "contains",
+   "note": {
+    "category": "explanation",
+    "text": "熟练是三种情况中的第一种。",
+    "paragraph": "I.i.6",
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  },
+  {
+   "from": "K5",
+   "to": "K3",
+   "kind": "contains",
+   "note": {
+    "category": "explanation",
+    "text": "机械是三种情况中的第三种。",
+    "paragraph": "I.i.8",
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  },
+  {
+   "from": "K6",
+   "to": "K4",
+   "kind": "cause",
+   "note": {
+    "category": "explanation",
+    "text": "各种产品成倍增加，引起普遍富裕。",
+    "paragraph": "I.i.10",
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  }
+ ]
+}

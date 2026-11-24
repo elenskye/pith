@@ -1,0 +1,84 @@
+{
+ "cards": [
+  {
+   "key": "c1",
+   "kind": "comment",
+   "title": "示例书评（文献库）：分工让工人变得迟钝",
+   "about": [
+    "K1"
+   ],
+   "sentences": [
+    {
+     "category": "others",
+     "text": "the division of labour, pushed far enough, makes the worker as stupid as it is possible for a human creature to become",
+     "paragraph": null,
+     "quote": "the division of labour, pushed far enough, makes the worker as stupid as it is possible for a human creature to become",
+     "zh": null,
+     "source": "S1"
+    },
+    {
+     "category": "explanation",
+     "text": "这是对「熟练」论证的修正：分工带来熟练，也带来单调和迟钝。",
+     "paragraph": null,
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  },
+  {
+   "key": "c2",
+   "kind": "comment",
+   "title": "示例网页：制针的数字被夸大了",
+   "about": [
+    "K1"
+   ],
+   "sentences": [
+    {
+     "category": "others",
+     "text": "the famous pin figures were copied from an encyclopaedia rather than observed",
+     "paragraph": null,
+     "quote": "the famous pin figures were copied from an encyclopaedia rather than observed",
+     "zh": null,
+     "source": "S2"
+    },
+    {
+     "category": "explanation",
+     "text": "批评针对的是例子的来源，不否认分工的效果。这是解释，不是文献里的话。",
+     "paragraph": null,
+     "quote": null,
+     "zh": null,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "from": "c1",
+   "to": "K1",
+   "kind": "revises",
+   "note": {
+    "category": "explanation",
+    "text": "书评修正了分工只有好处的说法。",
+    "paragraph": null,
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  },
+  {
+   "from": "c2",
+   "to": "K1",
+   "kind": "opposes",
+   "note": {
+    "category": "explanation",
+    "text": "网页质疑制针例子的数字。",
+    "paragraph": null,
+    "quote": null,
+    "zh": null,
+    "source": null
+   }
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  "publisher": "某网友的博客",
+  "published": "2024 年 12 月",
+  "facts": [
+    { "sub_question": "Q1", "metric": "青年失业率（网友说法）", "value": "30", "unit": "%", "region": "示例市", "population": "年轻人", "period": "", "definition": "个人感受，没有统计", "producer": "某网友", "producer_kind": "self_media", "relayed": false, "quote": "示例市年轻人的失业率恐怕已经超过 30% 了", "unit_quote": "" },
+    { "sub_question": "Q1", "metric": "没找到工作的同学占比", "value": "35", "unit": "%", "region": "示例市", "population": "同学", "period": "", "definition": "", "producer": "某网友", "producer_kind": "self_media", "relayed": false, "quote": "身边大约 35% 的同学都没找到工作", "unit_quote": "" }
+  ]
+}

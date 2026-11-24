@@ -1,0 +1,8 @@
+{
+  "publisher": "示例大学劳动经济研究所",
+  "published": "2025 年 1 月",
+  "facts": [
+    { "sub_question": "Q4", "metric": "青年失业率（独立估计）", "value": "15.8", "unit": "%", "region": "示例市", "population": "16–24 岁青年", "period": "2024 年", "definition": "宽口径：把已经放弃找工作的人也算作失业", "producer": "示例大学劳动经济研究所", "producer_kind": "academic", "relayed": false, "quote": "按照把已经放弃找工作的人也算作失业的宽口径估计，2024 年示例市 16–24 岁青年失业率为 15.8%。", "unit_quote": "" },
+    { "sub_question": "Q4", "metric": "调查的有效样本量", "value": "3,200", "unit": "人", "region": "示例市", "population": "", "period": "2024 年 10 月至 11 月", "definition": "", "producer": "示例大学劳动经济研究所", "producer_kind": "academic", "relayed": false, "quote": "本次调查于 2024 年 10 月至 11 月进行，有效样本 3,200 人。", "unit_quote": "" }
+  ]
+}

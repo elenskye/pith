@@ -1,0 +1,7 @@
+{
+  "publisher": "样本市统计局",
+  "published": "2025 年 2 月 25 日",
+  "facts": [
+    { "sub_question": "Q6", "metric": "16–24 岁城镇青年调查失业率", "value": "10.1", "unit": "%", "region": "样本市", "population": "16–24 岁城镇青年", "period": "2024 年", "definition": "城镇调查失业率", "producer": "样本市统计局", "producer_kind": "cn_gov_stats", "relayed": false, "quote": "2024 年，样本市 16–24 岁城镇青年调查失业率为 10.1%。", "unit_quote": "" }
+  ]
+}
