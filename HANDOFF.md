@@ -7,18 +7,19 @@
 ### 本轮（2026-11-24）：Atelier v1.0.1
 
 - Atelier：文档、代码精简；方案 `pith` 定为 1.0.0（用户批了 `logo-grow`），补了 `sync.json`，Design System「Pith」和 Pith Explore（R1）发到 Claude 现用账号；Pomelo 的 fold 进方案（pomelo 1.0.1）；tag `v1.0.1`、`pith-v1.0.0`、`pomelo-v1.0.1`、`peck-v1.0.0`、`vermilion-v1.5.0`（都没推送）。细节看 Atelier 的 `CHANGELOG.md`。
+- Atelier 收尾（同一天，还是 1.0.1）：`npm run all` 全过；一个新开的 Agent 只照文档冷启动跑通，验收问卷删了；Pomelo Explore 旧了的 11 张板重跑生成器更新到方案最新的样子；新加 `npm run check:canvases`（`npm run all` 里），以后板和生成器对不上会报出来。Peck 的 Design System 云端那份只差一个版本号，共享给了组织外的人，没重发（等你说）。
 - 本仓库：Atelier 的 `HANDOFF.md` 搬来成 `docs/atelier-handoff-2026-11-22.md`。用户定：和 `0028` 合并，**以它为主**；`ROADMAP.md`、`README.md` 跟着改。代码没改，`pnpm check` 没跑。
 
 ### 等你
 
-1. 推送两个仓库（Atelier 连 tag：`git -C ~/Documents/GitHub/visual-atelier push --follow-tags`，或 `push --tags`）。
+1. 推送两个仓库。Atelier 的 tag 还没推（`main` 已经推了）：`git -C ~/Documents/GitHub/visual-atelier push --tags`。
+3. Peck 的 Design System 要不要按 1.0.0 重发（只改 `tokens.json` 里的版本号；它共享给了组织外的人）。
 2. 下一轮做前端 UI：开工前先问开发程度；同步 `pith-v1.0.0` 进 `src/vendor/pith/` 要你说一声。
 
 ### 下一轮
 
 - 先把 `docs/atelier-handoff-2026-11-22.md` 和 `0028` 合成 `decisions/0030`，改 `CLAUDE.md` 规则 4、`requirements.md`、`ROADMAP.md`，删掉搬来的那份。
 - 再同步 `pith-v1.0.0`，定 shadcn 变量和 `--color-*` 的对照（写回 Atelier 的 `schemes/pith/DESIGN.md`），接界面。
-- Atelier 没做完的：`npm run all`、新会话冷启动验收（做完删 `canvases/v1-phase56-questionnaire/`）。
 
 ## 上一轮（2026-11-24）：合并 Atelier、换新的开发准则
 
