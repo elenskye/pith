@@ -13,8 +13,8 @@
 ### 等你
 
 1. 推送两个仓库。Atelier 的 tag 还没推（`main` 已经推了）：`git -C ~/Documents/GitHub/visual-atelier push --tags`。
-3. Peck 的 Design System 要不要按 1.0.0 重发（只改 `tokens.json` 里的版本号；它共享给了组织外的人）。
 2. 下一轮做前端 UI：开工前先问开发程度；同步 `pith-v1.0.0` 进 `src/vendor/pith/` 要你说一声。
+3. Peck 的 Design System 要不要按 1.0.0 重发（只改 `tokens.json` 里的版本号；它共享给了组织外的人）。
 
 ### 下一轮
 
