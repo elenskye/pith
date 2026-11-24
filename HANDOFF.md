@@ -2,7 +2,26 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.0.0，换了新的开发准则；等定 1.1.0 开发计划（2026-11-24）
+## 现在：1.0.0；Atelier 1.0.1 做完，下一步 Pith 前端 UI（2026-11-24）
+
+### 本轮（2026-11-24）：Atelier v1.0.1
+
+- Atelier：文档、代码精简；方案 `pith` 定为 1.0.0（用户批了 `logo-grow`），补了 `sync.json`，Design System「Pith」和 Pith Explore（R1）发到 Claude 现用账号；Pomelo 的 fold 进方案（pomelo 1.0.1）；tag `v1.0.1`、`pith-v1.0.0`、`pomelo-v1.0.1`、`peck-v1.0.0`、`vermilion-v1.5.0`（都没推送）。细节看 Atelier 的 `CHANGELOG.md`。
+- 本仓库：Atelier 的 `HANDOFF.md` 搬来成 `docs/atelier-handoff-2026-11-22.md`。用户定：和 `0028` 合并，**以它为主**；`ROADMAP.md`、`README.md` 跟着改。代码没改，`pnpm check` 没跑。
+
+### 等你
+
+1. 推送两个仓库（Atelier 连 tag：`git -C ~/Documents/GitHub/visual-atelier push --follow-tags`，或 `push --tags`）。
+2. 下一轮做前端 UI：开工前先问开发程度；同步 `pith-v1.0.0` 进 `src/vendor/pith/` 要你说一声。
+
+### 下一轮
+
+- 先把 `docs/atelier-handoff-2026-11-22.md` 和 `0028` 合成 `decisions/0030`，改 `CLAUDE.md` 规则 4、`requirements.md`、`ROADMAP.md`，删掉搬来的那份。
+- 再同步 `pith-v1.0.0`，定 shadcn 变量和 `--color-*` 的对照（写回 Atelier 的 `schemes/pith/DESIGN.md`），接界面。
+- Atelier 没做完的：`npm run all`、新会话冷启动验收（做完删 `canvases/v1-phase56-questionnaire/`）。
+
+## 上一轮（2026-11-24）：合并 Atelier、换新的开发准则
+
 
 ### 新架构（`decisions/0028`）
 
