@@ -199,8 +199,8 @@ function BookHome({ uid, onUnit }: { uid: string; onUnit: (unit: number) => void
           <p>
             中译：{d.translation.title || d.translation.itemTitle}；{d.alignedUnits} 章对齐
             {d.fittedUnits > 0 && `（其中 ${d.fittedUnits} 章中英分段不同，是自动对齐的）`}
-            {d.lowUnits.length > 0 && <span className="text-amber-700 dark:text-amber-400">，{d.lowUnits.length} 章对齐存疑（{d.lowUnits.slice(0, 8).join("、")}{d.lowUnits.length > 8 ? "…" : ""}）</span>}
-            {d.mismatchedUnits.length > 0 && <span className="text-amber-700 dark:text-amber-400">，{d.mismatchedUnits.length} 章没有对齐（{d.mismatchedUnits.slice(0, 8).join("、")}{d.mismatchedUnits.length > 8 ? "…" : ""}）</span>}
+            {d.lowUnits.length > 0 && <span className="text-warn">，{d.lowUnits.length} 章对齐存疑（{d.lowUnits.slice(0, 8).join("、")}{d.lowUnits.length > 8 ? "…" : ""}）</span>}
+            {d.mismatchedUnits.length > 0 && <span className="text-warn">，{d.mismatchedUnits.length} 章没有对齐（{d.mismatchedUnits.slice(0, 8).join("、")}{d.mismatchedUnits.length > 8 ? "…" : ""}）</span>}
           </p>
         ) : (
           orphans.length > 0 && (

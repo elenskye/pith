@@ -166,8 +166,5 @@ export const fieldLabel = (f: string) => {
 /** 「添加字段」里可选的常用字段 */
 export const ADDABLE_FIELDS = ["volume", "issue", "pages", "publisher", "place", "edition", "series", "url", "accessDate", "ISSN", "shortTitle", "numPages", "university", "institution", "reportNumber", "conferenceName", "callNumber"];
 
-const SORTS: Record<string, string> = { added: "加入时间", title: "标题", creator: "作者", year: "年份", type: "类型", relevance: "相关度" };
-export const sortLabel = (s: string) => SORTS[s] ?? s;
-
 /** 永久删除 / 清空回收站的确认说明（decisions/0013：删除前备份，附件文件留到没有备份用到） */
 export const DELETE_FOREVER_NOTE = "会从回收站里彻底去掉。删除前自动备份数据库，后悔了可以在「设置 → 备份」里恢复；附件文件等到没有任何备份用到时才从磁盘删除。";

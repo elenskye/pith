@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, TriangleAlert } from "lucide-react";
 
 /** 技能的一页（放在对话里）：一行小字的路径（最后一项是当前页）和右侧按钮，下面是内容。不自己滚动，跟着对话滚 */
-export function Page({ crumbs, actions, children }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
+export function Page({ crumbs, actions, children }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="skill-page">
       <header className="skill-page-head">
@@ -263,7 +263,7 @@ export function Markdown({ text }: { text: string }) {
       const quote: string[] = [];
       while (i < lines.length && lines[i].startsWith(">")) quote.push(lines[i++].replace(/^>\s?/, ""));
       out.push(
-        <blockquote key={key} className="border-l-2 border-amber-400 bg-amber-50 px-3 py-1.5 dark:bg-amber-950/30">
+        <blockquote key={key} className="border-l-2 border-warn bg-warn px-3 py-1.5">
           {inline(quote.join(" "))}
         </blockquote>,
       );

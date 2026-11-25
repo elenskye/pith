@@ -931,7 +931,6 @@ export type ResearchExecutePreview = {
 };
 
 export type ResearchProgress = { uid: string | null; stage: ResearchStage; done: number; total: number; message: string };
-export type ResearchDone = { uid: string; status: ResearchRunStatus | null; error: string | null };
 
 export type ResearchKeyWhich = "anthropic" | "deepseek" | "tavily";
 export type ResearchEndpoint = { provider: "anthropic" | "openai_compatible"; model: string; baseUrl: string | null };
@@ -1562,8 +1561,6 @@ export const api = {
   citeStyleRemove: (id: string) => invoke<void>("cite_style_remove", { id }),
   /** 排版 Agent：状态、密钥、月度上限 */
   agentStatus: () => invoke<AgentStatus>("agent_status"),
-  agentKeySet: (key: string) => invoke<AgentStatus>("agent_key_set", { key }),
-  agentKeyClear: () => invoke<AgentStatus>("agent_key_clear"),
   agentBudgetSet: (usd: number) => invoke<AgentStatus>("agent_budget_set", { usd }),
   agentSendModeSet: (mode: FormatMode) => invoke<AgentStatus>("agent_send_mode_set", { mode }),
   formatRulesetsList: () => invoke<FormatRulesetSummary[]>("format_rulesets_list"),
@@ -1592,7 +1589,6 @@ export const api = {
   researchKeySet: (which: ResearchKeyWhich, key: string) => invoke<ResearchStatus>("research_key_set", { which, key }),
   researchKeyClear: (which: ResearchKeyWhich) => invoke<ResearchStatus>("research_key_clear", { which }),
   researchQuestionsList: () => invoke<ResearchQuestion[]>("research_questions_list"),
-  researchQuestionGet: (id: number) => invoke<ResearchQuestion>("research_question_get", { id }),
   /** prepare 不联网：算出要发什么、大概多少钱；用户确认后拿 ticket 调 run（联网） */
   researchPlanPrepare: (question: string) => invoke<ResearchPlanPreview>("research_plan_prepare", { question }),
   researchPlanRun: (ticket: number) => invoke<ResearchRunView>("research_plan_run", { ticket }),
@@ -1639,7 +1635,6 @@ export const api = {
   conceptAskSearch: (uid: string, question: string, limit?: number) => invoke<ConceptAskResult>("concept_ask_search", { uid, question, limit: limit ?? null }),
   /** 在后台给一份文本（和它连着的译本）建语义索引；进度发事件 concept-index */
   conceptIndexStart: (uid: string) => invoke<ConceptIndexStatus>("concept_index_start", { uid }),
-  conceptIndexStatus: (uid: string) => invoke<ConceptIndexStatus>("concept_index_status", { uid }),
   localStatus: () => invoke<LocalStatus>("local_status"),
   /** prepare 不联网：算出每步发什么、最坏多少钱；用户确认后拿 ticket 调 execute（后台跑，事件 concept-progress / concept-done） */
   conceptRunPrepare: (request: ConceptRunRequest) => invoke<ConceptRunPreview>("concept_run_prepare", { request, resume: null }),

@@ -37,7 +37,7 @@ function Hits({ hits, chosen, onChosen, grouped }: { hits: Hit[]; chosen: Set<st
               <span className="min-w-0 flex-1">
                 <span className="font-medium tabular-nums">{h.key}</span>
                 {h.role !== "body" && <span className="ml-1 text-muted-foreground">（{ROLE[h.role]}）</span>}
-                {h.viaTranslation && <span className="ml-1 text-amber-700 dark:text-amber-400">在中译里搜到</span>}
+                {h.viaTranslation && <span className="ml-1 text-warn">在中译里搜到</span>}
                 {typeof h.score === "number" && (
                   <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground tabular-nums" title="相关度（本机的重排模型打的分，0–100）">
                     {Math.round(h.score * 100)}
@@ -150,7 +150,7 @@ export function AskDialog({ textUid, onRequest, onClose }: { textUid: string; on
         <IndexLine index={s.index} />
         {s.busy && <p className="text-muted-foreground">第一次找要先启动本机的模型，可能要等十几秒。</p>}
         {s.error && <p className="selectable text-destructive">{s.error}</p>}
-        {s.result?.note && <p className="selectable text-amber-700 dark:text-amber-400">{s.result.note}</p>}
+        {s.result?.note && <p className="selectable text-warn">{s.result.note}</p>}
         {s.result && s.result.mode === "semantic" && s.result.hits.length > 0 && <p className="text-muted-foreground">按相关度排，数字是相关度（0–100）；前 6 段已经勾上。</p>}
         {s.result && <Hits hits={s.result.hits} chosen={s.chosen} onChosen={s.setChosen} />}
         <div className="flex justify-end gap-2">

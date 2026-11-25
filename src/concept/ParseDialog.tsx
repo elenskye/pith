@@ -115,7 +115,7 @@ function ReparseSummary({ r }: { r: ConceptReparseReport }) {
           <span>句没挂上原文（在新文本里找不到，卡片上会标出来）</span>
           {r.zhLost > 0 && (
             <>
-              <span className="text-right font-medium text-amber-700 dark:text-amber-400">{r.zhLost}</span>
+              <span className="text-right font-medium text-warn">{r.zhLost}</span>
               <span>句的中译核不上了（只显示整段译文，或这一章不再对齐）</span>
             </>
           )}
@@ -149,7 +149,7 @@ function ReparseSummary({ r }: { r: ConceptReparseReport }) {
                     ) : (
                       <span className="tabular-nums">{anchorName(c.to)}</span>
                     )}
-                    {c.zhLost && <span className="text-amber-700 dark:text-amber-400">；中译核不上了</span>}
+                    {c.zhLost && <span className="text-warn">；中译核不上了</span>}
                   </li>
                 ))}
                 {x.findings.map((f, i) => (

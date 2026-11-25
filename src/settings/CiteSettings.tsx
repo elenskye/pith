@@ -83,7 +83,7 @@ export function CiteStylesSection() {
 function Stat({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <p className="flex items-start gap-1.5">
-      {ok ? <CircleCheck size={13} className="mt-0.5 shrink-0 text-emerald-600" /> : <CircleAlert size={13} className="mt-0.5 shrink-0 text-amber-600" />}
+      {ok ? <CircleCheck size={13} className="mt-0.5 shrink-0 text-ok" /> : <CircleAlert size={13} className="mt-0.5 shrink-0 text-warn" />}
       <span>{children}</span>
     </p>
   );

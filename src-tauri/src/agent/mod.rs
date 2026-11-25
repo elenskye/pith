@@ -511,20 +511,6 @@ pub fn agent_status(state: State<AppState>, agent: State<AgentState>) -> AgentSt
 }
 
 #[tauri::command(async)]
-pub fn agent_key_set(state: State<AppState>, agent: State<AgentState>, key: String) -> Result<AgentStatus, String> {
-    agent.secret.save(&key)?;
-    state.with_db(|c| crate::metadata::put_setting(c, KEY_SAVED, Some("1")))?;
-    Ok(status(&state, &agent))
-}
-
-#[tauri::command(async)]
-pub fn agent_key_clear(state: State<AppState>, agent: State<AgentState>) -> Result<AgentStatus, String> {
-    agent.secret.clear()?;
-    state.with_db(|c| crate::metadata::put_setting(c, KEY_SAVED, None))?;
-    Ok(status(&state, &agent))
-}
-
-#[tauri::command(async)]
 pub fn agent_budget_set(state: State<AppState>, agent: State<AgentState>, usd: f64) -> Result<AgentStatus, String> {
     if !usd.is_finite() || !(usage::MIN_BUDGET_USD..=usage::MAX_BUDGET_USD).contains(&usd) {
         return Err(format!("月度上限要在 ${:.0} 到 ${:.0} 之间。", usage::MIN_BUDGET_USD, usage::MAX_BUDGET_USD));

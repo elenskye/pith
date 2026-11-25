@@ -14,7 +14,7 @@ export function RestoreResult({ r, title, onClose }: { r: RestoreReport; title: 
   return (
     <div className="mb-3 rounded-md border bg-card px-3 py-2.5 text-xs">
       <div className="flex items-start gap-2">
-        <CircleCheck size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <CircleCheck size={15} className="mt-px shrink-0 text-ok" />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="font-medium">{title}</p>
           <p className="text-muted-foreground">{countsLine(r.counts)}</p>
@@ -41,7 +41,7 @@ function ExportResult({ r, onClose }: { r: ExportReport; onClose: () => void }) 
   return (
     <div className="mb-3 rounded-md border bg-card px-3 py-2.5 text-xs">
       <div className="flex items-start gap-2">
-        <CircleCheck size={15} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <CircleCheck size={15} className="mt-px shrink-0 text-ok" />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="font-medium">已导出</p>
           <p className="text-muted-foreground">{countsLine(r.counts)}</p>

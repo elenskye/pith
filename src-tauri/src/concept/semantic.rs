@@ -426,11 +426,6 @@ pub fn concept_index_start(app: AppHandle, state: State<AppState>, sem: State<Se
     index_status(&state, &state.local, &sem, &uid)
 }
 
-#[tauri::command(async)]
-pub fn concept_index_status(state: State<AppState>, sem: State<SemanticState>, uid: String) -> Result<IndexStatus, String> {
-    index_status(&state, &state.local, &sem, &uid)
-}
-
 /// 本机模型的状态（设置页）
 #[tauri::command(async)]
 pub fn local_status(state: State<AppState>) -> crate::local::LocalStatus {

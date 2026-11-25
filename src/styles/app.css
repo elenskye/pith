@@ -29,6 +29,12 @@
 .bg-ok { background: color-mix(in srgb, var(--color-accent) 14%, var(--color-page)); }
 .text-ok { color: var(--color-accent-text); }
 .border-ok { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line-2)); }
+.hl-mark { background: color-mix(in srgb, var(--color-gold) 60%, transparent); color: inherit; }
+/* 概念研究的四类句子：原文、他人、解释、推演（原来是 Tailwind 的蓝、琥珀、翠绿、紫） */
+.cat-original { background: var(--color-accent); color: var(--color-on-accent); }
+.cat-others { background: var(--color-second); color: var(--color-page); }
+.cat-explanation { background: var(--color-accent-text); color: var(--color-page); }
+.cat-speculation { background: color-mix(in srgb, var(--color-gold) 75%, var(--color-text-3)); color: var(--color-text); }
 .page-enter { animation: page-in .42s var(--out) both; }
 @keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
 

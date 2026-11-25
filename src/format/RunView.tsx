@@ -183,7 +183,7 @@ function Hits({ enabled, hits }: { enabled: boolean; hits: FormatHit[] }) {
   if (!enabled) return <p className="text-xs text-muted-foreground">没有勾选，不执行</p>;
   const n = hits.reduce((sum, h) => sum + h.count, 0);
   const samples = hits.flatMap((h) => h.samples).slice(0, 5);
-  if (n === 0) return <p className="text-xs text-amber-700 dark:text-amber-400">命中 0 段：论文里没有段落会因此改变</p>;
+  if (n === 0) return <p className="text-xs text-warn">命中 0 段：论文里没有段落会因此改变</p>;
   return (
     <div className="text-xs">
       <p className="tabular-nums">
@@ -523,9 +523,9 @@ function Result({ r, onReveal }: { r: FormatRunResult; onReveal: (path: string) 
   return (
     <div className="space-y-4">
       {r.delivered ? (
-        <div className="rounded-md border border-emerald-300/70 bg-emerald-50 px-3 py-2 text-xs dark:border-emerald-800/60 dark:bg-emerald-950/30">
+        <div className="rounded-md border border-ok bg-ok px-3 py-2 text-xs">
           <div className="flex items-center gap-2">
-            <CircleCheck size={14} className="shrink-0 text-emerald-600" />
+            <CircleCheck size={14} className="shrink-0 text-ok" />
             <p className="min-w-0 flex-1">
               <span className="font-medium">已写出</span>
               <span className="selectable ml-1.5 break-all">{r.outputPath ? baseName(r.outputPath) : ""}</span>
@@ -548,7 +548,7 @@ function Result({ r, onReveal }: { r: FormatRunResult; onReveal: (path: string) 
       )}
 
       <p className="flex items-center gap-1.5 text-xs">
-        {r.specFailed === 0 ? <CircleCheck size={13} className="shrink-0 text-emerald-600" /> : <CircleAlert size={13} className="shrink-0 text-amber-600" />}
+        {r.specFailed === 0 ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className="shrink-0 text-warn" />}
         <span className="tabular-nums">规范核对：{r.specChecks === 0 ? "没有检查" : r.specFailed === 0 ? `${r.specChecks} 项全部符合` : `${r.specChecks} 项中 ${r.specFailed} 项不符合`}</span>
       </p>
 
@@ -573,7 +573,7 @@ function Result({ r, onReveal }: { r: FormatRunResult; onReveal: (path: string) 
                     {c.text}
                   </td>
                   <td className="py-1.5 pr-3 whitespace-nowrap">
-                    {c.ok === true ? <span className="text-emerald-700 dark:text-emerald-400">✓ 符合</span> : c.ok === false ? <span className="font-medium text-destructive">✗ 不符合</span> : <span className="text-amber-700 dark:text-amber-400">需人工核对</span>}
+                    {c.ok === true ? <span className="text-ok">✓ 符合</span> : c.ok === false ? <span className="font-medium text-destructive">✗ 不符合</span> : <span className="text-warn">需人工核对</span>}
                   </td>
                   <td className="py-1.5 pr-3 tabular-nums">{c.value}</td>
                   <td className="py-1.5 text-muted-foreground">{c.detail}</td>

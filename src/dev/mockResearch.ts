@@ -270,10 +270,6 @@ export const researchHandlers: Record<string, (a: Args) => unknown> = {
   },
   research_questions_list: () =>
     [...questions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((q) => ({ ...q, runs: summaries(q.id) })),
-  research_question_get: (a) => {
-    const q = questions.find((x) => x.id === a.id) ?? fail("这个问题不存在了。");
-    return { ...q, runs: summaries(q.id) };
-  },
   research_plan_prepare: (a): ResearchPlanPreview => {
     const question = String(a.question ?? "").trim();
     if (!question) fail("先写下要调查的问题。");

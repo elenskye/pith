@@ -10,7 +10,7 @@ import { useNav, skillName, dateOf, when } from "@/app/nav";
 import { Home } from "@/chat/Home";
 import { Composer, type Ask } from "@/chat/Composer";
 import { Reply, YouLine } from "@/chat/Reply";
-import { ResearchPage } from "@/research/ResearchPage";
+import { RunScreen as ResearchRun } from "@/research/RunScreen";
 import { PlanSend } from "@/research/Confirm";
 import { ConceptPage, type ConceptAt } from "@/concept/ConceptPage";
 import { ConceptSidebar } from "@/concept/ConceptSidebar";
@@ -224,7 +224,7 @@ function SkillSurface({ skill, refUid, onRelink }: { skill: SkillId; refUid: str
   if (skill === "research")
     return (
       <div className="skill-surface">
-        <ResearchPage at={{ uid: refUid }} onAt={(a) => (a.uid ? onRelink?.(a.uid) : nav.openChat(null))} onSettings={() => nav.openSettings("keys")} />
+        <ResearchRun key={refUid} uid={refUid} onRoot={() => nav.openChat(null)} onOpen={(uid) => onRelink?.(uid)} onSettings={() => nav.openSettings("keys")} />
       </div>
     );
   if (skill === "concept") return <ConceptRef run={refUid} />;

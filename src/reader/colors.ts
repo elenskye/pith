@@ -12,10 +12,6 @@ export const COLORS: { value: string; label: string }[] = [
 
 export const DEFAULT_COLOR = COLORS[0].value;
 
-export function colorLabel(c: string | null): string {
-  return COLORS.find((x) => x.value === c?.toLowerCase())?.label ?? c ?? "";
-}
-
 const KINDS: Record<string, string> = { highlight: "高亮", underline: "下划线", note: "便签", image: "区域", ink: "手绘", text: "文本框" };
 export const kindLabel = (k: string) => KINDS[k] ?? k;
 

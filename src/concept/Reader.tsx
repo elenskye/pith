@@ -57,13 +57,13 @@ function Body({ p, focus, pages }: { p: ConceptPara; focus: Focus; pages: boolea
     const brk = pages ? p.breaks.find((x) => x.at === a) : undefined;
     if (brk) out.push(<span key={`b${a}`} className="mx-0.5 rounded bg-muted px-1 align-[1px] text-[10px] text-muted-foreground tabular-nums select-none" title={`第 ${brk.page} 页从这里开始`}>{`p.${brk.page}`}</span>);
     const piece = chars.slice(a, b).join("");
-    out.push(hl && a >= hl[0] && b <= hl[1] ? <mark key={a} className="rounded bg-yellow-200 px-0.5 dark:bg-yellow-700/60">{piece}</mark> : <span key={a}>{piece}</span>);
+    out.push(hl && a >= hl[0] && b <= hl[1] ? <mark key={a} className="hl-mark rounded px-0.5">{piece}</mark> : <span key={a}>{piece}</span>);
   }
   return <>{out}</>;
 }
 
 function Apparatus({ p }: { p: ConceptPara }) {
-  const tone = p.role === "sidenote" ? "border-amber-300/80 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/30" : "border-border bg-muted/50";
+  const tone = p.role === "sidenote" ? "border-warn bg-warn" : "border-border bg-muted/50";
   return (
     <div className={`mt-1 rounded border-l-2 px-2 py-1 text-[12px] leading-relaxed text-muted-foreground ${tone}`}>
       <span className="mr-1 text-[10px] font-medium">{ROLE[p.role]}</span>
@@ -214,7 +214,6 @@ export function Reader({ view, skills, focus, onRequest, onSettings }: { view: C
   return (
     <Page
       crumbs={[{ label: "概念" }, { label: unitLabel }]}
-      wide={mode === "both" && hasZh}
       actions={
         <>
           {hasZh && (

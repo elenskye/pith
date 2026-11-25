@@ -53,7 +53,7 @@ export function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onS
       <dt className="pt-0.5 text-muted-foreground">{k.label}</dt>
       <dd className="min-w-0">
         <p className="flex items-center gap-1.5">
-          {k.has ? <CircleCheck size={13} className="shrink-0 text-emerald-600" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed ? "text-amber-600" : "text-muted-foreground"}`} />}
+          {k.has ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed ? "text-warn" : "text-muted-foreground"}`} />}
           <span>{k.has ? "已填" : "还没有填"}</span>
           <span className="text-xs text-muted-foreground">（{PLACE[k.place]}）</span>
           {!k.needed && k.which !== "anthropic" && <Badge>现在的调查设置用不到</Badge>}
@@ -171,7 +171,7 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
             <dd className="text-xs">
               {(() => {
                 const missing = s.keys.filter((k) => k.needed && !k.has).map((k) => k.label);
-                return <span className={missing.length ? "text-amber-700" : ""}>{missing.length ? `还没有填 ${missing.join("、")} 的密钥` : "要用的密钥都填了"}</span>;
+                return <span className={missing.length ? "text-warn" : ""}>{missing.length ? `还没有填 ${missing.join("、")} 的密钥` : "要用的密钥都填了"}</span>;
               })()}
               <span className="text-muted-foreground tabular-nums">
                 {" "}
@@ -323,7 +323,7 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
           </dl>
 
           <div className="flex items-center justify-end gap-2">
-            {dirty && <span className="text-xs text-amber-700">有改动还没保存</span>}
+            {dirty && <span className="text-xs text-warn">有改动还没保存</span>}
             <button onClick={() => setDraft(structuredClone(s.settings))} disabled={!dirty} className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50">
               还原
             </button>

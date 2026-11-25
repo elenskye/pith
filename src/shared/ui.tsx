@@ -292,7 +292,7 @@ export function Checks({ title, checks, columns = ["来源", "库里"] }: { titl
   return (
     <details className="mt-4 rounded-md border px-3 py-2">
       <summary className="flex cursor-default items-center gap-1.5 text-xs">
-        {ok ? <CircleCheck size={14} className="text-emerald-600 dark:text-emerald-400" /> : <TriangleAlert size={14} className="text-destructive" />}
+        {ok ? <CircleCheck size={14} className="text-ok" /> : <TriangleAlert size={14} className="text-destructive" />}
         {title}：{checks.length} 类{ok ? "全部一致" : "有不一致"}
       </summary>
       <table className="mt-2 w-full text-left text-xs">

@@ -719,17 +719,6 @@ const baseName = (p: string) => p.split("/").pop() ?? p;
 
 export const agentHandlers: Record<string, (a: Args) => unknown> = {
   agent_status: () => status(),
-  agent_key_set: ({ key }) => {
-    const k = String(key).trim();
-    if (!(k.startsWith("sk-ant-") && k.length >= 40 && /^[A-Za-z0-9_-]+$/.test(k))) fail("这看起来不是 Anthropic 的 API 密钥（应以 sk-ant- 开头）。到 console.anthropic.com 的 API Keys 里复制完整的一串。");
-    // 模拟：只记「填过了」，不留密钥本身
-    hasKey = true;
-    return status();
-  },
-  agent_key_clear: () => {
-    hasKey = false;
-    return status();
-  },
   agent_send_mode_set: ({ mode }) => {
     sendMode = mode === "full" ? "full" : "brief";
     return status();

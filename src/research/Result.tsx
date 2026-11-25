@@ -351,7 +351,7 @@ export function Process({ report, selected, onSelect }: { report: ResearchReport
                 {s.state === "ok" ? (
                   <span>
                     {s.facts} 条事实，{s.verified} 条核实
-                    {s.truncated && <span className="text-amber-700">；正文没读完</span>}
+                    {s.truncated && <span className="text-warn">；正文没读完</span>}
                     {s.extractError && <span className="block text-destructive">{s.extractError}</span>}
                   </span>
                 ) : (

@@ -7,7 +7,7 @@ import { useUi } from "@/shared/ui";
 function Light({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1.5">
-      {ok ? <CircleCheck size={13} className="shrink-0 text-emerald-600" /> : <CircleAlert size={13} className="shrink-0 text-amber-600" />}
+      {ok ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className="shrink-0 text-warn" />}
       <span>{children}</span>
     </span>
   );
@@ -130,7 +130,7 @@ export function WordSettingsSection() {
         </dl>
       )}
       {inst?.manualTemplate && (
-        <div className="mt-3 rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs dark:bg-amber-950/30">
+        <div className="mt-3 rounded-md border border-warn bg-warn px-3 py-2 text-xs">
           <p className="mb-1.5 font-medium">模板还没放进 Word 的启动文件夹（macOS 不让 Pith 自己写）：</p>
           <p className="mb-2 text-muted-foreground">
             点「放进 Word 启动文件夹」，弹出的对话框已经打开了那个文件夹，直接点「打开」；然后重新打开 Word。也可以手动放：「显示模板」后把 Pith.dotm 拖进「打开 Word 启动文件夹」打开的文件夹。

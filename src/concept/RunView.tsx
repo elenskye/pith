@@ -28,7 +28,7 @@ function Highlighted({ p, start, end }: { p: ConceptAnchoredParagraph; start?: n
   return (
     <>
       {chars.slice(0, start).join("")}
-      <mark className="rounded bg-yellow-200 px-0.5 dark:bg-yellow-700/60">{chars.slice(start, end).join("")}</mark>
+      <mark className="hl-mark rounded px-0.5">{chars.slice(start, end).join("")}</mark>
       {chars.slice(end).join("")}
     </>
   );

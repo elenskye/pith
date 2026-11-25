@@ -195,7 +195,7 @@ function ProgressPanel({ uid }: { uid: string }) {
       <ol className="flex flex-wrap items-center gap-1">
         {STAGES.map((s, i) => (
           <li key={s} className="flex items-center gap-1">
-            <span className={`rounded px-1.5 py-0.5 ${i < at ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" : i === at ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{STAGE[s]}</span>
+            <span className={`rounded px-1.5 py-0.5 ${i < at ? "bg-ok text-ok" : i === at ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{STAGE[s]}</span>
             {i < STAGES.length - 1 && <span className="text-muted-foreground">›</span>}
           </li>
         ))}

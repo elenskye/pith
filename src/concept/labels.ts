@@ -12,10 +12,10 @@ export const CATEGORY_HINT: Record<ConceptCategory, string> = {
 };
 /** 每个类别一个颜色（标签的底色） */
 export const CATEGORY_TONE: Record<ConceptCategory, string> = {
-  original: "bg-blue-600 text-white dark:bg-blue-500",
-  others: "bg-amber-600 text-white dark:bg-amber-500",
-  explanation: "bg-emerald-600 text-white dark:bg-emerald-500",
-  speculation: "bg-violet-600 text-white dark:bg-violet-500",
+  original: "cat-original",
+  others: "cat-others",
+  explanation: "cat-explanation",
+  speculation: "cat-speculation",
 };
 
 export const CARD_KIND: Record<ConceptCardKind, string> = { concept: "概念卡", argument: "论证卡", comment: "评论卡", counterfactual: "推演卡", note: "笔记" };
@@ -45,4 +45,3 @@ export function shown(s: ConceptSentence): string {
   return s.category === "original" || s.category === "others" ? `“${s.quote ?? s.text}”` : s.text;
 }
 
-export const TRANSLATION_PREFIX = "译:";

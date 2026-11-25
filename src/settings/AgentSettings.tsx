@@ -45,7 +45,7 @@ export function AgentSettingsSection({ onKeys }: { onKeys: () => void }) {
 
             <dt className="text-muted-foreground">密钥与上限</dt>
             <dd className="text-xs">
-              <span className={s.hasKey ? "" : "text-amber-700"}>{s.hasKey ? "Anthropic 密钥已填" : "还没有填 Anthropic 密钥"}</span>
+              <span className={s.hasKey ? "" : "text-warn"}>{s.hasKey ? "Anthropic 密钥已填" : "还没有填 Anthropic 密钥"}</span>
               <span className="text-muted-foreground tabular-nums">
                 {" "}
                 · 本月已花 {usd(s.monthSpentUsd)} / 上限 {usd(s.budgetUsd)}（和事实调查共用）

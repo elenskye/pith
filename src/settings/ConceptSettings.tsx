@@ -50,7 +50,7 @@ export function ConceptKeyRows() {
           <dt className="pt-0.5 text-muted-foreground">{k.label}</dt>
           <dd className="min-w-0">
             <p className="flex items-center gap-1.5">
-              {k.has ? <CircleCheck size={13} className="shrink-0 text-emerald-600" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed && k.which === "openai" ? "text-amber-600" : "text-muted-foreground"}`} />}
+              {k.has ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed && k.which === "openai" ? "text-warn" : "text-muted-foreground"}`} />}
               <span>{k.has ? "已填" : "还没有填"}</span>
               <span className="text-xs text-muted-foreground">（{PLACE[k.place]}）</span>
               <Badge>概念研究</Badge>

@@ -181,7 +181,7 @@ function Stat({ label, value, sub }: { label: string; value: React.ReactNode; su
 }
 
 function Notice({ tone, children }: { tone: "warn" | "error" | "info"; children: React.ReactNode }) {
-  const cls = tone === "error" ? "bg-destructive/10 text-destructive" : tone === "warn" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-muted text-muted-foreground";
+  const cls = tone === "error" ? "bg-destructive/10 text-destructive" : tone === "warn" ? "bg-warn text-warn" : "bg-muted text-muted-foreground";
   return (
     <div className={`mt-3 flex items-start gap-2 rounded-md px-3 py-2 text-xs ${cls}`}>
       {tone === "info" ? <CircleAlert size={14} className="mt-px shrink-0" /> : <TriangleAlert size={14} className="mt-px shrink-0" />}
@@ -361,7 +361,7 @@ function RunReport({ run, fresh, onLibrary, onAgain }: { run: RunDetail; fresh: 
     <>
       {fresh && (
         <p className="mb-4 flex items-center gap-2 font-medium">
-          <CircleCheck size={16} className="text-emerald-600 dark:text-emerald-400" />
+          <CircleCheck size={16} className="text-ok" />
           导入完成
         </p>
       )}

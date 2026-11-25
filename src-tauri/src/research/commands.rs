@@ -671,11 +671,6 @@ pub fn research_questions_list(state: State<AppState>) -> Result<Vec<store::Ques
     state.with_db(|c| store::questions_list(c))
 }
 
-#[tauri::command(async)]
-pub fn research_question_get(state: State<AppState>, id: i64) -> Result<store::QuestionSummary, String> {
-    state.with_db(|c| store::question_get(c, id))
-}
-
 /// 新问题：算出要发什么、大概多少钱。不联网。
 #[tauri::command(async)]
 pub fn research_plan_prepare(state: State<AppState>, agent: State<AgentState>, research: State<ResearchState>, question: String) -> Result<PlanPreview, String> {

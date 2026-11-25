@@ -297,7 +297,7 @@ function RequirementRow({ rulesetId, r, onChange }: { rulesetId: string; r: Form
             {s.section && <span> · {s.section}</span>}
             <span className="text-foreground/80">「{s.quote}」</span>
             {s.verified ? (
-              <span className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap text-emerald-700 dark:text-emerald-400">
+              <span className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap text-ok">
                 <CircleCheck size={11} />
                 已在原文核对
               </span>
