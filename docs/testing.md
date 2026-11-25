@@ -13,7 +13,7 @@ pnpm check
 - 全部用合成数据：Zotero 合成夹具 `zotero_import::fixture`、各格式的合成样例、`transfer::tests::rich_library`（夹具导入 + 各种 App 里产生的数据）。
 - 临时目录 `db::tests::temp_dir`（`<tmp>/researchlab-test-<pid>-<名称>`，离开作用域删除）；内存库 `db::tests::memory_db`（带内存搜索索引）。
 - 联网的测试不联网：假的 HTTP 回放合成的响应。
-- 浏览器预览：`pnpm dev` → http://localhost:1430/?mock（`src/dev/mockIpc.ts`）。新增 Rust 命令时同步 mock。调阅读器时把真实副本里的某个 PDF 复制到 `local/` 下，用 `?mock&pdf=/local/<文件名>.pdf` 打开（所有附件都打开它）。真实 App：`pnpm app:dev`（数据在 `~/Pith Dev/`）。开发版、测试、用 `PITH_DATA_DIR` 另指数据目录的打包版里，排版 Agent 用模拟模型（不联网、不花钱、不碰钥匙串）；试用时选 `src-tauri/fixtures/agent/示例规范.txt`，出处才核对得上。
+- 浏览器预览：`pnpm dev` → http://localhost:1430/?mock（`src/dev/mockIpc.ts`；对话、知识库的假数据照 Explore R1，在 `mockChat.ts`）。1430 被别的项目占着时用 `.claude/launch.json` 的 `web-mock-alt`（1432）。新增 Rust 命令时同步 mock。调阅读器时把真实副本里的某个 PDF 复制到 `local/` 下，用 `?mock&pdf=/local/<文件名>.pdf` 打开（所有附件都打开它）。真实 App：`pnpm app:dev`（数据在 `~/Pith Dev/`）。开发版、测试、用 `PITH_DATA_DIR` 另指数据目录的打包版里，排版 Agent 用模拟模型（不联网、不花钱、不碰钥匙串）；试用时选 `src-tauri/fixtures/agent/示例规范.txt`，出处才核对得上。
 
 ## 各模块测什么
 
@@ -25,6 +25,7 @@ pnpm check
 | 搜索 | `search/tests.rs` | 中文二元组、西文前缀、子笔记命中父文献、FTS 特殊字符、索引跟着改动更新 |
 | 阅读 | `reader/tests.rs`、`protocol.rs` | 矩形合并、排序键与位置 JSON 与 Zotero 逐字符一致、只读的标注；协议的 Range / 拒绝路径穿越 |
 | 联网补全 | `metadata/tests.rs` | 认 DOI / ISBN、Crossref / Open Library 换成 Zotero 字段、只填空字段、待确认 / 撤销、后台队列 |
+| 对话、角色、知识库（1.0.2） | `chat/tests.rs` | 内置角色改了不多出一个、删掉就是改回默认、新建的头像字；模拟回答只挑勾的库里沾边的材料、没有沾边的拿最近的、伴读会反问；对话的位置连续、照料多了长、改名删掉；以前的调查一个问题列一条、有了对话就不重复列；能种的东西（两份文本、做完的调查、研究的卡片）；材料同一来源只种一次、阶段夹在 0–2、对话删了材料还在、知识库删了材料也没了。`sample` 进了 `rich_library`，升级和导出恢复都带着这五张表 |
 | 恢复与导出 | `transfer/tests.rs`、`lib.rs` | 见下 |
 | Word 集成（v0.2） | `word/*.rs` | 本机服务：没令牌 / 令牌错 401、带 Origin 403、分块 411、超大 413、`Expect: 100-continue`、service.json 0600、停止时只删自己那份；宏协议：新文档第一处引文、旧名换新、复制粘贴重复、缺数据、切换样式、比 App 新的数据、搜索窗（新插入 / 编辑预填 / 删除 / 取消）、编辑保留 ID 与创建时间、Style 菜单清单、Word 里的 Zotero 转换；搜索窗：搜索、预填（库里 / 文档快照 / 找不到 / 回收站）、一次只有一个会话；样式：内置清单与 CSL 文件一致、导入 / 替换 / 依赖样式 / 删除；Zotero 条目 key 对应；CSL 映射（含印刷品文章不出网址、「额外」字段换算）；模板含全部按钮的回调与图片；装进临时「家目录」再卸载（真跑 osacompile）、写不进时由用户选中的文件夹写入 |
 | 排版 Agent（v0.2 W3） | `agent/*.rs`、`agent/tests.rs` | 整条流程用模拟模型和合成文档（提炼 → 合成规范 → 计划 → 排版 → 报告，原文件不变、不覆盖）；预算按最坏情况拦、上月不算；截断 / 拒答 / 格式不对照样记账且不存结果；中途停止按估计记账；流（SSE）解析用录好的文本；出处摘录核对、数值换算表、冲突取确定度高的；计划里不存在的样式 / 编不过的正则 / 越界的分节被丢掉；存档编号防路径穿越；测试不碰钥匙串、不联网 |

@@ -1,6 +1,6 @@
 # 架构
 
-> 依据 `decisions/0001`–`0003`、`0006`–`0025`，沿用 Pomelo 的工程约定。数据库结构见 `docs/schema.md`。
+> 代码怎么分、工程上的规矩。产品架构（四个入口、知识库、对话 Agent）在 `decisions/0030`，1.0.2 的界面和存储在 `0031`；表结构在 `docs/schema.md`，测试在 `docs/testing.md`。
 
 ## 目录
 
@@ -12,22 +12,25 @@ pith/
 │   │                           fonts.css 登记随 App 打包的 Lato、Newsreader（@fontsource）；明暗跟着系统写根上的 data-theme（shared/theme.ts）
 │   ├── vendor/pith/            视觉方案 pith 的已发版本（Atelier 按 tag 同步：pith.css、bundle.css、tokens.ts、DESIGN.md、marks/、App 图标 PNG），
 │   │                           带 VERSION、SHA256SUMS，不手改（CLAUDE.md 规则 9）；App 图标由 scripts/app-icon.sh（pnpm app:icon）缩到 macOS 网格再出 src-tauri/icons/
-│   ├── app/                    App.tsx（外框：最左一列切换主页面，各主页面有自己的侧栏；阅读时阅读器占满窗口）、
-│   │                           Rail（文献库 / 排版 / 调查 / 概念 + 设置，`decisions/0023`）、SideNav（各主页面和设置共用的侧栏外框与条目）
-│   ├── library/                Sidebar（文献库视图、集合树、标签筛选）、ItemList（搜索、筛选、排序、多选、右键菜单）、
-│   │                           ItemDetail（可编辑详情、批量面板、合并）、labels（中文名）
-│   ├── shared/ui.tsx           弹窗（确认 / 输入 / 选集合）、右键菜单、提示条、就地编辑、标签输入（带提示）、useMutate、useStoredState
-│   ├── settings/               SettingsPage（数据目录、数据库版本、备份列表：立即备份 / 恢复）、Transfer（整库导出、从导出恢复、恢复结果）、
-│   │                           WordSettings（安装 / 卸载 Word 模板、服务与排版器状态）、CiteSettings（引文样式与导入 .csl、Word 外转换 Zotero 文档）、
-│   │                           KeysSettings（密钥与费用：三把密钥、共用的月度上限）、ResearchSettings（事实调查：模型、专用搜索、网页抓取后备、单价、可信度等级表）；
-│   │                           SettingsPage 分两组七页（`decisions/0023`）
+│   ├── styles/app.css          外框和几屏的版面（照 Explore R1，跟着窗口伸缩）；组件的样子和动效零件在 vendor/pith/bundle.css
+│   ├── app/                    外框（`0031`）：App（顶栏 + 一屏；⌘K、⌘\、⌘N、两指横滑；阅读器占满窗口；存卡的种子、换配色的湖面）、nav（几屏之间跳、技能清单）、
+│   │                           TopBar、History（对话历史的枝桠）、Palette（⌘K）、branch（枝桠的画法，历史和设置共用）、SideNav（技能左边那一列）
+│   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
+│   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）
+│   ├── kb/KnowledgePage.tsx    知识库：知识库一排、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
+│   ├── library/                LibraryScreen（页头、范围、集合与标签的下拉、右边的面板、导入）、ItemList（搜索、筛选、排序、多选、右键菜单）、
+│   │                           ItemDetail（可编辑详情、批量面板、合并）、Sidebar（集合树、标签筛选、几个特殊范围，放在下拉里）、labels
+│   ├── settings/               SettingsScreen（枝桠 + 七页；角色、知识库、外观是新的）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
+│   │                           Transfer、WordSettings、CiteSettings、KeysSettings、ResearchSettings、ConceptSettings、AgentSettings
+│   ├── shared/                 ipc.ts（带类型的 api 对象，唯一的 invoke 入口）、ui.tsx（弹窗、右键菜单、提示条、就地编辑、标签输入）、
+│   │                           marks.tsx（内联 vendor/pith/marks 的图形）、theme.ts（配色和明暗，记在 localStorage）、plainInputs.ts
 │   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
-│   ├── shared/ipc.ts           带类型的 api 对象，唯一的 invoke 入口
-│   ├── dev/mockIpc.ts          `pnpm dev` → http://localhost:1430/?mock，合成数据，打包时剔除；mockResearch.ts / .json 是调查页的假后端（数据由引擎生成）
-│   ├── concept/                概念页（v0.4）：ConceptSidebar（书 → 章 → 研究）、Reader（原文段落、中英并排、划选）、Entries（问这本书、追踪概念）、
-│   │                           Confirm、RunView（卡片、关系图、锚点跳原文、导出）、ParseDialog（附件解析成文本）
-│   ├── research/               事实调查页（v0.3）：ResearchSidebar（问过的问题和各次调查）、ResearchPage（新调查）、Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、
-│   │                           Result（短答、点数字看原文、全过程、导出、加入文献库、重查对比）、labels
+│   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、
+│   │                           mockResearch / mockConcept / mockAgent（三个技能，数据由各自的引擎生成）
+│   ├── concept/                概念研究（v0.4，放在对话里）：ConceptPage（书架 → 一本书 → 一章 → 研究）、ConceptSidebar（书的目录）、Reader（原文段落、中英并排、划选）、
+│   │                           Entries（问这本书、追踪概念）、Confirm、RunView（卡片、关系图、导出）、ParseDialog（附件解析成文本）
+│   ├── research/               事实调查（v0.3，放在对话里）：Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、Result（短答、点数字看原文、全过程、导出、重查对比）
+│   ├── format/                 排版（v0.2，放在对话里）：FormatPage（规范 → 一次排版）、FormatSidebar、RulesetView、RunView、SendConfirm、parts（技能页共用的 Page、Notice 等）
 │   ├── cite/                   引文排版（v0.2）：renderer（听 cite-render 事件、交回结果）、engine（citeproc-js；GB/T 页码在方括号外、前后缀）、
 │   │                           runs（HTML → 带格式片段）、resources（内置样式打包、导入样式向 Rust 要）、styles.json（内置样式清单，Rust 也读）、
 │   │                           csl/ 与 locales/（官方 CSL 文件，来源见 SOURCES.md）、*.test.ts（node --test）
@@ -36,7 +39,7 @@ pith/
 │   └── reader/                 阅读器（单独打包，第一次阅读时加载）：Reader（工具栏、浮动工具条、查找）、
 │                               controller（pdf.js 的 PDFViewer、标注层、选区 → PDF 坐标）、AnnotationList、useRead
 ├── src-tauri/                  Rust 后端（唯一读写 SQLite 的地方）
-│   ├── migrations/             0001_library … 0007_research_fetch；顺序编号，用过永不改
+│   ├── migrations/             0001_library … 0010_chat；顺序编号，用过永不改
 │   ├── word/                   Word 一侧的源文件：Pith.bas（宏，ASCII）、customUI.xml（选项卡）、images/（选项卡图标 PNG）、Pith.applescript、pith-bridge.sh
 │   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）；
 │   │                           research/（虚构「示例市」的网页、统计表原件，录制的 Anthropic / DeepSeek / Tavily 回复）
@@ -47,6 +50,8 @@ pith/
 │       ├── backup.rs           VACUUM INTO 快照、daily / manual / before-*、清理规则；恢复用的检查、整库复制（backup API）；
 │       │                       还有备份用到的附件文件不删（sweep_files）
 │       ├── common.rs           Tx（SAVEPOINT 嵌套事务）、ULID uid
+│       ├── chat/               对话、角色、知识库（1.0.2，`0031`）：store（0010 的五张表；内置四个角色；对话历史并上以前的调查和研究；能种进知识库的东西）、
+│       │                       mock（模拟的回答，1.1.0 换成 Agent 循环）、commands（`chat_*`、`role_*`、`kb_*`）
 │       ├── library.rs          文献库只读查询（概览、列表的范围 / 搜索 / 筛选 / 排序、四种详情、集合树、标签、附件打开位置）
 │       ├── edit.rs             写操作：编辑、新建、标签、集合、批量、回收站、合并、添加附件
 │       ├── fields.rs           条目字段规则：由字段推出常用列（导入与编辑共用）
@@ -86,7 +91,7 @@ pith/
 │                               vba（生成 vbaProject.bin）、template（生成 .dotm）
 ├── poc/
 │   └── word-addin/             0-B：citeproc 引文引擎、Word 外直写、宏桥接、Office.js（保留待用）；独立 pnpm 包
-├── scripts/                   install-app.sh（打包、签名、装进「应用程序」）、clean-build.sh（清编译缓存）、phase0-check.sh（Phase 0 端到端自检）、cite-render.ts（Node 里排版，测试与命令行用）、
+├── scripts/                   install-app.sh（打包、签名、装进「应用程序」）、app-icon.sh（App 图标缩到 macOS 网格再出 src-tauri/icons/）、clean-build.sh（清编译缓存）、phase0-check.sh（Phase 0 端到端自检）、cite-render.ts（Node 里排版，测试与命令行用）、
 │                               word-icons.mjs / .swift（生成 Word 选项卡图标）
 ├── local/                      本机私有（真实论文、样例、证书），gitignore
 └── docs/
@@ -112,10 +117,19 @@ pith/
 
 ## 命令
 
-- 命令清单以 `src/shared/ipc.ts` 为准（前端唯一的 invoke 入口），Rust 一侧在 `lib.rs` 注册。命名 `模块_动作`：文献库 `items_*` / `attachments_*` / `tags_*` / `collections_*` / `trash_*`，导入 `import_*`，阅读 `reader_*` / `annotations_*`，联网补全 `metadata_*`，备份与导出 `backups_*` / `export_*`，Word `word_*` / `cite_*` / `picker_*`，排版 Agent `agent_*` / `format_*`，事实调查 `research_*`，概念研究 `concept_*`。
+- 命令清单以 `src/shared/ipc.ts` 为准（前端唯一的 invoke 入口），Rust 一侧在 `lib.rs` 注册。命名 `模块_动作`：文献库 `items_*` / `attachments_*` / `tags_*` / `collections_*` / `trash_*`，导入 `import_*`，阅读 `reader_*` / `annotations_*`，联网补全 `metadata_*`，备份与导出 `backups_*` / `export_*`，Word `word_*` / `cite_*` / `picker_*`，排版 Agent `agent_*` / `format_*`，事实调查 `research_*`，概念研究 `concept_*`，对话、角色、知识库 `chat_*` / `role_*` / `kb_*`。前端用到的和 `lib.rs` 注册的一一对应（1.0.2 清掉了没人调的）。
 - 数据库命令都是 `#[tauri::command(async)]`，在线程池里跑；会改内容的命令在提交后更新搜索索引。
 - 要花钱的都是两段：`*_prepare` 先算出要发什么、多少钱（不联网），用户确认后再调发送的命令（如 `format_plan_run`、`research_execute`）。
 - 列表里的行用 `targets`：`{ kind: item | attachment | note | collection, id }`。选择文件夹 / 文件用 `@tauri-apps/plugin-dialog`（`ipc.ts` 的 `pickFolder` / `pickFile`）。
+
+## 对话、角色、知识库（1.0.2，`decisions/0031`）
+
+- **存**：`chat::store`，migration 0010 的五张表（`docs/schema.md`）。消息的 body 是 JSON：你说的 `{text, role}`；Pith 的 `{steps, paragraphs, cites, ask, delivery, mock}`，前端照它画状态行、正文（`[n]` 是编号）、页边注、交付卡。1.1.0 的 Agent 循环照这个形状写消息。
+- **角色**：内置四个在 `chat::store::BUILTIN`，改过的用同一个 uid 存一份，删掉就是改回默认；新建的 uid 是 ULID。
+- **技能进对话**：`conversations.skill` + `ref_uid` 连到那次运行（research：调查 uid；concept：研究 uid；format：`规范 id:排版 id`）。点名了技能的对话先只存你说的那句，技能跑起来以后 `chat_link`。以前的调查和研究没有对话：`chat_list` 把每个问题最新的那次调查、每次研究也列出来（`uid` 是空的），接着问时 `chat_open_ref` 才建对话。
+- **知识库**：材料按 `(库, source_kind, source_ref)` 去重，再种一次只是更新「最近照料」。`kb_candidates` 列出能种的：解析好的书（`concept_text`）、做完的调查（`research_run`）、做完的研究的卡片（`concept_card`，`研究 uid#卡片 key`）。`kb_material_add` 不给库时种进第一个，没有就建「随手存」。
+- **模拟的回答**：`chat::mock::answer`，在勾的知识库（没勾就全部）里按问题里的字两两一组粗略地挑三份当出处，出状态行、段落、反问（伴读、审稿人才有）、交付卡，标 `mock: true`。
+- **界面**：外框的状态在 `app/nav.tsx`（哪一屏、哪段对话、设置哪一页、文献库要看的）；配色和明暗在 `shared/theme.ts`（localStorage，跟随系统时听系统的变化）；图形只从 `shared/marks.tsx` 取（内联同步来的 SVG，类名留给 `bundle.css` 的动效零件）。
 
 ## 恢复的流程（`decisions/0013`）
 
@@ -186,7 +200,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - 加入文献库：来源 → 网页 / 报告条目，原件作附件（附件 SHA-256 去重），同一网址已有的连上不重建；先做「导入前」备份。
 - Word 导出不改文档引擎：`research/docx.rs` 用 `docx_engine::package::Package` 拼最小的 .docx（标题、表格、列表、外链、书签与文档内跳转）。
 - 密钥：Anthropic 和排版 Agent 共用一把（`agent.key_saved`）；DeepSeek、Tavily 各一个钥匙串条目（`deepseek-api-key`、`tavily-api-key`）。和排版 Agent 一样，只有正式版用钥匙串和真接口。三把密钥和月度上限都在「设置 › 密钥与费用」。
-- 命令（`research_*`，21 个）：status / settings_set / key_set / key_clear；questions_list / question_get；plan_prepare → plan_run；run_get；plan_update / source_add / source_remove；execute_prepare → execute；cancel；rerun；export / reveal；add_to_library；run_delete / question_delete。
+- 命令（`research_*`，20 个）：status / settings_set / key_set / key_clear；questions_list；plan_prepare → plan_run；run_get；plan_update / source_add / source_remove；execute_prepare → execute；cancel；rerun；export / reveal；add_to_library；run_delete / question_delete。
 
 ## v0.4 概念研究（`decisions/0024`、`0025`）
 
@@ -208,12 +222,12 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - **Word**：搜索窗把原文放进引文数据的 `pithQuote`（原样存进文档的数据部件）；有页码的写 `110 (I.i.3)`（label page），没有的写 `I.i.3`（label paragraph）。桥接回复里多一行 `Q`，宏在新插入的引文前面加上「“原文”」（编辑已有引文时不加）。
 - **快照**：评论来源的正文在 `数据目录/concept/sources/`，和事实调查的分开，不会被调查的清理删掉。
 
-## v0.5 本机模型与语义检索（修 `0025` 的已知问题）
+## 本机模型与语义检索（2026-11-15 修 `0025` 的已知问题）
 
 - **本机模型**（`src-tauri/src/local/`）：用户的 `~/Documents/LLM`（和柚儿园共用）里的向量模型（8081，`/v1/embeddings`）和重排模型（8082，`/v1/rerank`）。Pith 只读清单 `config/models.json`（每类用第一个）、只经 `scripts/llmctl.sh` 启停，不改那个文件夹。用到时才启动（`ensure`：先看 `/health`，没开就 `start <key> --by pith`，最多等 45 秒）；只停自己启动的（`status` 里有 `By: pith`）：闲置 15 分钟停，退出 Pith 时停。只连 `127.0.0.1`，不走代理，不花钱。三种模式：`Real`、`Mock`（测试和 `PITH_LOCAL_MODELS=mock`：按字散列的 256 维向量）、`Off`（找不到文件夹或 `PITH_LOCAL_MODELS=off`）。`PITH_LLM_DIR` 可以另指位置。`AppState.local` 拿着它。
 - **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`，App 现在没喂，只用长度和锚点）。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
 - **向量是派生数据**：`search.concept_vecs(para_id, model, sig, vec)`，在 `search.db`，不写 migration。按模型的 key 分开存；`sig` 是段落文字的散列，段落换了（重新解析）就当作没有，重新算。归一化的 f32 小端连起来存，检索时整本书扫一遍算点积（一本书几千段，几十毫秒）。以后的内部知识库量大了再换存法。
-- **建索引**在后台线程（`concept::semantic`，命令 `concept_index_start` / `concept_index_status`，事件 `concept-index`），一批 16 段，读库和写库各拿一次锁、联本机服务时不拿锁。真实的两本《国富论》9265 段约 6 分钟。
+- **建索引**在后台线程（`concept::semantic`，命令 `concept_index_start`，事件 `concept-index`），一批 16 段，读库和写库各拿一次锁、联本机服务时不拿锁。真实的两本《国富论》9265 段约 6 分钟。
 - **「问这本书」**（`concept_ask_search`）：问题的向量 → 原著里最像的 40 段 + 译本里最像的 24 段（按对齐映射回原著）+ 按词检索的命中 → 重排模型打分 → 按相关度给前几段，只给正文段（旁注、注释算到它挂的正文段，编者的导读不要）。中文问题、有对齐的中译时重排比的是中译。退路：本机模型用不了、或索引还一段都没有 → 按词检索并说明原因；重排用不了 → 按向量相似度排。「追踪概念」仍按词（要的就是这个词出现在哪）。
 - **反方读长文**（`concept-engine/src/excerpt.rs`）：来源超过 1.2 万字时不再只发开头，而是切成约 900 字的块，按和目标卡片、检索词的字面重合取前 40 块，本机重排模型（`Shelf::relevance`，App 一侧 `DbShelf` 实现）按意思再排，开头一块总带上，装满 1.2 万字，按原文顺序排回去，中间写「……（中间略）……」；余量接着开头往下装。发给模型的是片段，核对引文照旧用全文。费用上限不变（每条来源仍最多 1.2 万字）。
 - 向量和重排只决定「给人和模型看哪些段落」，原文引用照旧由确定的逐字核对把关。
@@ -223,7 +237,8 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - v0.1 唯一的联网功能是联网补全；只在 Rust 里联网（`metadata::net`），界面不直接发请求。没打开时 Rust 拒绝联网。v0.2 W3 多了排版 Agent 调用 Claude（`agent::claude`，见上；每次发送前确认、有月度上限）。
 - v0.3 事实调查（见上）：连 `api.anthropic.com`、`api.deepseek.com`（地址可改）、`api.tavily.com`，以及检索到的网页（本机下载，只取单页）。每次发送模型和搜索前界面确认、查月度上限。
 - v0.4 概念研究（见上）：连 `api.openai.com`（或选 Opus 时的 `api.anthropic.com`）、`api.mathpix.com`（上传前确认页数和费用，用完删除），网页检索同 v0.3。
-- v0.5 本机模型（见上）：只连 `127.0.0.1:8081` / `8082`，不出这台电脑。
+- 本机模型（见上）：只连 `127.0.0.1:8081` / `8082`，不出这台电脑。
+- 1.0.2 的对话不联网（回答是模拟的）。
 - 导入完成、改了 DOI / ISBN 后，命令层把文献放进 `AppState.lookups` 队列，后台线程一次一条地查：读库（拿锁）→ 联网（不拿锁）→ 写库（拿锁）并更新搜索索引。
 
 ## 资源约束

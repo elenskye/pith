@@ -1,6 +1,6 @@
 # 数据库结构
 
-> 状态：**已定**（用户 2026-11-08 同意下面 4 个取舍）。以 `src-tauri/migrations/` 为准，用过永不改；改结构写新编号的 migration。本文详写 v0.1 的 0001–0005，之后的见文末「0006 以后」。
+> 以 `src-tauri/migrations/` 为准，用过永不改；改结构写新编号的 migration。本文详写 v0.1 的 0001–0005（用户 2026-11-08 同意的 4 个取舍），之后的见「0006 以后」。
 > 依据：`decisions/0002`（Zotero 迁移）、`0003`（数据目录）、`0006`（Word 引文需要稳定 ID）、`docs/zotero-mapping.md` 第 7 节、Phase 0-A 真实库统计。
 > 约定沿用 Pomelo：`INTEGER PRIMARY KEY`、`STRICT` 表、时间为 UTC ISO 字符串（`strftime('%Y-%m-%dT%H:%M:%fZ','now')`）、枚举值在 Rust 校验、版本号在 `PRAGMA user_version`、WAL + `foreign_keys = ON`。
 
@@ -281,10 +281,11 @@ CREATE INDEX metadata_lookups_item ON metadata_lookups(item_id, id);
 | `0007_research_fetch.sql` | v0.3 | `research_sources.fetched_via` | 下载失败时改用 Claude 网页抓取（`0023`） |
 | `0008_concept.sql` | v0.4 | `concept_texts`（一份解析好的文本：附件 SHA-256、解析器版本、关联的原著）、`concept_units`（篇章节、导读、注释、前后附）、`concept_paragraphs`（角色、引用名、页码与段内分页点、注释引用）、`concept_alignments` + `concept_aligned`（中英对齐）、`concept_runs`、`concept_steps`（含模型原始输出）、`concept_cards`、`concept_sentences`、`concept_anchors`（一句一行：段落号、核对状态、位置、页码、中译核对）、`concept_relations`、`concept_sources`、`concept_rejected` | 概念研究（`0024`、`0025`）；保存一次研究 = 一个事务里整份换掉子表；重新解析 = 一个事务里换掉这份文本的 `concept_units` / `concept_paragraphs`（`concept_texts` 那一行的 id、uid 不变）、重算 `concept_alignments`、重写受影响研究的子表，不加表不加列；评论来源的快照在 `数据目录/concept/sources/` |
 | `0009_alignment.sql` | v0.5 | `concept_aligned_pairs`（对齐的段落，主键 `(alignment_id, original_seq, translation_seq)`：一段可以对几段、几段可以对一段，写成多行；按 `(alignment_id, translation_seq)` 另有索引）；`concept_alignments.algorithm`（对齐算法的版本 = `concept_engine::align::VERSION`，旧行默认 1）、`concept_alignments.similarity`（算的时候用了哪个向量模型的语义相似度，没用是 NULL） | 全书对齐：段数不同的章做单调对齐。`concept_alignments.units` 的 JSON 每章多了 `method`（exact / fitted / none）、`confidence`、`low`、`merged`、`unmatched`，旧的 JSON 照样读（按 `aligned` 补）。**0008 的 `concept_aligned`（主键 `(alignment_id, original_seq)`，存不了一对多）从这一版起不再读、不再写**，表留着。对齐是派生数据：读到 `algorithm` 比 App 旧的那一行，就用两份文本重算、存回去（`store::alignment_ensure`）；旧表里属于那份对齐的行这时随旧的那一行级联删掉 |
+| `0010_chat.sql` | 1.0.2 | `conversations`（标题、角色 uid、勾的知识库 JSON、`skill` + `ref_uid` 连到那次运行、生长阶段）、`messages`（对话里的位置、作者 = `you` 或角色 uid、body JSON）、`roles`（改过的内置角色和新建的）、`knowledge_bases`、`kb_materials`（库、十种之一、标题、出处一行、正文、生长阶段、`source_kind` + `source_ref` 指回原来的东西、从哪段对话存的） | 对话、角色、知识库（`decisions/0031`）。只建表；消息 body 的形状见 `docs/architecture.md`「对话、角色、知识库」。材料先一库一份，`(kb_id, source_kind, source_ref)` 去重在代码里做；对话删了材料留着（`conversation_id` 置空），知识库删了材料一起删。1.1.0 做检索时加段落块（`passages`）、材料共享 |
 
 ## 不在主库里的
 
-- **语义检索的向量**（v0.5）也在 `search.db`：`concept_vecs(para_id INTEGER PRIMARY KEY, model TEXT, sig INTEGER, vec BLOB)`，`para_id` = `concept_paragraphs.id`，`model` 是本机向量模型的 key，`sig` 是段落文字的散列（对不上就重算），`vec` 是归一化的 f32（小端）。主库里没有的段落启动检索时清掉。
+- **语义检索的向量**（2026-11-15）也在 `search.db`：`concept_vecs(para_id INTEGER PRIMARY KEY, model TEXT, sig INTEGER, vec BLOB)`，`para_id` = `concept_paragraphs.id`，`model` 是本机向量模型的 key，`sig` 是段落文字的散列（对不上就重算），`vec` 是归一化的 f32（小端）。主库里没有的段落启动检索时清掉。
 - **搜索索引**放 `search.db`（派生数据，可删了重建，不写 migration，以 `search` 名 ATTACH 到主连接）：一张 FTS5 表 `docs(title, creators, tags, abstract, notes, other)`；中文用「重叠二元组 + 末字单字」改写后交给 unicode61（实测选定，`decisions/0010`）。
 - **Word 引文数据**存在 Word 文档自己的数据部件里（`decisions/0006`），主库只提供 `items.uid` 与 CSL-JSON 导出；v0.2 再加「文档 ↔ 文献」的引用记录表。
 - **备份文件**在 `backups/`，不进表。

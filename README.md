@@ -1,23 +1,12 @@
 # Pith
 
-（开发名 Research Lab，`decisions/0014`）
+站主自己的 macOS 研究工作台：本地优先，数据归自己。打开就是对话；知识库是文献库和对话之间的一层；读过的书、做完的调查、对话里的好回答都种进知识库，回答时带编号、点开是原文。Tauri 2 + React + TypeScript + Rust + SQLite。（开发名 Research Lab，`docs/decisions/0014`。）
 
-本地优先、个人所有、以证据为核心的 macOS 研究工作台。Tauri 2 + React + TypeScript + Rust + SQLite。
+## 现在
 
-它要解决三类问题：
-
-1. **毕业论文**：Zotero 文献管理 + Word 中英文混排 / 引用格式反复调整效率低
-2. **日常调查**：现成 Deep Research 漏来源、报告冗长、事实与推测混在一起
-3. **阅读学习**：读书摘抄难以沉淀为有出处、可复习的知识作品
-
-顺序：Library（v0.1）→ Word 引用与排版（v0.2）→ 事实调查（v0.3）→ 概念研究（v0.4）→ 对话与技能（1.1.0，新架构）→ WonderLab → 学术研究（1.2.0）→ Adaptive Agent（1.3.0），见 `docs/decisions/0005`、`0028`、`0029`。
-
-## 当前状态
-
-- 1.0.0（2026-11-24 由 0.4.1 改名，功能不变；正式版装的还是 0.4.1）：v0.1 文献库、v0.2 Word（顶栏「Pith」选项卡里的引用和排版 Agent）、v0.3 事实调查、v0.4 概念研究都能用；v0.4 的四个已知问题已修（`docs/decisions/0025`）。
-- 2026-11-22 定了新架构（`docs/decisions/0028`，和 `docs/atelier-handoff-2026-11-22.md` 合并、以后者为主，下一轮写成 `0030`）。设计在 Visual Atelier 里做完了（方案 `pith` 1.0.0），还没同步进来。
-- 版本号从 1.0.0 起，按开发程度升版本（`docs/decisions/0029`）。
-- 交接看 `HANDOFF.md`，计划看 `ROADMAP.md`。
+- **1.0.2**（2026-11-25）：界面照 Visual Atelier 的 Explore R1 做好了——四个入口（对话、知识库、文献库、设置），事实调查、概念研究、排版在对话里用 `/` 点名。对话、角色、知识库已经真存，回答还是演示的（不调模型），1.1.0 接上 Agent 循环（`docs/decisions/0030`、`0031`）。
+- 以前做好的照常能用：文献库（Zotero 导入、阅读与标注、联网补全）、Word 里的引用和排版、事实调查、概念研究。
+- 现在做到哪、下一步：`HANDOFF.md`；版本计划：`ROADMAP.md`。
 
 ## 运行
 
@@ -25,13 +14,11 @@
 pnpm install
 ```
 
-三种版本（同一份代码，做法照 Pomelo）：
-
 | | 命令 | 数据 | 模型与密钥 |
 | --- | --- | --- | --- |
-| 开发版 | `pnpm app:dev` | `~/Pith Dev/` | 模拟模型，不联网、不碰钥匙串 |
+| 开发版 | `pnpm app:dev` | `~/Pith Dev/` | 模拟接口，不联网、不碰钥匙串 |
 | 打包版 | `pnpm app:build`，再 `open --env PITH_DATA_DIR=<临时目录> target/release/bundle/macos/Pith.app` | 你指定的目录 | 同上（测试用） |
-| 正式版 | `pnpm app:install` | `~/Pith/` | 真模型，密钥在钥匙串 |
+| 正式版 | `pnpm app:install` | `~/Pith/` | 真接口，密钥在钥匙串 |
 
 ```bash
 pnpm app:dev
@@ -41,36 +28,37 @@ pnpm app:dev
 pnpm app:install
 ```
 
-- **正式版**装在「应用程序」里，只用这一个（把它拖进程序坞）。`pnpm app:install` 打包、用固定的自签名证书「Pith Self-Signed」签名、换掉「应用程序」里的旧版；新版第一次打开会先备份、再升级数据库。装完到 设置 › Word 点一次「更新」（脚本里记着 Pith 的位置）。
-- 编译输出在 `target/`，可以随便清：`pnpm clean:build`；超过 20 GB 时 `pnpm check` / `app:dev` / `app:build` / `app:install` 会自动清。清掉不影响「应用程序」里的正式版。
-- 证书只要建一次：钥匙串访问 › 证书助理 › 创建证书，名称 `Pith Self-Signed`、自签名根证书、证书类型「代码签名」。
+- 正式版装在「应用程序」里，用固定的自签名证书「Pith Self-Signed」签名（钥匙串访问 › 证书助理 › 创建证书：自签名根证书、代码签名，建一次）。新版第一次打开会先备份、再升级数据库；装完到 设置 › Word 与引文 点一次「更新」。
+- 只看界面（浏览器，不启动 Rust）：`pnpm dev`，打开 http://localhost:1430/?mock 。
+- 编译输出在 `target/`，`pnpm clean:build` 随便清；超过 20 GB 时几条命令会自动清。
+- App 图标从同步来的方案生成：`pnpm app:icon`。
 
-只看界面（浏览器，不启动 Rust）：`pnpm dev` 后打开 http://localhost:1430/?mock
-
-检查（每轮必过）：
+每轮必过的检查：
 
 ```bash
 pnpm check
 ```
 
-## 文档
+## 文档分工
 
-常用：
+一件事只写一处，别处指过去。
 
-| 文件 | 用途 |
-| --- | --- |
-| `CLAUDE.md` | Agent 工作规则（必读） |
-| `HANDOFF.md` | 最近一轮交接 |
-| `ROADMAP.md` | 现在 / 已完成 / 以后 |
-| `docs/requirements.md` | 已定需求 |
-| `docs/decisions/` | 决策记录（一事一文；新架构 `0028`、和 Atelier 联动 `0027`） |
-| `docs/architecture.md` | 目录、规则、各模块的流程 |
-| `docs/schema.md` | 数据库结构 |
-| `docs/testing.md` | 测试约定与真实验收命令 |
-| `THIRD_PARTY.md` | 第三方依赖与许可证 |
+| 文件 | 写什么 | 谁看 |
+| --- | --- | --- |
+| `CLAUDE.md` | Agent 的工作规则：开工前读什么、硬边界、工程约定、版本与 Git、和 Atelier 联动 | Agent，每次开工必读 |
+| `HANDOFF.md` | 只写现在：上一轮做了什么、测试、等用户的、下一轮从哪开始 | 用户、接手的 Agent |
+| `ROADMAP.md` | 版本计划（现在、做完的、到 2.0.0）、用户验收清单 | 用户、Agent |
+| `docs/requirements.md` | 拍过板、仍然管用的需求 | 动功能前 |
+| `docs/decisions/` | 为什么这么定，一事一文；`README.md` 是索引，标了哪些现行、哪些被取代 | 查理由 |
+| `docs/architecture.md` | 代码怎么分、工程规矩、各模块的流程 | 动代码前 |
+| `docs/schema.md` | 数据库表 | 动表前 |
+| `docs/testing.md` | 测试约定、各模块测什么、真实验收的命令 | 写测试、做验收 |
+| `docs/zotero-mapping.md`、`docs/zotero-copy-guide.md` | Zotero 字段怎么对过来；怎么给 Pith 一份 Zotero 副本 | 动导入时、要用户给副本时 |
+| `docs/questionnaire/` | 规划问卷的源文件（答案读回后写进 ROADMAP 和决策） | 出问卷时 |
+| `THIRD_PARTY.md` | 第三方依赖与许可证 | 加依赖时 |
+| `src/vendor/pith/DESIGN.md` | 视觉基线（同步来的，不手改） | 动界面前 |
+| `crates/*/README.md` | 各引擎的模块表和格式 | 动引擎时 |
 
-参考（做完的阶段留下的）：`docs/brief-digest.md`（原始 Brief 压缩版）、`docs/feasibility.md`（Phase 0 验证）、`docs/open-source-evaluation.md`、`docs/zotero-mapping.md`、`docs/zotero-copy-guide.md`、`crates/*/README.md`、`poc/word-addin/README.md`。
+## 本机环境
 
-## 本机环境（2026-11-08）
-
-macOS 27.2，Apple M3 Pro，18 GB；Microsoft Word 16.114（个人账号）；Zotero 9.0.3（`~/Zotero` 为真实库，只读、不触碰）；Node 24.16、pnpm 12.6、Rust 1.99。
+macOS 27.2，Apple M3 Pro，18 GB；Microsoft Word 16.114；Zotero 9.0.3（`~/Zotero` 是真实库，只读、不碰）；Node 24、pnpm 12、Rust 1.99。
