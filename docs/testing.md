@@ -209,3 +209,17 @@ PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_QUESTIONS='问题一|问题
 # 真实的反方来源：看挑出来的片段比只取开头多带了多少提到目标概念的地方
 PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM='division of labour' cargo test -p pith real_excerpt -- --ignored --nocapture
 ```
+
+## 换配色的帧（1.0.3，`decisions/0032`）
+
+动效卡不卡要在 WebKit 里量（Tauri 用的就是它）；无头 Chrome 用 GPU 画 SVG 滤镜，量不出来。看不见的窗口 WebKit 会停掉动画帧，所以这个小窗口会浮在最前面一两分钟。
+
+```bash
+swiftc -O scripts/webkit-perf.swift -o /tmp/pith-wk
+```
+
+```bash
+/tmp/pith-wk "http://localhost:1430/?mock&perf"
+```
+
+先 `pnpm dev`。`?perf` 默认量两遍：`small`（假数据原样）、`big`（文献库表格复制到 1500 行）；每遍在 设置 › 外观点两次色板、在文献库用 ⌘K 换一次，各记 2.4 秒里的帧数、点下去到第一帧、超过 34 毫秒的帧。满帧是 144 左右。

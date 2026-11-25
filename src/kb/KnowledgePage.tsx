@@ -1,4 +1,5 @@
-// 知识库（R1）：上面一排知识库，下面是卡片墙，十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
+// 知识库（R1，1.0.3 借文献库的两栏）：第一栏左边是一排知识库，右边是种类和搜索；第二栏是生长阶段；
+// 下面是卡片墙，十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
 // 点一张卡，右边滑出面板：正文、从哪来、在哪个库，能改、能照料（换阶段）、能打开原处。
 // 「种进来」：解析好的书（全文）、做完的调查（调查报告）、概念研究的卡片（概念卡），或者自己写一条笔记、记一条摘抄。
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +7,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { api, type KnowledgeBase, type Material, type MaterialKind } from "@/shared/ipc";
 import { Modal, useUi } from "@/shared/ui";
-import { KindIcon, KIND_NAMES, Stage, STAGE_NAMES } from "@/shared/marks";
+import { Select } from "@/shared/controls";
+import { KindIcon, KIND_NAMES, Mark, Stage, STAGE_NAMES } from "@/shared/marks";
 import { useNav, dateOf } from "@/app/nav";
 
 /** 书封的颜色：从方案的几种颜色里轮着取（不写死色值） */
@@ -22,8 +24,20 @@ export function KnowledgePage() {
   const mats = useQuery({ queryKey: ["materials", sel?.uid ?? ""], queryFn: () => api.kbMaterials(sel!.uid), enabled: !!sel });
   const [open, setOpen] = useState<string | null>(nav.kb.material);
   const [planting, setPlanting] = useState(false);
+  const [kind, setKind] = useState("");
+  const [stage, setStage] = useState(-1);
+  const [q, setQ] = useState("");
   useEffect(() => setOpen(nav.kb.material), [nav.kb.material]);
+  useEffect(() => {
+    setKind("");
+    setStage(-1);
+    setQ("");
+  }, [sel?.uid]);
   const current = mats.data?.find((m) => m.uid === open) ?? null;
+  const all = mats.data ?? [];
+  const term = q.trim().toLowerCase();
+  const shown = all.filter((m) => (!kind || m.kind === kind) && (stage < 0 || m.stage === stage) && (!term || `${m.title} ${m.body} ${m.sub}`.toLowerCase().includes(term)));
+  const kinds = (Object.keys(KIND_NAMES) as MaterialKind[]).filter((k) => all.some((m) => m.kind === k));
 
   const create = async () => {
     const name = await ui.prompt({ title: "新建知识库", label: "名字", placeholder: "例如：读《国富论》、毕业论文", confirm: "建好" });
@@ -40,25 +54,71 @@ export function KnowledgePage() {
   return (
     <div className={current ? "has-panel" : ""}>
       <main className="page page-enter">
-        <p className="page-count num">{sel ? `${sel.count} 份` : " "}</p>
-        <h1 className="page-h1">{sel?.name ?? "知识库"}</h1>
+        <p className="page-count num">{sel ? (shown.length === all.length ? `${sel.count} 份` : `${shown.length} / ${all.length} 份`) : " "}</p>
+        <div className="lib-head">
+          <h1 className="page-h1 truncate">{sel?.name ?? "知识库"}</h1>
+          <div className="lib-acts">
+            {sel && (
+              <button className="pith-link" onClick={() => setPlanting(true)}>
+                ＋ 种进来
+              </button>
+            )}
+          </div>
+        </div>
         {sel?.note && <p className="page-line">{sel.note}</p>}
-        <div className="tabs">
-          {list.map((k) => (
-            <button key={k.uid} className={k.uid === sel?.uid ? "is-on" : ""} onClick={() => nav.openKb(k.uid)}>
-              {k.name}
-              <span className="num">{k.count}</span>
+        <div className="lib-bar">
+          <div className="tabs">
+            {list.map((k) => (
+              <button key={k.uid} className={k.uid === sel?.uid ? "is-on" : ""} onClick={() => nav.openKb(k.uid)}>
+                {k.name}
+                <span className="num">{k.count}</span>
+              </button>
+            ))}
+            <button className="act" onClick={create}>
+              ＋ 知识库
             </button>
-          ))}
-          <button className="act" onClick={create}>
-            ＋ 新知识库
-          </button>
-          {sel && (
-            <button className="act" onClick={() => setPlanting(true)}>
-              种进来
-            </button>
+          </div>
+          {sel && all.length > 0 && (
+            <div className="lib-find-row">
+              <Select value={kind} onChange={setKind} title="按种类筛选">
+                <option value="">全部种类</option>
+                {kinds.map((k) => (
+                  <option key={k} value={k}>
+                    {KIND_NAMES[k]}
+                  </option>
+                ))}
+              </Select>
+              <label className="pith-search">
+                <Mark path="icons/search" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQ("")} placeholder="搜索标题、正文" className="selectable" />
+                {q && (
+                  <button onClick={() => setQ("")} aria-label="清空" className="pith-search-x">
+                    ×
+                  </button>
+                )}
+              </label>
+            </div>
           )}
         </div>
+        {sel && all.length > 0 && (
+          <div className="lib-cols">
+            <div className="pith-strip" role="toolbar" aria-label="生长阶段">
+              <button className={`pith-strip-item ${stage < 0 ? "is-on" : ""}`} onClick={() => setStage(-1)}>
+                全部
+              </button>
+              {STAGE_NAMES.map((n, i) => {
+                const c = all.filter((m) => m.stage === i).length;
+                return (
+                  <button key={n} className={`pith-strip-item kb-stage ${stage === i ? "is-on" : ""}`} onClick={() => setStage(stage === i ? -1 : i)} disabled={c === 0}>
+                    <Stage stage={i} />
+                    {n}
+                    <em className="num">{c}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="page-body">
           {kbs.data && list.length === 0 ? (
             <div className="empty">
@@ -74,9 +134,14 @@ export function KnowledgePage() {
                 种进来 <i className="ar not-italic">→</i>
               </button>
             </div>
+          ) : mats.data && shown.length === 0 ? (
+            <div className="empty">
+              <p>没有符合条件的</p>
+              <p className="empty-sub">换个搜索词，或者去掉种类、阶段的筛选。</p>
+            </div>
           ) : (
             <div className="wall">
-              {(mats.data ?? []).map((m, i) => (
+              {shown.map((m, i) => (
                 <Card key={m.uid} m={m} i={i} on={m.uid === open} onClick={() => setOpen(m.uid === open ? null : m.uid)} />
               ))}
             </div>
@@ -308,12 +373,12 @@ function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBa
             <span>{KIND_NAMES[m.kind]}</span>
           </p>
           {edit ? (
-            <input className="field mt-3 font-serif text-xl" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input className="pith-field kb-title-in" value={title} onChange={(e) => setTitle(e.target.value)} />
           ) : (
             <h2 className={`w${m.stage}`}>{m.title}</h2>
           )}
           {m.sub && <p className="s">{m.sub}</p>}
-          {edit ? <textarea className="field mt-4" value={body} onChange={(e) => setBody(e.target.value)} /> : m.body && <p className="t selectable">{m.body}</p>}
+          {edit ? <textarea className="pith-field" value={body} onChange={(e) => setBody(e.target.value)} /> : m.body && <p className="t selectable">{m.body}</p>}
           <p className="acts">
             {edit ? (
               <>
@@ -412,8 +477,8 @@ function Plant({ kb, onClose }: { kb: KnowledgeBase; onClose: () => void }) {
     <Modal title={`种进「${kb.name}」`} onClose={onClose} width="w-[560px]">
       {write ? (
         <div className="space-y-3">
-          <input className="field" autoFocus placeholder={write === "excerpt" ? "出处，例如：Stigler 1951 的摘抄" : "标题"} value={title} onChange={(e) => setTitle(e.target.value)} />
-          <textarea className="field" placeholder={write === "excerpt" ? "摘下来的原话" : "写点什么"} value={body} onChange={(e) => setBody(e.target.value)} />
+          <input className="pith-field" autoFocus placeholder={write === "excerpt" ? "出处，例如：Stigler 1951 的摘抄" : "标题"} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <textarea className="pith-field" placeholder={write === "excerpt" ? "摘下来的原话" : "写点什么"} value={body} onChange={(e) => setBody(e.target.value)} />
           <div className="flex justify-end gap-2">
             <button className="pith-button pith-button--quiet" onClick={() => setWrite(null)}>
               返回

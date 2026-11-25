@@ -7,6 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 import { BookOpen, CornerDownLeft, LoaderCircle, Search, Trash2, X } from "lucide-react";
 import { api, type CiteRef, type ConceptQuote, type PickerSession, type PickInfo } from "@/shared/ipc";
 import { conceptCite, withoutQuote, type LocatorMode, type PithQuote } from "@/picker/conceptLocator";
+import { Select } from "@/shared/controls";
 
 type Chosen = { cite: CiteRef; info: PickInfo };
 
@@ -21,7 +22,7 @@ function Quotes({ cite, quotes, onCite }: { cite: CiteRef; quotes: ConceptQuote[
     <div className="mt-1 flex w-full basis-full flex-col gap-1 pl-5">
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span className="shrink-0">卡片里的原文</span>
-        <select value={chosen} onChange={(e) => pick(Number(e.target.value), mode)} className="min-w-0 flex-1 rounded border bg-background px-1 py-0.5 text-xs text-foreground">
+        <Select variant="field" className="pith-select--s min-w-0 flex-1" value={String(chosen)} onChange={(v) => pick(Number(v), mode)}>
           <option value={-1}>（不插原文）</option>
           {quotes.map((q, i) => (
             <option key={i} value={i}>
@@ -29,7 +30,7 @@ function Quotes({ cite, quotes, onCite }: { cite: CiteRef; quotes: ConceptQuote[
               {q.pages ? `，第 ${q.pages} 页` : ""} · {q.text.slice(0, 60)}
             </option>
           ))}
-        </select>
+        </Select>
         <span className="flex shrink-0 overflow-hidden rounded border">
           {(["page", "paragraph"] as LocatorMode[]).map((m) => (
             <button

@@ -1,6 +1,6 @@
 # 架构
 
-> 代码怎么分、工程上的规矩。产品架构（四个入口、知识库、对话 Agent）在 `decisions/0030`，1.0.2 的界面和存储在 `0031`；表结构在 `docs/schema.md`，测试在 `docs/testing.md`。
+> 代码怎么分、工程上的规矩。产品架构（四个入口、知识库、对话 Agent）在 `decisions/0030`，1.0.2 的界面和存储在 `0031`，1.0.3 的控件和文献库在 `0032`；表结构在 `docs/schema.md`，测试在 `docs/testing.md`。
 
 ## 目录
 
@@ -12,21 +12,22 @@ pith/
 │   │                           fonts.css 登记随 App 打包的 Lato、Newsreader（@fontsource）；明暗跟着系统写根上的 data-theme（shared/theme.ts）
 │   ├── vendor/pith/            视觉方案 pith 的已发版本（Atelier 按 tag 同步：pith.css、bundle.css、tokens.ts、DESIGN.md、marks/、App 图标 PNG），
 │   │                           带 VERSION、SHA256SUMS，不手改（CLAUDE.md 规则 9）；App 图标由 scripts/app-icon.sh（pnpm app:icon）缩到 macOS 网格再出 src-tauri/icons/
-│   ├── styles/app.css          外框和几屏的版面（照 Explore R1，跟着窗口伸缩）；组件的样子和动效零件在 vendor/pith/bundle.css
-│   ├── app/                    外框（`0031`）：App（顶栏 + 一屏；⌘K、⌘\、⌘N、两指横滑；阅读器占满窗口；存卡的种子、换配色的湖面）、nav（几屏之间跳、技能清单）、
+│   ├── styles/app.css          外框和几屏的版面（照 Explore R1，跟着窗口伸缩）；组件的样子（含下拉框、勾选框这些控件）和动效零件在 vendor/pith/bundle.css
+│   ├── app/                    外框（`0031`）：App（顶栏 + 一屏；⌘K、⌘\、⌘N、两指横滑：文献库里叫标签树、别处叫对话历史；阅读器占满窗口；存卡的种子、换配色的波纹）、nav（几屏之间跳、技能清单）、
 │   │                           TopBar、History（对话历史的枝桠）、Palette（⌘K）、branch（枝桠的画法，历史和设置共用）、SideNav（技能左边那一列）
 │   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
 │   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）
-│   ├── kb/KnowledgePage.tsx    知识库：知识库一排、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
-│   ├── library/                LibraryScreen（页头、范围、集合与标签的下拉、右边的面板、导入）、ItemList（搜索、筛选、排序、多选、右键菜单）、
-│   │                           ItemDetail（可编辑详情、批量面板、合并）、Sidebar（集合树、标签筛选、几个特殊范围，放在下拉里）、labels
-│   ├── settings/               SettingsScreen（枝桠 + 七页；角色、知识库、外观是新的）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
+│   ├── kb/KnowledgePage.tsx    知识库：两栏（知识库 | 种类、搜索；生长阶段）、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
+│   ├── library/                LibraryScreen（页头、两栏：范围 | 类型、搜索；集合；标签筛选；右边的面板）、Collections（集合一栏，子集合点开接在后面）、
+│   │                           TagTree（标签树，两指往右滑）、ItemList（表格、排序、多选、右键菜单、「新建」）、ItemDetail（可编辑详情、批量面板、合并）、scope、labels
+│   ├── settings/               SettingsScreen（枝桠 + 八页；角色、知识库、外观是新的，导入 1.0.3 从文献库挪来）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
 │   │                           Transfer、WordSettings、CiteSettings、KeysSettings、ResearchSettings、ConceptSettings、AgentSettings
 │   ├── shared/                 ipc.ts（带类型的 api 对象，唯一的 invoke 入口）、ui.tsx（弹窗、右键菜单、提示条、就地编辑、标签输入）、
-│   │                           marks.tsx（内联 vendor/pith/marks 的图形）、theme.ts（配色和明暗，记在 localStorage）、plainInputs.ts
+│   │                           controls.tsx（下拉框 Select、弹出列表 Menu、退场 usePresence；不用系统的 <select>）、
+│   │                           marks.tsx（内联 vendor/pith/marks 的图形）、theme.ts（配色和明暗，记在 localStorage；换的时候用 View Transitions 洇开）、plainInputs.ts
 │   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
 │   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、
-│   │                           mockResearch / mockConcept / mockAgent（三个技能，数据由各自的引擎生成）
+│   │                           mockResearch / mockConcept / mockAgent（三个技能，数据由各自的引擎生成）；perfProbe（?perf 量换配色的帧）
 │   ├── concept/                概念研究（v0.4，放在对话里）：ConceptPage（书架 → 一本书 → 一章 → 研究）、ConceptSidebar（书的目录）、Reader（原文段落、中英并排、划选）、
 │   │                           Entries（问这本书、追踪概念）、Confirm、RunView（卡片、关系图、导出）、ParseDialog（附件解析成文本）
 │   ├── research/               事实调查（v0.3，放在对话里）：Confirm（两次确认框）、RunScreen（改计划、进度、停止 / 接着做）、Result（短答、点数字看原文、全过程、导出、重查对比）

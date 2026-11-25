@@ -1,23 +1,29 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, FileText, Folder, Paperclip, Plus, Search, StickyNote, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Folder, Paperclip, StickyNote } from "lucide-react";
 import { api, type ListQuery, type ListRow, type RowKind, type Target } from "@/shared/ipc";
-import { childrenMap, useMutate, useStoredState, useUi } from "@/shared/ui";
+import { childrenMap, useMutate, useUi } from "@/shared/ui";
 import { useRead } from "@/reader/useRead";
 import { useMetadata } from "@/metadata/MetadataProvider";
-import type { Scope } from "./Sidebar";
-import { DELETE_FOREVER_NOTE, ITEM_TYPE_OPTIONS, NEW_ITEM_TYPES, contentTypeLabel, creatorsSummary, formatTime, itemTypeLabel } from "./labels";
+import type { Scope } from "./scope";
+import { DELETE_FOREVER_NOTE, NEW_ITEM_TYPES, contentTypeLabel, creatorsSummary, formatTime, itemTypeLabel } from "./labels";
 
 export type Selection = { kind: RowKind; id: number };
 
 type Props = {
   scope: Scope;
   tags: string[];
+  q: string;
+  itemType: string;
+  includeChildren: boolean;
+  onShowSubcollections: () => void;
   selection: Selection[];
   onSelection: (s: Selection[]) => void;
   onImport: () => void;
-  /** 页头下面那排：范围、集合与标签、导入（LibraryScreen 给） */
-  tabs?: React.ReactNode;
+  /** 页头下面的两栏：范围、类型、搜索；集合（LibraryScreen 给） */
+  bars?: React.ReactNode;
+  /** 页头右边的进度（联网补全） */
+  status?: React.ReactNode;
 };
 
 const same = (a: Selection, b: Selection) => a.kind === b.kind && a.id === b.id;
@@ -28,24 +34,14 @@ function toQueryScope(s: Scope, includeChildren: boolean): ListQuery["scope"] {
 }
 
 /** 中间的列表。切换范围时由外层用 key 重建，搜索词、筛选、排序随之清空。 */
-export function ItemList({ scope, tags, selection, onSelection, onImport, tabs }: Props) {
+export function ItemList({ scope, tags, q, itemType, includeChildren, onShowSubcollections, selection, onSelection, onImport, bars, status }: Props) {
   const ui = useUi();
   const mutate = useMutate();
   const { openItem, openAttachment } = useRead();
   const metadata = useMetadata();
-  const [input, setInput] = useState("");
-  const [q, setQ] = useState("");
-  const [itemType, setItemType] = useState("");
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
-  // 「含子集合」记住，不用每进一个集合勾一次
-  const [includeChildren, setIncludeChildren] = useStoredState("includeChildren", false);
   const anchor = useRef<number | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setQ(input.trim()), 250);
-    return () => clearTimeout(t);
-  }, [input]);
 
   const query: ListQuery = { scope: toQueryScope(scope, includeChildren), q, tags, itemType: itemType || null, sort: sort?.key ?? null, desc: sort?.desc ?? false };
   const items = useQuery({ queryKey: ["items", query], queryFn: () => api.itemsList(query), placeholderData: (prev) => prev });
@@ -248,68 +244,36 @@ export function ItemList({ scope, tags, selection, onSelection, onImport, tabs }
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <p className="page-count num">{items.data ? `${rows.length} 条` : " "}</p>
-      <h1 className="page-h1 truncate">{scope.kind === "all" ? "文献库" : title}</h1>
-      {tabs}
-      <div className="lib-tools">
-        <label className="lib-find">
-          <Search size={14} />
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setInput("")}
-            placeholder="搜索标题、作者、标签、摘要、笔记"
-            className="selectable"
-          />
-          {input && (
-            <button onClick={() => setInput("")} className="hover:text-foreground" aria-label="清空">
-              <X size={13} />
-            </button>
-          )}
-        </label>
-        <select value={itemType} onChange={(e) => setItemType(e.target.value)} className="menu-btn bg-transparent outline-none" title="按类型筛选">
-          <option value="">全部类型</option>
-          {ITEM_TYPE_OPTIONS.map((t) => (
-            <option key={t} value={t}>
-              {itemTypeLabel(t)}
-            </option>
-          ))}
-          <option value="attachment">独立附件</option>
-          <option value="note">独立笔记</option>
-        </select>
-        {scope.kind === "collection" && (
-          <label className="menu-btn" title="同时显示下级集合里的">
-            <input type="checkbox" checked={includeChildren} onChange={(e) => setIncludeChildren(e.target.checked)} />
-            含子集合
-          </label>
-        )}
-        <div className="ml-auto">
+      <div className="lib-head">
+        <h1 className="page-h1 truncate">{scope.kind === "all" ? "文献库" : title}</h1>
+        <div className="lib-acts">
+          {status}
           {trash ? (
-            <button onClick={emptyTrash} disabled={rows.length === 0} className="pith-button pith-button--quiet text-destructive disabled:opacity-40">
-              <Trash2 size={14} />
+            <button onClick={emptyTrash} disabled={rows.length === 0} className="pith-link is-danger disabled:opacity-40">
               清空回收站
             </button>
           ) : (
-            <button onClick={newMenu} className="pith-button pith-button--quiet">
-              <Plus size={14} />
-              新建
+            <button onClick={newMenu} className="pith-link">
+              ＋ 新建
             </button>
           )}
         </div>
       </div>
+      {bars}
 
       <div ref={tableRef} tabIndex={0} onKeyDown={onKey} className="lib-table min-h-0 flex-1 overflow-y-auto outline-none">
         {items.error ? (
           <p className="selectable p-6 text-destructive">{String(items.error)}</p>
         ) : items.data && rows.length === 0 ? (
-          <Empty scope={scope} filtered={filtered} onImport={onImport} inSubcollections={includeChildren ? 0 : inSubcollections} onShowSubcollections={() => setIncludeChildren(true)} />
+          <Empty scope={scope} filtered={filtered} onImport={onImport} inSubcollections={includeChildren ? 0 : inSubcollections} onShowSubcollections={onShowSubcollections} />
         ) : (
           <table className="w-full table-fixed border-collapse">
             <thead>
               <tr className="border-b">
                 {header("title", "题名", "pl-4")}
-                {header("creator", "作者", "w-48")}
+                {header("creator", "作者", "w-48 col-a")}
                 {trash ? header("added", "删除于", "w-32") : header("year", "年份", "w-16")}
-                {header("type", "类型", "w-28")}
+                {header("type", "类型", "w-28 col-t")}
               </tr>
             </thead>
             <tbody>
@@ -344,9 +308,9 @@ export function ItemList({ scope, tags, selection, onSelection, onImport, tabs }
                           <Badges row={it} />
                         </div>
                       </td>
-                      <td className="c truncate">{creatorsSummary(it.firstCreator, it.creatorCount)}</td>
+                      <td className="c col-a truncate">{creatorsSummary(it.firstCreator, it.creatorCount)}</td>
                       <td className="c truncate tabular-nums">{trash ? formatTime(it.deletedAt) : (it.year ?? "")}</td>
-                      <td className="c f truncate">{typeLabel(it)}</td>
+                      <td className="c f col-t truncate">{typeLabel(it)}</td>
                     </tr>
                   </Fragment>
                 );
@@ -422,12 +386,12 @@ function Empty({
   inSubcollections: number;
   onShowSubcollections: () => void;
 }) {
-  if (filtered) return <Centered main="没有符合条件的" sub="换个搜索词，或清除标签 / 类型筛选" />;
+  if (filtered) return <Centered main="没有符合条件的" sub="换个搜索词，或者去掉标签、类型的筛选。" />;
   if (scope.kind === "trash") return <Centered main="回收站是空的" />;
   if (scope.kind === "collection" && inSubcollections > 0)
     return (
       <Centered main="这个集合本身没有文献，都在子集合里">
-        <button onClick={onShowSubcollections} className="mt-2 rounded-md border px-3 py-1 text-xs hover:bg-muted">
+        <button onClick={onShowSubcollections} className="pith-button pith-button--quiet">
           显示子集合里的文献
         </button>
       </Centered>
@@ -438,9 +402,9 @@ function Empty({
   if (scope.kind === "missing") return <Centered main="没有缺失的附件文件" />;
   if (scope.kind === "review") return <Centered main="联网补全没有要你确认的了" />;
   return (
-    <Centered main="还没有文献">
-      <button onClick={onImport} className="mt-2 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">
-        导入 Zotero 库或文献文件
+    <Centered main="还没有文献" sub="从 Zotero 库、BibTeX、RIS 文件搬进来。">
+      <button onClick={onImport} className="pith-button pith-sweep">
+        去 设置 › 导入 <i className="ar not-italic">→</i>
       </button>
     </Centered>
   );
@@ -448,9 +412,9 @@ function Empty({
 
 function Centered({ main, sub, children }: { main: string; sub?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
-      <p className="text-sm">{main}</p>
-      {sub && <p className="text-xs">{sub}</p>}
+    <div className="empty">
+      <p>{main}</p>
+      {sub && <p className="empty-sub">{sub}</p>}
       {children}
     </div>
   );

@@ -6,6 +6,7 @@ import { api, type FormatAnchor, type FormatDraft, type FormatHit, type FormatRu
 import { useUi } from "@/shared/ui";
 import { baseName, count, MODE, ROLES, usd, when } from "@/format/labels";
 import { Badge, CommitInput, Markdown, Notice, Page, SectionTitle } from "@/format/parts";
+import { Select } from "@/shared/controls";
 
 export function RunView({ rulesetId, runId, onRoot, onBack }: { rulesetId: string; runId: string; onRoot: () => void; onBack: () => void }) {
   const qc = useQueryClient();
@@ -162,19 +163,18 @@ export function RunView({ rulesetId, runId, onRoot, onBack }: { rulesetId: strin
   );
 }
 
-const roleSelect = "rounded border bg-background px-1 py-0.5 text-xs outline-none focus:border-ring";
 
 function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const known = ROLES.some((r) => r[0] === value.toLowerCase());
   return (
-    <select value={value.toLowerCase()} onChange={(e) => onChange(e.target.value)} className={roleSelect}>
+    <Select variant="field" className="pith-select--s" value={value.toLowerCase()} onChange={onChange}>
       {!known && <option value={value.toLowerCase()}>{value}</option>}
       {ROLES.map(([key, label]) => (
         <option key={key} value={key}>
           {label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -206,7 +206,7 @@ function Hits({ enabled, hits }: { enabled: boolean; hits: FormatHit[] }) {
 function Row({ enabled, onToggle, onRemove, children }: { enabled: boolean; onToggle: (v: boolean) => void; onRemove?: () => void; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2.5 px-3 py-2.5">
-      <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} className="mt-1 shrink-0" />
+      <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} className="pith-check mt-1 shrink-0" />
       <div className="min-w-0 flex-1 space-y-1">{children}</div>
       {onRemove && (
         <button onClick={onRemove} title="删掉这一项" className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -256,13 +256,13 @@ function StyleMap({ v, rev, onSave }: { v: FormatRunView; rev: number; onSave: (
             <span className="text-muted-foreground">{v.styles.length === 0 ? "读不到论文里的样式" : "论文里的样式都已经列在上面"}</span>
           ) : (
             <>
-              <select value={pick} onChange={(e) => setFrom(e.target.value)} className={`${roleSelect} max-w-48 min-w-0`}>
+              <Select variant="field" className="pith-select--s max-w-48 min-w-0" value={pick} onChange={setFrom}>
                 {free.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
-              </select>
+              </Select>
               <span className="text-muted-foreground">→</span>
               <RoleSelect value={to} onChange={setTo} />
               <button onClick={add} className={addButton}>
@@ -438,10 +438,12 @@ function Zones({ v, onSave }: { v: FormatRunView; onSave: (d: FormatDraft) => vo
           <div key={r.key} className="contents">
             <dt className="pt-1 text-muted-foreground">{r.label}</dt>
             <dd className="min-w-0">
-              <select
+              <Select
+                variant="field"
+                className="pith-select--s w-full max-w-md"
+                menuClassName="pith-menu--tall"
                 value={l[r.key] ? String(l[r.key]!.paragraph) : ""}
-                onChange={(e) => pick(r.key, e.target.value)}
-                className="w-full max-w-md rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-ring"
+                onChange={(v) => pick(r.key, v)}
               >
                 <option value="">{r.none}</option>
                 {v.anchors.map((a) => (
@@ -449,7 +451,7 @@ function Zones({ v, onSave }: { v: FormatRunView; onSave: (d: FormatDraft) => vo
                     {label(a)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <p className="mt-0.5 text-xs text-muted-foreground">{r.hint}</p>
             </dd>
           </div>
@@ -459,7 +461,7 @@ function Zones({ v, onSave }: { v: FormatRunView; onSave: (d: FormatDraft) => vo
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             {[false, true].map((duplex) => (
               <label key={String(duplex)} className="flex cursor-default items-center gap-1.5">
-                <input type="radio" name="format-duplex" checked={l.duplex === duplex} onChange={() => set({ duplex })} />
+                <input type="radio" className="pith-radio" name="format-duplex" checked={l.duplex === duplex} onChange={() => set({ duplex })} />
                 {duplex ? "双面（页眉分奇偶页）" : "单面"}
               </label>
             ))}
@@ -492,7 +494,7 @@ function Tables({ v, onSave }: { v: FormatRunView; onSave: (d: FormatDraft) => v
           const skip = d.skipTables.find((x) => x.table === t.index && x.enabled);
           return (
             <li key={t.index} className="flex items-start gap-2 px-3 py-2">
-              <input type="checkbox" checked={t.state === "three_line"} disabled={t.state === "auto"} onChange={(e) => toggle(t.index, e.target.checked)} className="mt-1" />
+              <input type="checkbox" checked={t.state === "three_line"} disabled={t.state === "auto"} onChange={(e) => toggle(t.index, e.target.checked)} className="pith-check mt-1" />
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-medium">第 {t.index} 个表格</span>

@@ -100,6 +100,12 @@
 .pith-branch-item.is-current { color: var(--color-text); }
 .pith-branch-item.is-current::after { background: var(--color-coral); border-color: var(--color-coral); }
 
+/* 标签树（文献库，1.1.0）：同一种枝桠，名字后面一个小计数；按「/」前面那段分组；能多选，选中的节点是珊瑚色、字加粗 */
+.pith-branch-group { margin: 14px 0 4px -12px; font: 700 11px/1.4 var(--font-sans); letter-spacing: .12em; color: var(--color-text-4); }
+.pith-branch-item > em { margin-left: 7px; font: 400 11px/1 var(--font-sans); font-style: normal; color: var(--color-text-4); }
+.pith-branch-item.is-on { color: var(--color-text); font-weight: 600; }
+.pith-branch-item.is-on::after { background: var(--color-coral); border-color: var(--color-coral); }
+
 /* ---------- 按钮和链接 ---------- */
 .pith-button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-on-accent); font: 700 14px/1 var(--font-sans); }
 .pith-button--quiet { background: transparent; color: var(--color-text-2); box-shadow: inset 0 0 0 1px var(--color-line-2); font-weight: 400; }
@@ -111,6 +117,153 @@
 .pith-swatch > b { font: 600 15px/1.2 var(--font-serif); color: var(--color-text); }
 .pith-swatch > span { margin-left: auto; font-size: 12px; color: var(--color-text-4); }
 .pith-swatch.is-on { box-shadow: 0 0 0 2px var(--color-accent); }
+
+/* ---------- 下拉框（Select，1.1.0）：按钮是一行字，后面一个小折角；打开时折角翻上去 ---------- */
+.pith-select { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 28px 0 10px; border-radius: var(--radius-s); font: 400 13.5px/1 var(--font-sans); color: var(--color-text-2); white-space: nowrap; text-align: left; transition: background .2s, color .2s, box-shadow .2s; }
+.pith-select::after { content: ""; position: absolute; right: 11px; top: 50%; width: 6px; height: 6px; margin-top: -5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; opacity: .55; transform: rotate(45deg); transition: transform .32s cubic-bezier(.34,1.36,.64,1), margin-top .32s cubic-bezier(.34,1.36,.64,1); }
+.pith-select:hover:not(:disabled), .pith-select.is-open { background: var(--color-tint); color: var(--color-text); }
+.pith-select.is-open::after { margin-top: -1px; transform: rotate(225deg); }
+.pith-select:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent); outline-offset: 1px; }
+.pith-select:disabled { opacity: .45; }
+.pith-select-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pith-select-ph { color: var(--color-text-4); }
+.pith-select--field { height: 34px; background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line-2); color: var(--color-text); }
+.pith-select--field:hover:not(:disabled), .pith-select--field.is-open { background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.pith-select--s { height: 28px; padding: 0 24px 0 9px; font-size: 12.5px; }
+.pith-select--s::after { right: 9px; width: 5px; height: 5px; margin-top: -4px; }
+.pith-select--s.is-open::after { margin-top: -1px; }
+.pith-select.is-bad { box-shadow: inset 0 0 0 1px var(--color-second); color: var(--color-second); }
+
+/* ---------- 弹出的列表（下拉框、右键菜单、「新建」）：从上往下舒展开一点，收起时往回收、淡出 ---------- */
+.pith-menu { position: fixed; z-index: 70; min-width: 180px; max-width: min(440px, calc(100vw - 16px)); max-height: min(340px, calc(100vh - 24px)); overflow-y: auto; padding: 6px; border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-raised); box-shadow: var(--shadow-lg); outline: 0; scrollbar-width: thin; transform-origin: 50% 0; --menu-dy: -4px; --menu-clip: inset(0 0 70% 0 round var(--radius-m)); animation: pith-menu-in .24s cubic-bezier(.23,1,.32,1) both; }
+.pith-menu.is-up { transform-origin: 50% 100%; --menu-dy: 4px; --menu-clip: inset(70% 0 0 0 round var(--radius-m)); }
+.pith-menu.is-out { animation: pith-menu-out .14s cubic-bezier(.4,0,1,1) both; pointer-events: none; }
+.pith-menu.is-inline { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 190px; max-height: 240px; animation-duration: .18s; }
+.pith-menu--tall { max-height: min(460px, calc(100vh - 24px)); }
+@keyframes pith-menu-in { from { opacity: 0; transform: translateY(var(--menu-dy)) scale(.985); clip-path: var(--menu-clip); } to { clip-path: inset(0 0 0 0 round var(--radius-m)); } }
+@keyframes pith-menu-out { to { opacity: 0; transform: translateY(var(--menu-dy)) scale(.985); } }
+.pith-menu-item { position: relative; display: flex; align-items: baseline; gap: 14px; width: 100%; padding: 7px 12px 7px 26px; border-radius: 6px; text-align: left; font: 400 13.5px/1.35 var(--font-sans); color: var(--color-text-2); --dot-x: 13px; --dot-y: 50%; }
+.pith-menu-item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pith-menu-item > em { flex: none; font-style: normal; font-size: 12px; color: var(--color-text-4); }
+.pith-menu-item.is-active { background: var(--color-tint); color: var(--color-text); }
+.pith-menu-item.is-active::before { animation: pith-arrive .4s linear both; }
+.pith-menu-item.is-active > span { transform: translateX(3px); }
+.pith-menu-item.is-on { color: var(--color-text); font-weight: 700; }
+.pith-menu-item.is-on::after { content: ""; position: absolute; left: 13px; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--color-accent); }
+.pith-menu-item.is-danger { color: var(--color-second); }
+.pith-menu-item:disabled { opacity: .4; }
+.pith-menu-sep { margin: 5px 8px; border: 0; border-top: 1px solid var(--color-line); }
+.pith-menu-group { padding: 9px 12px 5px; font: 700 10.5px/1 var(--font-sans); letter-spacing: .1em; color: var(--color-text-4); }
+
+/* ---------- 勾选框、单选框：纸上的小方框、小圆；勾是一笔从左写到右，单选是海蓝的芯 ---------- */
+.pith-check, .pith-radio { appearance: none; -webkit-appearance: none; position: relative; flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; vertical-align: -3px; background: var(--color-surface); box-shadow: inset 0 0 0 1.4px var(--color-line-2); cursor: default; transition: background .2s, box-shadow .28s cubic-bezier(.34,1.36,.64,1); }
+.pith-check { border-radius: 4px; }
+.pith-check::after { content: ""; width: 10px; height: 10px; background: var(--color-on-accent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.4 4 7.7 8.6 2.4' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.4 4 7.7 8.6 2.4' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; clip-path: inset(0 100% 0 0); transition: clip-path .24s cubic-bezier(.5,0,.2,1); }
+.pith-check:checked { background: var(--color-accent); box-shadow: inset 0 0 0 1.4px var(--color-accent); }
+.pith-check:checked::after { clip-path: inset(0 0 0 0); transition-delay: .06s; }
+.pith-radio { border-radius: 50%; }
+.pith-radio:checked { background: var(--color-accent); box-shadow: inset 0 0 0 1.4px var(--color-accent), inset 0 0 0 4.6px var(--color-surface); }
+:is(.pith-check, .pith-radio):hover:not(:checked):not(:disabled) { box-shadow: inset 0 0 0 1.4px var(--color-accent); }
+:is(.pith-check, .pith-radio):focus-visible { outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent); outline-offset: 2px; }
+:is(.pith-check, .pith-radio):disabled { opacity: .45; }
+
+/* ---------- 输入框 ---------- */
+.pith-field { width: 100%; min-width: 0; height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-s); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line-2); font: 400 14px/1.4 var(--font-sans); color: var(--color-text); outline: 0; transition: box-shadow .2s; }
+textarea.pith-field { height: auto; min-height: 140px; padding: 10px 12px; resize: vertical; font: 400 15.5px/1.7 var(--font-serif); }
+.pith-field::placeholder { color: var(--color-text-4); }
+.pith-field:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, var(--color-line-2)); }
+.pith-field:focus { box-shadow: inset 0 0 0 1.5px var(--color-accent), 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.pith-field--s { height: 30px; padding: 0 9px; font-size: 13px; }
+
+/* 搜索：胶囊，放大镜在前面（icons/search），点进去伸长一点 */
+.pith-search { display: flex; align-items: center; gap: 8px; width: 250px; height: 34px; padding: 0 10px 0 12px; border-radius: var(--radius-pill); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line-2); color: var(--color-text-4); transition: box-shadow .2s, width .45s cubic-bezier(.23,1,.32,1); }
+.pith-search:focus-within { width: 320px; box-shadow: inset 0 0 0 1.5px var(--color-accent); }
+.pith-search > :is(.mark, .pith-glyph) { flex: none; width: 17px; height: 17px; color: var(--color-text-3); }
+.pith-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 400 13.5px/1 var(--font-sans); color: var(--color-text); }
+.pith-search input::placeholder { color: var(--color-text-4); }
+.pith-search-x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 14px; line-height: 1; color: var(--color-text-4); }
+.pith-search-x:hover { background: var(--color-tint); color: var(--color-text); }
+
+/* ---------- 一栏左右滑的（文献库的集合）：衬线的名字，选中的那个是浮在纸上的胶囊；子集合从一根小枝上长出来 ---------- */
+.pith-strip { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; padding: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-mask: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
+.pith-strip::-webkit-scrollbar { display: none; }
+.pith-strip-item { position: relative; flex: none; display: inline-flex; align-items: baseline; gap: 6px; height: 30px; padding: 0 13px; border-radius: var(--radius-pill); font: 400 15px/30px var(--font-serif); color: var(--color-text-3); white-space: nowrap; transition: color .2s, background .2s, box-shadow .25s; }
+.pith-strip-item > em { font: 400 11px/1 var(--font-sans); font-style: normal; color: var(--color-text-4); }
+.pith-strip-item:hover { background: var(--color-tint); color: var(--color-text); }
+.pith-strip-item.is-on { background: var(--color-surface); color: var(--color-text); box-shadow: inset 0 0 0 1px var(--color-line-2), var(--shadow-sm); }
+.pith-strip-item.has-kids::after { content: ""; align-self: center; width: 5px; height: 5px; margin-left: 1px; border-right: 1.3px solid currentColor; border-bottom: 1.3px solid currentColor; opacity: .5; transform: translateY(-1px) rotate(-45deg); transition: transform .3s cubic-bezier(.34,1.36,.64,1); }
+.pith-strip-item.has-kids.is-open::after { transform: translateY(-2px) rotate(45deg); }
+.pith-strip-item.is-sub { height: 26px; padding: 0 10px; font-size: 13.5px; line-height: 26px; color: var(--color-text-4); animation: pith-strip-in .42s cubic-bezier(.23,1,.32,1) both; }
+.pith-strip-item.is-sub:hover, .pith-strip-item.is-sub.is-on { color: var(--color-text); }
+.pith-strip-item.is-add { font: 700 12.5px/30px var(--font-sans); color: var(--color-accent-text); }
+.pith-strip-twig { flex: none; align-self: flex-start; width: 13px; height: 15px; margin: 2px -3px 0 -4px; border-left: 1.3px solid var(--color-accent); border-bottom: 1.3px solid var(--color-accent); border-bottom-left-radius: 10px; opacity: .65; animation: pith-twig .38s cubic-bezier(.23,1,.32,1) both; }
+.pith-strip-end { flex: none; width: 1px; height: 14px; margin: 0 6px; background: var(--color-line-2); }
+.pith-strip-empty { padding: 0 8px; font: 400 14px/30px var(--font-serif); color: var(--color-text-4); }
+@keyframes pith-strip-in { from { opacity: 0; transform: translateX(-8px); } }
+@keyframes pith-twig { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+
+/* ---------- 标签：小胶囊，前面一个绯红的 #；集合的是描边的；× 悬停才出来 ---------- */
+.pith-tag { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: var(--radius-pill); background: var(--color-tint); font: 400 12.5px/1 var(--font-sans); color: var(--color-text-2); white-space: nowrap; }
+.pith-tag::before { content: "#"; font-weight: 700; color: var(--color-second); }
+.pith-tag.is-col { background: transparent; box-shadow: inset 0 0 0 1px var(--color-line-2); font: 400 13.5px/1 var(--font-serif); color: var(--color-text); }
+.pith-tag.is-col::before { content: none; }
+.pith-tag.is-on { background: color-mix(in srgb, var(--color-accent) 15%, var(--color-page)); color: var(--color-text); }
+.pith-tag > i { font-style: normal; color: var(--color-text-4); }
+.pith-tag-x { display: grid; place-items: center; width: 16px; height: 16px; margin-right: -5px; border-radius: 50%; font-size: 13px; line-height: 1; color: var(--color-text-4); opacity: 0; transition: opacity .2s, background .2s; }
+.pith-tag:hover .pith-tag-x, .pith-tag-x:focus-visible { opacity: 1; }
+.pith-tag-x:hover { background: color-mix(in srgb, var(--color-text) 10%, transparent); color: var(--color-text); }
+.pith-tag-add { width: 92px; height: 24px; padding: 0 10px; border: 1px dashed var(--color-line-2); border-radius: var(--radius-pill); background: transparent; font: 400 12.5px/1 var(--font-sans); color: var(--color-text); outline: 0; transition: border-color .2s, width .35s cubic-bezier(.23,1,.32,1); }
+.pith-tag-add::placeholder { color: var(--color-text-4); }
+.pith-tag-add:focus { width: 150px; border-style: solid; border-color: var(--color-accent); }
+.pith-tag-add.is-btn { display: grid; place-items: center; width: 24px; padding: 0; color: var(--color-text-4); }
+.pith-tag-add.is-btn:hover { border-color: var(--color-accent); color: var(--color-text); }
+
+/* ---------- 就地改的字：悬停一层淡底，点进去是海蓝描边的框 ---------- */
+.pith-inline { display: block; margin: 0 -5px; padding: 1px 5px; border-radius: 5px; cursor: text; transition: background .2s; }
+.pith-inline:hover { background: color-mix(in srgb, var(--color-tint) 70%, transparent); }
+.pith-inline.is-empty { color: var(--color-text-4); }
+.pith-inline.is-locked { cursor: default; }
+.pith-inline.is-locked:hover { background: none; }
+.pith-inline.is-multi { white-space: pre-wrap; }
+.pith-inline.is-editing { width: calc(100% + 10px); border: 0; outline: 0; resize: none; overflow: hidden; background: var(--color-surface); box-shadow: inset 0 0 0 1.5px var(--color-accent); font: inherit; color: var(--color-text); cursor: text; }
+.pith-inline.is-editing.is-multi { resize: vertical; overflow: auto; }
+
+/* ---------- 按钮的两个小变化，链接的危险色 ---------- */
+.pith-button { transition: opacity .2s; }
+.pith-button:disabled { opacity: .4; }
+.pith-button--s { height: 30px; padding: 0 13px; font-size: 13px; }
+.pith-button--danger { background: var(--color-second); color: var(--color-page); }
+.pith-link.is-danger { color: var(--color-second); }
+
+/* ---------- 弹窗：纸上浮起来的一张卡，衬线标题 ---------- */
+.pith-scrim { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: color-mix(in srgb, var(--color-app-ink) 24%, transparent); backdrop-filter: blur(1.5px); animation: pith-fade .2s both; }
+.pith-dialog { max-width: min(90vw, 720px); max-height: 86vh; overflow-y: auto; padding: 22px 24px 20px; border-radius: var(--radius-l); background: var(--color-raised); box-shadow: var(--shadow-lg); animation: pith-dialog-in .34s cubic-bezier(.23,1,.32,1) both; }
+.pith-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.pith-dialog h2 { font: 600 21px/1.3 var(--font-serif); color: var(--color-text); }
+.pith-dialog-x { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: -3px -6px 0 0; border-radius: 8px; color: var(--color-text-4); }
+.pith-dialog-x:hover { background: var(--color-tint); color: var(--color-text); }
+.pith-dialog-msg { font: 400 15px/1.7 var(--font-serif); color: var(--color-text-2); }
+.pith-dialog-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.pith-picklist { max-height: 300px; overflow-y: auto; margin: 0 -10px; }
+.pith-picklist button { position: relative; display: flex; width: 100%; padding: 7px 12px 7px 26px; border-radius: 6px; text-align: left; font: 400 15px/1.35 var(--font-serif); color: var(--color-text-2); --dot-x: 13px; }
+.pith-picklist button:hover { background: var(--color-tint); color: var(--color-text); }
+.pith-picklist button.is-on { background: var(--color-tint); color: var(--color-text); font-weight: 600; }
+.pith-picklist button.is-on::after { content: ""; position: absolute; left: 13px; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--color-accent); }
+@keyframes pith-fade { from { opacity: 0; } }
+@keyframes pith-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+
+/* ---------- 提示条：右下角，墨色的底、纸色的字（和悬停的名字一样）；出错的是纸上一道绯红 ---------- */
+.pith-toasts { position: fixed; right: 18px; bottom: 18px; z-index: 80; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 400px; pointer-events: none; }
+.pith-toast { pointer-events: auto; display: flex; align-items: baseline; gap: 14px; padding: 10px 16px; border-radius: var(--radius-m); background: var(--color-text); color: var(--color-page); font: 400 13.5px/1.5 var(--font-sans); box-shadow: var(--shadow-lg); animation: pith-toast-in .42s cubic-bezier(.34,1.36,.64,1) both; }
+.pith-toast > span { flex: 1; min-width: 0; }
+.pith-toast .pith-link { color: color-mix(in srgb, var(--color-accent) 55%, var(--color-page)); }
+.pith-toast.is-error { background: var(--color-raised); color: var(--color-second); box-shadow: inset 3px 0 0 var(--color-second), var(--shadow-lg); }
+@keyframes pith-toast-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pith-menu, .pith-menu.is-out, .pith-dialog, .pith-scrim, .pith-toast, .pith-strip-item.is-sub, .pith-strip-twig { animation: none; }
+  .pith-check::after, .pith-select::after { transition: none; }
+}
 
 /* ---------- 两套配色（非默认的那套，构建插进来） ---------- */
 [data-palette="mist-ochre"][data-theme="dark"],
@@ -315,9 +468,15 @@
 /* ---------- 动效 · 换配色 · 湖面波纹（palette-lake，expressive） ---------- */
 /* 换配色 · 湖面波纹（expressive，登记的表面 palette-lake，2.3 秒；站主 2026-11-23：要像几层真实的湖面波纹，不是一个圈）。
    从点的地方漾开五圈：暗的波谷（强调色压暗）和亮的波峰（纸色提亮）一对一对，第二、四圈是珊瑚色，一圈比一圈晚、一圈比一圈细；
-   同时整页像水面一样轻轻晃一下（SVG 滤镜 #pith-lake-f，1.4 秒），颜色 token 慢慢过渡（0.9 秒，@property 注册成 <color>）。
-   用法：.pith-lake 放在点的位置（left/top），里面五对圆 .rg1–5、.rh1–5，加 .is-in 才漾开；页面的根加 .pith-smooth（颜色过渡）；换的那一刻根加 .is-lake（1.45 秒后拿掉），
-   并调滤镜里 <animate id="pith-lake-anim"> 的 beginElement()。滤镜在大页面上可能吃性能，开发时要量，必要时只扭曲一张截图层。 */
+   新的颜色从同一个点像墨一样洇开（1.3 秒，和波纹同一种先快后慢的节奏、半径大得多，波纹一直落在已经洇开的那片里）。
+   1.1.0（Pith 1.0.3 实测）：拿掉整页的水面扭曲（SVG 滤镜，WebKit 里每帧约 100 毫秒，换一次卡一秒多）；颜色改成 View Transitions 的「洇开」：
+   浏览器拍下旧的样子，新样子的样式只算一次，洇开是一张图上的软边遮罩。.pith-smooth（十四个颜色变量各自过渡）留给小页面和导出动图：
+   它每帧要重算整页，文献库一长（1500 行）在 WebKit 里会掉到一秒几帧，真的 App 里别用。
+   用法：.pith-lake 放在点的位置（left/top），里面五对圆 .rg1–5、.rh1–5，加 .is-in 才漾开；
+   换颜色：根上写 --ink-x、--ink-y（点的位置）、--ink-r（到最远那个角再加 160px），document.startViewTransition(() => 换 data-palette)。
+   波纹等 transition.ready 再加 .is-in：浏览器拍旧画面的那一下（约 0.2 秒）屏幕是冻住的，早起的话最浓的那段被吃掉，看起来像没有波纹。
+   波纹留在页面里（不另起 view-transition-name：WebKit 里单独那一层过渡时不实时画）。
+   没有 View Transitions、减弱动态效果时直接换。 */
 @property --color-page { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --color-surface { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --color-raised { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -333,7 +492,6 @@
 @property --color-second { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --color-coral { syntax: '<color>'; inherits: true; initial-value: transparent; }
 .pith-smooth { transition: --color-page .9s cubic-bezier(.4,0,.2,1), --color-surface .9s cubic-bezier(.4,0,.2,1), --color-raised .9s cubic-bezier(.4,0,.2,1), --color-tint .9s cubic-bezier(.4,0,.2,1), --color-line .9s cubic-bezier(.4,0,.2,1), --color-line-2 .9s cubic-bezier(.4,0,.2,1), --color-text .9s cubic-bezier(.4,0,.2,1), --color-text-2 .9s cubic-bezier(.4,0,.2,1), --color-text-3 .9s cubic-bezier(.4,0,.2,1), --color-text-4 .9s cubic-bezier(.4,0,.2,1), --color-accent .9s cubic-bezier(.4,0,.2,1), --color-accent-text .9s cubic-bezier(.4,0,.2,1), --color-second .9s cubic-bezier(.4,0,.2,1), --color-coral .9s cubic-bezier(.4,0,.2,1); }
-.pith-smooth.is-lake { filter: url(#pith-lake-f); }
 .pith-lake { position: absolute; z-index: 65; width: 40px; height: 40px; margin: -20px 0 0 -20px; overflow: visible; pointer-events: none; }
 .pith-lake circle { fill: none; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; opacity: 0; }
 .pith-lake.is-in circle { animation: pith-lake 2.1s cubic-bezier(.15,.65,.3,1) var(--d) forwards; }
@@ -346,10 +504,15 @@
 .pith-lake :is(.rg4, .rh4) { --d: .54s; --k: 32; --o: .42; stroke-width: 1.4; }
 .pith-lake :is(.rg5, .rh5) { --d: .76s; --k: 22; --o: .34; stroke-width: 1; }
 @keyframes pith-lake { 0% { transform: scale(.15); opacity: 0; } 8% { opacity: var(--o); } 100% { transform: scale(var(--k)); opacity: 0; } }
+/* 洇开：新的样子从 --ink-x、--ink-y 用一圈 160px 的软边遮罩露出来，旧的垫在下面不动 */
+@property --ink { syntax: '<length>'; inherits: false; initial-value: 0px; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { -webkit-mask: radial-gradient(circle at var(--ink-x, 50%) var(--ink-y, 50%), #000 calc(var(--ink) - 160px), transparent var(--ink)); mask: radial-gradient(circle at var(--ink-x, 50%) var(--ink-y, 50%), #000 calc(var(--ink) - 160px), transparent var(--ink)); animation: pith-ink 1.3s cubic-bezier(.15,.65,.3,1) both; }
+@keyframes pith-ink { from { --ink: 0px; } to { --ink: var(--ink-r, 150vmax); } }
 @media (prefers-reduced-motion: reduce) {
   .pith-lake { display: none; }
-  .pith-smooth.is-lake { filter: none; }
   .pith-smooth { transition: none; }
+  ::view-transition-new(root) { animation: none; -webkit-mask: none; mask: none; }
 }
 
 /* ---------- 动效 · 生长 · 存进知识库（save-grow，expressive） ---------- */

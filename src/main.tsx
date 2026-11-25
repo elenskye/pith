@@ -25,6 +25,9 @@ if (import.meta.env.DEV && params.has("mock")) {
 
 installPlainInputs();
 
+// 开发构建里 ?perf：量换配色的帧（src/dev/perfProbe.ts）
+if (import.meta.env.DEV && params.has("perf")) void import("./dev/perfProbe").then((m) => m.runPerfProbe());
+
 // 本机 IPC：不需要网络重试、切回窗口自动刷新
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, staleTime: Infinity } },

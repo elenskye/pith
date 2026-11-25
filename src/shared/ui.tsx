@@ -1,8 +1,9 @@
 // 界面通用部件（不引入组件库）：弹窗（确认 / 输入 / 选集合）、右键菜单、提示条、就地编辑的文本、执行修改并刷新。
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, CircleCheck, Folder, TriangleAlert, X } from "lucide-react";
+import { ChevronRight, CircleCheck, TriangleAlert, X } from "lucide-react";
 import { api, type Check, type CollectionNode } from "@/shared/ipc";
+import { Menu } from "@/shared/controls";
 
 // ---------------- 弹窗与提示 ----------------
 
@@ -38,7 +39,8 @@ type Dialog =
 export function UiProvider({ children }: { children: React.ReactNode }) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [toasts, setToasts] = useState<{ id: number; msg: string; tone: "info" | "error"; action?: ToastAction }[]>([]);
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[]; n: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const nextId = useRef(1);
 
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
@@ -57,10 +59,13 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
       prompt: (o) => new Promise((resolve) => setDialog({ kind: "prompt", o, resolve })),
       pickCollection: (o) => new Promise((resolve) => setDialog({ kind: "pick", o, resolve })),
       notify,
+      // 右键：菜单在鼠标那一点；点一个按钮（「新建」）：贴着按钮的下沿
       menu: (e, items) => {
         e.preventDefault();
         e.stopPropagation();
-        setMenu({ x: e.clientX, y: e.clientY, items });
+        const r = e.type === "click" ? (e.currentTarget as HTMLElement).getBoundingClientRect() : null;
+        setMenu((m) => ({ x: r ? r.left : e.clientX, y: r ? r.bottom + 6 : e.clientY, items, n: (m?.n ?? 0) + 1 }));
+        setMenuOpen(true);
       },
     }),
     [notify],
@@ -71,7 +76,15 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
   return (
     <UiContext.Provider value={ui}>
       {children}
-      {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
+      {menu && (
+        <Menu
+          key={menu.n}
+          open={menuOpen}
+          at={{ x: menu.x, y: menu.y }}
+          onClose={() => setMenuOpen(false)}
+          items={menu.items.map((it, i) => (it === "-" ? { key: `s${i}`, sep: true } : { key: `i${i}`, label: it.label, danger: it.danger, disabled: it.disabled, onPick: it.onClick }))}
+        />
+      )}
       {dialog?.kind === "confirm" && (
         <ConfirmDialog
           o={dialog.o}
@@ -99,20 +112,17 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
-      <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex max-w-sm flex-col gap-2">
+      <div className="pith-toasts">
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`selectable pointer-events-auto flex items-center gap-3 rounded-md border px-3 py-2 text-xs shadow-md ${t.tone === "error" ? "border-destructive/40 bg-card text-destructive" : "bg-card"}`}
-          >
-            <span className="min-w-0 flex-1">{t.msg}</span>
+          <div key={t.id} className={`selectable pith-toast ${t.tone === "error" ? "is-error" : ""}`}>
+            <span>{t.msg}</span>
             {t.action && (
               <button
                 onClick={() => {
                   dismiss(t.id);
                   t.action?.onClick();
                 }}
-                className="shrink-0 font-medium text-primary hover:underline"
+                className="pith-link"
               >
                 {t.action.label}
               </button>
@@ -124,21 +134,22 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** 弹窗（pith-dialog）：纸上浮起来的一张卡，衬线的标题；Esc、点外面关上 */
 export function Modal({ title, children, onClose, width = "w-96" }: { title: string; children: React.ReactNode; onClose: () => void; width?: string }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !(e.target as HTMLElement | null)?.closest(".pith-menu") && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30" onMouseDown={onClose}>
-      <div className={`${width} max-w-[90vw] rounded-lg border bg-card p-4 shadow-xl`} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded p-0.5 text-muted-foreground hover:bg-muted">
-            <X size={14} />
+    <div className="pith-scrim" onMouseDown={onClose}>
+      <div className={`pith-dialog ${width}`} role="dialog" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>
+        <header>
+          <h2>{title}</h2>
+          <button onClick={onClose} className="pith-dialog-x" aria-label="关上">
+            <X size={16} />
           </button>
-        </div>
+        </header>
         {children}
       </div>
     </div>
@@ -147,15 +158,11 @@ export function Modal({ title, children, onClose, width = "w-96" }: { title: str
 
 function Buttons({ onCancel, onOk, ok, danger, disabled }: { onCancel: () => void; onOk: () => void; ok: string; danger?: boolean; disabled?: boolean }) {
   return (
-    <div className="mt-4 flex justify-end gap-2">
-      <button onClick={onCancel} className="rounded-md border px-3 py-1 text-xs hover:bg-muted">
-        取消
+    <div className="pith-dialog-acts">
+      <button onClick={onCancel} className="pith-button pith-button--quiet">
+        算了
       </button>
-      <button
-        onClick={onOk}
-        disabled={disabled}
-        className={`rounded-md px-3 py-1 text-xs disabled:opacity-40 ${danger ? "bg-destructive text-background" : "bg-primary text-primary-foreground"}`}
-      >
+      <button onClick={onOk} disabled={disabled} className={`pith-button pith-sweep ${danger ? "pith-button--danger" : ""}`}>
         {ok}
       </button>
     </div>
@@ -165,7 +172,7 @@ function Buttons({ onCancel, onOk, ok, danger, disabled }: { onCancel: () => voi
 function ConfirmDialog({ o, onDone }: { o: ConfirmOpts; onDone: (v: boolean) => void }) {
   return (
     <Modal title={o.title} onClose={() => onDone(false)}>
-      {o.message && <div className="text-xs leading-relaxed text-muted-foreground">{o.message}</div>}
+      {o.message && <div className="pith-dialog-msg">{o.message}</div>}
       <Buttons onCancel={() => onDone(false)} onOk={() => onDone(true)} ok={o.confirm ?? "确定"} danger={o.danger} />
     </Modal>
   );
@@ -176,14 +183,14 @@ function PromptDialog({ o, onDone }: { o: PromptOpts; onDone: (v: string | null)
   const ok = () => v.trim() && onDone(v.trim());
   return (
     <Modal title={o.title} onClose={() => onDone(null)}>
-      {o.label && <p className="mb-1.5 text-xs text-muted-foreground">{o.label}</p>}
+      {o.label && <p className="pith-dialog-msg">{o.label}</p>}
       <input
         autoFocus
         value={v}
         placeholder={o.placeholder}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && ok()}
-        className="selectable w-full rounded-md border bg-background px-2 py-1 outline-none focus:border-ring"
+        className="selectable pith-field mt-2"
       />
       <Buttons onCancel={() => onDone(null)} onOk={ok} ok={o.confirm ?? "确定"} disabled={!v.trim()} />
     </Modal>
@@ -195,13 +202,13 @@ function PickCollectionDialog({ o, onDone }: { o: PickOpts; onDone: (v: number |
   const [chosen, setChosen] = useState<number | null>(null);
   return (
     <Modal title={o.title} onClose={() => onDone(null)}>
-      <div className="max-h-72 overflow-y-auto rounded-md border p-1">
+      <div className="pith-picklist">
         {o.allowRoot && (
-          <button onClick={() => setChosen(0)} className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left ${chosen === 0 ? "bg-accent" : "hover:bg-muted"}`}>
-            <span className="text-muted-foreground">（顶层）</span>
+          <button onClick={() => setChosen(0)} className={`pith-row ${chosen === 0 ? "is-on" : ""}`}>
+            <span>（顶层）</span>
           </button>
         )}
-        {cols.data && cols.data.length === 0 && !o.allowRoot && <p className="p-2 text-xs text-muted-foreground">还没有集合</p>}
+        {cols.data && cols.data.length === 0 && !o.allowRoot && <p className="pith-dialog-msg">还没有集合</p>}
         {cols.data && <CollectionTree nodes={cols.data} exclude={o.exclude} chosen={chosen} onChoose={setChosen} />}
       </div>
       <Buttons onCancel={() => onDone(null)} onOk={() => chosen !== null && onDone(chosen)} ok={o.confirm ?? "确定"} disabled={chosen === null} />
@@ -216,13 +223,8 @@ function CollectionTree({ nodes, exclude, chosen, onChoose }: { nodes: Collectio
     (children.get(parent) ?? []).map((n) =>
       n.id === exclude ? null : (
         <div key={n.id}>
-          <button
-            onClick={() => onChoose(n.id)}
-            style={{ paddingLeft: 8 + depth * 14 }}
-            className={`flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left ${chosen === n.id ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
-          >
-            <Folder size={13} className="shrink-0 text-muted-foreground" />
-            <span className="truncate">{n.name}</span>
+          <button onClick={() => onChoose(n.id)} style={{ paddingLeft: 26 + depth * 16 }} className={`pith-row ${chosen === n.id ? "is-on" : ""}`}>
+            <span>{n.name}</span>
           </button>
           {render(n.id, depth + 1)}
         </div>
@@ -239,48 +241,6 @@ export function childrenMap(nodes: CollectionNode[]) {
     m.set(parent, [...(m.get(parent) ?? []), n]);
   }
   return m;
-}
-
-function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ x, y });
-  useLayoutEffect(() => {
-    const r = ref.current?.getBoundingClientRect();
-    if (r) setPos({ x: Math.min(x, window.innerWidth - r.width - 8), y: Math.min(y, window.innerHeight - r.height - 8) });
-  }, [x, y]);
-  useEffect(() => {
-    const close = () => onClose();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("mousedown", close);
-    window.addEventListener("blur", close);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("blur", close);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-  return (
-    <div ref={ref} style={{ left: pos.x, top: pos.y }} className="fixed z-50 min-w-40 rounded-md border bg-card py-1 shadow-lg" onMouseDown={(e) => e.stopPropagation()}>
-      {items.map((it, i) =>
-        it === "-" ? (
-          <div key={i} className="my-1 border-t" />
-        ) : (
-          <button
-            key={i}
-            disabled={it.disabled}
-            onClick={() => {
-              onClose();
-              it.onClick();
-            }}
-            className={`block w-full px-3 py-1 text-left text-xs hover:bg-muted disabled:opacity-40 ${it.danger ? "text-destructive" : ""}`}
-          >
-            {it.label}
-          </button>
-        ),
-      )}
-    </div>
-  );
 }
 
 // ---------------- 核对结果 ----------------
@@ -448,17 +408,17 @@ export function TagInput({
         className={className}
       />
       {shown && (
-        <ul className="absolute top-full left-0 z-30 mt-1 max-h-56 w-max max-w-72 min-w-44 overflow-y-auto rounded-md border bg-card py-1 text-xs shadow-md">
+        <ul className="pith-menu is-inline">
           {matches.map((t, i) => (
             <li key={t.id}>
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(t.name)}
                 onMouseEnter={() => setHi(i)}
-                className={`flex w-full items-center gap-3 px-2.5 py-1 text-left ${i === hi ? "bg-accent text-accent-foreground" : ""}`}
+                className={`pith-menu-item pith-row ${i === hi ? "is-active" : ""}`}
               >
-                <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
+                <span>{t.name}</span>
+                <em className="num">{t.count}</em>
               </button>
             </li>
           ))}
@@ -520,7 +480,7 @@ export function EditableText({
     return (
       <span
         onClick={() => !disabled && setEditing(true)}
-        className={`-mx-1 block rounded px-1 ${disabled ? "" : "cursor-text hover:bg-muted"} ${value ? "" : "text-muted-foreground"} ${multiline ? "whitespace-pre-wrap" : ""} ${className}`}
+        className={`pith-inline ${disabled ? "is-locked" : ""} ${value ? "" : "is-empty"} ${multiline ? "is-multi" : ""} ${className}`}
       >
         {value || placeholder}
       </span>
@@ -543,7 +503,7 @@ export function EditableText({
         commit();
       }
     },
-    className: `selectable -mx-1 block w-[calc(100%+0.5rem)] rounded border border-ring bg-background px-1 outline-none ${multiline ? "" : "resize-none overflow-hidden"} ${className}`,
+    className: `selectable pith-inline is-editing ${multiline ? "is-multi" : ""} ${className}`,
   };
   return <textarea rows={multiline ? Math.min(12, Math.max(3, draft.split("\n").length + 1)) : 1} {...common} />;
 }

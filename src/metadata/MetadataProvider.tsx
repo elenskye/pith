@@ -178,7 +178,7 @@ function ConsentDialog({ initialEmail, onDone }: { initialEmail: string; onDone:
           />
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+          <input type="checkbox" className="pith-check" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
           导入后、填写 DOI / ISBN 后自动查
         </label>
         <p className="text-muted-foreground">随时可以在「设置」里关闭或修改。</p>

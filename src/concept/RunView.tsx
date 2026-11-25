@@ -335,7 +335,7 @@ export function RunScreen({ uid, card, onCard, onOpenText, onPrepare, onDeleted 
             {sources.map((s) => (
               <li key={s.id} className="flex items-start gap-2">
                 {s.origin === "web" && !s.error && !s.addedItem ? (
-                  <input type="checkbox" className="mt-0.5" checked={picked.has(s.id)} onChange={() => setPicked((p) => (p.has(s.id) ? new Set([...p].filter((x) => x !== s.id)) : new Set([...p, s.id])))} />
+                  <input type="checkbox" className="pith-check mt-0.5" checked={picked.has(s.id)} onChange={() => setPicked((p) => (p.has(s.id) ? new Set([...p].filter((x) => x !== s.id)) : new Set([...p, s.id])))} />
                 ) : (
                   <span className="w-[13px]" />
                 )}

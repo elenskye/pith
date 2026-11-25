@@ -9,6 +9,7 @@ import { useUi } from "@/shared/ui";
 import { Badge, Notice } from "@/format/parts";
 import { count, when } from "@/format/labels";
 import { ENGINE, PROVIDER, PURPOSE, TIER, TIERS, money } from "@/research/labels";
+import { Select } from "@/shared/controls";
 
 const PLACE: Record<AgentKeyPlace, string> = {
   keychain: "存在 macOS 钥匙串",
@@ -84,17 +85,17 @@ export function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onS
 function EndpointEditor({ value, onChange }: { value: ResearchEndpoint; onChange: (e: ResearchEndpoint) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <select
+      <Select
+        variant="field"
         value={value.provider}
-        onChange={(e) => {
-          const provider = e.target.value as ResearchEndpoint["provider"];
+        onChange={(v) => {
+          const provider = v as ResearchEndpoint["provider"];
           onChange(provider === "anthropic" ? { provider, model: "claude-opus-5-5", baseUrl: null } : { provider, model: "deepseek-flash", baseUrl: "https://api.deepseek.com" });
         }}
-        className="rounded-md border bg-background px-1.5 py-1"
       >
         <option value="anthropic">{PROVIDER.anthropic}</option>
         <option value="openai_compatible">{PROVIDER.openai_compatible}</option>
-      </select>
+      </Select>
       <input value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} placeholder="模型名" className="selectable w-44 rounded-md border bg-background px-2 py-1 font-mono outline-none focus:border-ring" />
       <input
         value={value.baseUrl ?? ""}
@@ -198,14 +199,10 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
             <dd className="space-y-1 text-xs">
               <label className="flex items-center gap-2">
                 <span className="w-28 shrink-0">Anthropic</span>
-                <select
-                  value={draft.dedicatedSearch.anthropic ?? "none"}
-                  onChange={(e) => setDraft({ ...draft, dedicatedSearch: { ...draft.dedicatedSearch, anthropic: e.target.value } })}
-                  className="rounded-md border bg-background px-1.5 py-1"
-                >
+                <Select variant="field" value={draft.dedicatedSearch.anthropic ?? "none"} onChange={(v) => setDraft({ ...draft, dedicatedSearch: { ...draft.dedicatedSearch, anthropic: v } })}>
                   <option value="claude_web_search">Claude 网页搜索（每千次 $10）</option>
                   <option value="none">无（用 Tavily）</option>
-                </select>
+                </Select>
               </label>
               <p className="flex items-center gap-2">
                 <span className="w-28 shrink-0">OpenAI 兼容</span>
@@ -213,10 +210,10 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
               </p>
               <label className="flex items-center gap-2">
                 <span className="w-28 shrink-0">Tavily 搜索深度</span>
-                <select value={draft.tavilyDepth} onChange={(e) => setDraft({ ...draft, tavilyDepth: e.target.value as "basic" | "advanced" })} className="rounded-md border bg-background px-1.5 py-1">
+                <Select variant="field" value={draft.tavilyDepth} onChange={(v) => setDraft({ ...draft, tavilyDepth: v as "basic" | "advanced" })}>
                   <option value="basic">基础（1 点）</option>
                   <option value="advanced">高级（2 点）</option>
-                </select>
+                </Select>
               </label>
               <label className="flex items-center gap-2">
                 <span className="w-28 shrink-0">计划时摸底</span>
@@ -238,7 +235,7 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
             <dt className="pt-0.5 text-muted-foreground">下载失败时</dt>
             <dd className="space-y-1 text-xs">
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={draft.webFetchFallback} onChange={(e) => setDraft({ ...draft, webFetchFallback: e.target.checked })} />
+                <input type="checkbox" className="pith-check" checked={draft.webFetchFallback} onChange={(e) => setDraft({ ...draft, webFetchFallback: e.target.checked })} />
                 <span>改用 Claude 网页抓取</span>
                 <input
                   value={draft.fetchModel}
@@ -298,13 +295,13 @@ export function ResearchSettingsSection({ onKeys }: { onKeys: () => void }) {
                           {t.label}
                         </td>
                         <td className="py-1 pr-2">
-                          <select value={tier} onChange={(e) => setTier(t.kind, e.target.value as ResearchTier)} className="rounded border bg-background px-1 py-0.5">
+                          <Select variant="field" className="pith-select--s" value={tier} onChange={(v) => setTier(t.kind, v as ResearchTier)}>
                             {TIERS.map((x) => (
                               <option key={x} value={x}>
                                 {TIER[x]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </td>
                         <td className="py-1 text-muted-foreground">{tier !== t.defaultTier && `默认「${TIER[t.defaultTier]}」`}</td>
                       </tr>

@@ -1,5 +1,5 @@
-// 设置（R1）：左边是常驻的枝桠（每次进设置长一遍），七页：角色、技能、知识库与检索、模型与费用、Word 与引文、数据、外观。
-// 原来八页的内容（SettingsPage 的各块）分进这七页；角色、外观、知识库的管理是 1.0.2 新的。
+// 设置（R1）：左边是常驻的枝桠（每次进设置长一遍），八页：角色、技能、知识库与检索、模型与费用、Word 与引文、导入、数据、外观。
+// 原来八页的内容（SettingsPage 的各块）分进这几页；角色、外观、知识库的管理是 1.0.2 新的，导入 1.0.3 从文献库挪过来。
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Role } from "@/shared/ipc";
@@ -8,6 +8,7 @@ import { PALETTES, paletteVars, useLook, type ThemePref } from "@/shared/theme";
 import { useNav, roleTone, type SetSection } from "@/app/nav";
 import { branch, labelDelay } from "@/app/branch";
 import { SettingsPage, type SettingsSection } from "@/settings/SettingsPage";
+import { ImportPage } from "@/import/ImportPage";
 
 const PAGES: { id: SetSection; name: string; line: string; blocks?: [SettingsSection, string][] }[] = [
   { id: "roles", name: "角色", line: "请谁来答：每个角色有自己的说话方式、默认的知识库和常用的技能。" },
@@ -15,11 +16,13 @@ const PAGES: { id: SetSection; name: string; line: string; blocks?: [SettingsSec
   { id: "kb", name: "知识库与检索", line: "知识库是文献库和对话之间的一层；回答时在你勾的库里找。" },
   { id: "keys", name: "模型与费用", line: "几家接口的密钥，和每个月最多花多少。", blocks: [["keys", ""]] },
   { id: "word", name: "Word 与引文", line: "Word 里的 Pith 选项卡、引文样式、把 Zotero 的引文换过来。", blocks: [["word", ""]] },
+  { id: "import", name: "导入", line: "把 Zotero 库、BibTeX、RIS 里的文献搬进文献库；原来的文件一个字也不动。" },
   { id: "data", name: "数据", line: "数据放在哪、备份和恢复、整库导出、联网补全。", blocks: [["general", "数据目录"], ["backup", "备份与导出"], ["library", "联网补全"]] },
   { id: "look", name: "外观", line: "两套配色，随时换；换的时候颜色像墨一样慢慢洇过去。" },
 ];
 
-const NODES = [{ kind: "g" as const, y: 36 }, ...PAGES.map((_, i) => ({ kind: "i" as const, y: 92 + i * 50 }))];
+const STEP = 46;
+const NODES = [{ kind: "g" as const, y: 36 }, ...PAGES.map((_, i) => ({ kind: "i" as const, y: 92 + i * STEP }))];
 
 export function SettingsScreen({ onRestored }: { onRestored: () => void }) {
   const nav = useNav();
@@ -45,7 +48,7 @@ export function SettingsScreen({ onRestored }: { onRestored: () => void }) {
           <button
             key={p.id}
             className={`br-st pith-row ${p.id === page.id ? "is-on" : ""}`}
-            style={{ top: 92 + i * 50 - 11 + 20, "--d": `${labelDelay(i + 1, 0.1, 0.06)}s` } as React.CSSProperties}
+            style={{ top: 92 + i * STEP - 11 + 20, "--d": `${labelDelay(i + 1, 0.1, 0.06)}s` } as React.CSSProperties}
             onClick={() => nav.openSettings(p.id)}
           >
             {p.name}
@@ -60,6 +63,7 @@ export function SettingsScreen({ onRestored }: { onRestored: () => void }) {
           {page.id === "roles" && <Roles />}
           {page.id === "kb" && <KnowledgeBases />}
           {page.id === "look" && <Appearance />}
+          {page.id === "import" && <ImportPage onDone={() => nav.go("lib")} />}
           {page.blocks?.map(([s, title]) => (
             <section key={s} className="set-block">
               {title && <h3 className="set-block-title">{title}</h3>}
@@ -128,16 +132,16 @@ function Roles() {
         <section className="mt-8 max-w-[720px] space-y-3">
           <p className="set-k">{draft.uid ? "改这个角色" : "新角色"}</p>
           <div className="grid grid-cols-[1fr_90px] gap-3">
-            <input className="field" placeholder="名字，例如：导师" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            <input className="field" placeholder="头像字" value={draft.mark} maxLength={2} onChange={(e) => setDraft({ ...draft, mark: e.target.value })} />
+            <input className="pith-field" placeholder="名字，例如：导师" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <input className="pith-field" placeholder="头像字" value={draft.mark} maxLength={2} onChange={(e) => setDraft({ ...draft, mark: e.target.value })} />
           </div>
-          <input className="field" placeholder="一句话：什么时候请它" value={draft.line} onChange={(e) => setDraft({ ...draft, line: e.target.value })} />
-          <textarea className="field" placeholder="它怎么说话、先做什么后做什么（这一版回答是演示的，接上模型后照这个说）" value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} />
+          <input className="pith-field" placeholder="一句话：什么时候请它" value={draft.line} onChange={(e) => setDraft({ ...draft, line: e.target.value })} />
+          <textarea className="pith-field" placeholder="它怎么说话、先做什么后做什么（这一版回答是演示的，接上模型后照这个说）" value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
-            <input className="field" placeholder="默认知识库，例如：在读的那本书" value={draft.kb} onChange={(e) => setDraft({ ...draft, kb: e.target.value })} />
-            <input className="field" placeholder="偏好的模型（空着跟随全局）" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
+            <input className="pith-field" placeholder="默认知识库，例如：在读的那本书" value={draft.kb} onChange={(e) => setDraft({ ...draft, kb: e.target.value })} />
+            <input className="pith-field" placeholder="偏好的模型（空着跟随全局）" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
           </div>
-          <input className="field" placeholder="常用技能，用顿号隔开" value={draft.skills.join("、")} onChange={(e) => setDraft({ ...draft, skills: e.target.value.split(/[、,，]/).map((s) => s.trim()).filter(Boolean) })} />
+          <input className="pith-field" placeholder="常用技能，用顿号隔开" value={draft.skills.join("、")} onChange={(e) => setDraft({ ...draft, skills: e.target.value.split(/[、,，]/).map((s) => s.trim()).filter(Boolean) })} />
           <div className="flex gap-2 pt-2">
             <button className="pith-button pith-sweep" onClick={save} disabled={!draft.name.trim()}>
               存好
@@ -281,7 +285,7 @@ function Appearance() {
             onClick={(e) => {
               if (look.palette === p.id) return;
               nav.lake(e.clientX, e.clientY);
-              setLook({ ...look, palette: p.id });
+              setLook({ ...look, palette: p.id }, { x: e.clientX, y: e.clientY });
             }}
             aria-label={`换成${p.name}`}
           >
@@ -310,7 +314,7 @@ function Appearance() {
             ["dark", "暗"],
           ] as [ThemePref, string][]
         ).map(([t, n]) => (
-          <button key={t} className={look.theme === t ? "is-on" : ""} onClick={() => setLook({ ...look, theme: t })}>
+          <button key={t} className={look.theme === t ? "is-on" : ""} onClick={(e) => setLook({ ...look, theme: t }, { x: e.clientX, y: e.clientY })}>
             {n}
           </button>
         ))}

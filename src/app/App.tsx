@@ -1,10 +1,11 @@
 // 外框（1.0.2，照 Explore R1）：顶栏（Logo + 知识库、文献库、设置三个图标）下面是一屏。
-// 打开 Pith 就是对话；对话历史没有按钮，⌘\ 或两指往右滑叫出来（枝桠）；⌘K 去任何地方。
+// 打开 Pith 就是对话；对话历史没有按钮，⌘\ 或两指往右滑叫出来（枝桠）；文献库里两指往右滑叫出的是标签树；⌘K 去任何地方。
 // 阅读 PDF 时阅读器占满窗口，各屏只是藏起来，返回就回到原样。
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import { api } from "@/shared/ipc";
+import { INK_READY } from "@/shared/theme";
 import { UiProvider, useUi } from "@/shared/ui";
 import { ReadContext } from "@/reader/useRead";
 import { MetadataProvider } from "@/metadata/MetadataProvider";
@@ -37,10 +38,10 @@ function Shell() {
   const [kb, setKb] = useState<{ uid: string | null; material: string | null }>({ uid: null, material: null });
   const [libRequest, setLibRequest] = useState<LibRequest | null>(null);
   const [side, setSide] = useState(false);
+  const [tags, setTags] = useState(false);
   const [palette, setPalette] = useState(false);
   const [reading, setReading] = useState<number | null>(null);
-  const [lakeAt, setLakeAt] = useState<{ x: number; y: number; n: number } | null>(null);
-  const [lakeOn, setLakeOn] = useState(false);
+  const [lakeAt, setLakeAt] = useState<{ x: number; y: number; n: number; run: boolean } | null>(null);
   const [seedPath, setSeedPath] = useState<{ d: string; n: number } | null>(null);
   const [fed, setFed] = useState(false);
   const kbIcon = useRef<HTMLButtonElement>(null);
@@ -49,6 +50,7 @@ function Shell() {
   const go = useCallback((s: Screen) => {
     setScreen(s);
     setSide(false);
+    setTags(false);
   }, []);
 
   const seed = useCallback((from: Element | null) => {
@@ -67,13 +69,18 @@ function Shell() {
     }, 2700);
   }, [qc]);
 
+  // 换配色：五圈波纹（2.3 秒）。整页的水面扭曲（SVG 滤镜）在 WebKit 里每帧要 100 毫秒，1.0.3 拿掉了；
+  // 颜色从点的地方洇开在 shared/theme 的 saveLook（View Transitions）。波纹先摆好，等洇开真的开始（INK_READY）才漾开
+  const lakeN = useRef(0);
   const lake = useCallback((x: number, y: number) => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    setLakeAt((l) => ({ x, y, n: (l?.n ?? 0) + 1 }));
-    setLakeOn(true);
-    (document.getElementById("pith-lake-anim") as unknown as { beginElement?: () => void } | null)?.beginElement?.();
-    setTimeout(() => setLakeOn(false), 1450);
-    setTimeout(() => setLakeAt(null), 2300);
+    const n = ++lakeN.current;
+    setLakeAt({ x, y, n, run: false });
+    const go = () => {
+      setLakeAt((l) => (l && l.n === n ? { ...l, run: true } : l));
+      setTimeout(() => setLakeAt((l) => (l && l.n === n ? null : l)), 2400);
+    };
+    window.addEventListener(INK_READY, go, { once: true });
   }, []);
 
   const nav: Nav = useMemo(
@@ -106,12 +113,13 @@ function Shell() {
       },
       side,
       setSide,
+      tags,
       openPalette: () => setPalette(true),
       seed,
       lake,
       say: (text) => ui.notify(text),
     }),
-    [screen, go, chat, setSection, kb, side, seed, lake, ui],
+    [screen, go, chat, setSection, kb, side, tags, seed, lake, ui],
   );
 
   // ⌘K 去任何地方；⌘\ 对话历史；⌘N 新对话；Esc 收起
@@ -131,14 +139,18 @@ function Shell() {
         nav.openChat(null);
       } else if (e.key === "Escape" && side) {
         setSide(false);
+      } else if (e.key === "Escape" && tags && !(e.target as HTMLElement | null)?.closest("input, textarea, .pith-menu")) {
+        setTags(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [reading, side, nav]);
+  }, [reading, side, tags, nav]);
 
   // 两指横滑：横向比纵向大、累计过 60 才算，一次锁 0.6 秒；手指往右（自然滚动下 deltaX 为负）叫出来，往左收起。
-  // 输入框里、能横向滚动的地方不算。
+  // 文献库里叫出的是标签树，别处是对话历史。输入框里、能横向滚动的地方（集合那一栏）不算。
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
   useEffect(() => {
     let acc = 0;
     let locked = 0;
@@ -156,7 +168,8 @@ function Shell() {
       const open = acc < 0;
       acc = 0;
       locked = now + 600;
-      if (open) {
+      if (screenRef.current === "lib") setTags(open);
+      else if (open) {
         setScreen("chat");
         setSide(true);
       } else setSide(false);
@@ -214,7 +227,7 @@ function Shell() {
               </ReaderBoundary>
             </div>
           )}
-          <div className={`app pith-smooth ${side && screen === "chat" ? "is-side" : ""} ${lakeOn ? "is-lake" : ""}`} style={reading !== null ? { display: "none" } : undefined}>
+          <div className={`app ${side && screen === "chat" ? "is-side" : ""}`} style={reading !== null ? { display: "none" } : undefined}>
             <TopBar kbRef={kbIcon} fed={fed} />
             {info.data?.startupError && (
               <div className="startup-error">
@@ -233,31 +246,25 @@ function Shell() {
               {screen === "lib" && <LibraryScreen request={libRequest} onDone={() => setLibRequest(null)} />}
               {screen === "set" && <SettingsScreen onRestored={afterRestore} />}
             </main>
-            <svg className="absolute h-0 w-0" aria-hidden="true">
-              <filter id="pith-lake-f" x="-5%" y="-5%" width="110%" height="110%">
-                <feTurbulence type="fractalNoise" baseFrequency=".011 .016" numOctaves={2} seed={7} result="n" />
-                <feDisplacementMap in="SourceGraphic" in2="n" scale={0} xChannelSelector="R" yChannelSelector="G">
-                  <animate id="pith-lake-anim" attributeName="scale" values="0;11;5;2;0" keyTimes="0;.22;.5;.75;1" dur="1.4s" begin="indefinite" fill="freeze" />
-                </feDisplacementMap>
-              </filter>
-            </svg>
           </div>
           {lakeAt && (
-            <svg key={lakeAt.n} className="pith-lake is-in" style={{ position: "fixed", left: lakeAt.x, top: lakeAt.y }} viewBox="-20 -20 40 40" aria-hidden="true">
-              {[1, 2, 3, 4, 5].map((k) => (
-                <g key={k}>
-                  <circle className={`rg rg${k}`} r="10" />
-                  <circle className={`rh rh${k}`} r="10.6" />
-                </g>
-              ))}
-            </svg>
+            <div key={lakeAt.n} className="lake-layer">
+              <svg className={`pith-lake ${lakeAt.run ? "is-in" : ""}`} style={{ left: lakeAt.x, top: lakeAt.y }} viewBox="-20 -20 40 40" aria-hidden="true">
+                {[1, 2, 3, 4, 5].map((k) => (
+                  <g key={k}>
+                    <circle className={`rg rg${k}`} r="10" />
+                    <circle className={`rh rh${k}`} r="10.6" />
+                  </g>
+                ))}
+              </svg>
+            </div>
           )}
           {seedPath && (
             <div className="seed-layer">
               <i key={seedPath.n} className="pith-seed is-in" style={{ offsetPath: `path('${seedPath.d}')` }} />
             </div>
           )}
-          {palette && <Palette onClose={() => setPalette(false)} />}
+          <Palette open={palette} onClose={() => setPalette(false)} />
         </ReadContext.Provider>
       </MetadataProvider>
     </NavContext.Provider>

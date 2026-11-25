@@ -26,7 +26,7 @@ function SubQuestionEditor({ q, onChange, onRemove }: { q: ResearchSubQuestion; 
   return (
     <li className={`rounded-md border px-3 py-2 ${q.enabled ? "" : "opacity-50"}`}>
       <div className="flex items-start gap-2">
-        <input type="checkbox" className="mt-1.5" checked={q.enabled} onChange={(e) => onChange({ ...q, enabled: e.target.checked })} title="不想查这一项就去掉勾" />
+        <input type="checkbox" className="pith-check mt-1.5" checked={q.enabled} onChange={(e) => onChange({ ...q, enabled: e.target.checked })} title="不想查这一项就去掉勾" />
         <span className="mt-1 w-6 shrink-0 font-mono text-xs text-muted-foreground">{q.id || "新"}</span>
         <div className="min-w-0 flex-1 space-y-1.5">
           <textarea

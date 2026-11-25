@@ -56,7 +56,7 @@ export function MetadataSettingsSection() {
         <dd className="flex items-center gap-2">
           <label className="flex items-center gap-1.5">
             <input
-              type="checkbox"
+              type="checkbox" className="pith-check"
               checked={s?.enabled === true}
               onChange={(e) => void (e.target.checked && s?.enabled === null ? ensureConsent() : save({ enabled: e.target.checked }))}
             />
@@ -66,7 +66,7 @@ export function MetadataSettingsSection() {
         <dt className="text-muted-foreground">自动查</dt>
         <dd>
           <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={s?.auto ?? true} disabled={s?.enabled !== true} onChange={(e) => void save({ auto: e.target.checked })} />
+            <input type="checkbox" className="pith-check" checked={s?.auto ?? true} disabled={s?.enabled !== true} onChange={(e) => void save({ auto: e.target.checked })} />
             导入后、填写 DOI / ISBN 后自动查
           </label>
         </dd>

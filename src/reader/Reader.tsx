@@ -8,6 +8,7 @@ import { COLORS, DEFAULT_COLOR, excerptForCopy } from "./colors";
 import { FIND_NOT_FOUND, FIND_PENDING, PdfController, type FindResult, type SelectionInfo } from "./controller";
 import { fetchPdf, loadPdfjs } from "./pdfjs";
 import { AnnotationList } from "./AnnotationList";
+import { Select } from "@/shared/controls";
 
 type Props = { attachmentId: number; onClose: () => void; onShowItem: (itemId: number) => void };
 
@@ -289,13 +290,13 @@ export default function Reader({ attachmentId, onClose, onShowItem }: Props) {
               <ToolButton onClick={() => ctrl.current?.zoom(-1)} title="缩小（⌘−）">
                 <Minus size={15} />
               </ToolButton>
-              <select value={scale} onChange={(e) => ctrl.current?.setScale(e.target.value)} className="rounded border bg-background px-1 py-0.5 text-xs" title="缩放">
+              <Select value={scale} onChange={(v) => ctrl.current?.setScale(v)} title="缩放" className="pith-select--s">
                 {scaleOptions.map((z) => (
                   <option key={z.value} value={z.value}>
                     {z.label}
                   </option>
                 ))}
-              </select>
+              </Select>
               <ToolButton onClick={() => ctrl.current?.zoom(1)} title="放大（⌘+）">
                 <Plus size={15} />
               </ToolButton>

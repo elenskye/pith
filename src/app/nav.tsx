@@ -12,11 +12,11 @@ export type ChatTarget =
   /** 打开一本解析好的书（概念研究）；在书里跑起一次研究时才建对话 */
   | { kind: "book"; text: string; title: string };
 
-/** 设置的七页（R1：角色、技能、知识库与检索、模型与费用、Word 与引文、数据、外观） */
-export type SetSection = "roles" | "skills" | "kb" | "keys" | "word" | "data" | "look";
+/** 设置的八页（R1 的七页 + 1.0.3 从文献库挪来的导入） */
+export type SetSection = "roles" | "skills" | "kb" | "keys" | "word" | "import" | "data" | "look";
 
-/** 从别处跳进文献库：看某一条、某个范围（Sidebar 的 Scope）、导入页 */
-export type LibRequest = { kind: "item"; id: number } | { kind: "review" } | { kind: "import" };
+/** 从别处跳进文献库：看某一条、待确认的补全 */
+export type LibRequest = { kind: "item"; id: number } | { kind: "review" };
 
 export type Nav = {
   screen: Screen;
@@ -28,16 +28,18 @@ export type Nav = {
   /** 知识库：哪个库、哪份材料（空串：照旧） */
   kb: { uid: string | null; material: string | null };
   openKb: (uid: string | null, material?: string | null) => void;
-  /** 文献库：选中一条、看待确认的补全、去导入 */
+  /** 文献库：选中一条、看待确认的补全 */
   openLibrary: (r: LibRequest) => void;
   openItem: (id: number) => void;
   /** 对话历史的枝桠 */
   side: boolean;
   setSide: (v: boolean) => void;
+  /** 文献库的标签树（两指往右滑叫出来） */
+  tags: boolean;
   openPalette: () => void;
   /** 存进知识库：种子从 from 飞到顶栏的知识库图标 */
   seed: (from: Element | null) => void;
-  /** 换配色：湖面从 (x, y) 漾开 */
+  /** 换配色：湖面波纹从 (x, y) 漾开（颜色从同一点洇开在 shared/theme 的 saveLook） */
   lake: (x: number, y: number) => void;
   say: (text: string) => void;
 };

@@ -60,7 +60,7 @@ export function AgentSettingsSection({ onKeys }: { onKeys: () => void }) {
               <div className="space-y-1">
                 {(["brief", "full"] as FormatMode[]).map((m) => (
                   <label key={m} className="flex cursor-default items-start gap-2 text-xs">
-                    <input type="radio" name="agent-send-mode" checked={s.sendMode === m} disabled={saveMode.isPending} onChange={() => saveMode.mutate(m)} className="mt-0.5" />
+                    <input type="radio" name="agent-send-mode" checked={s.sendMode === m} disabled={saveMode.isPending} onChange={() => saveMode.mutate(m)} className="pith-radio mt-0.5" />
                     <span>
                       {MODE[m]}
                       {m === "brief" && <span className="text-muted-foreground">（默认）</span>}

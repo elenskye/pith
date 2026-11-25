@@ -33,7 +33,7 @@ function Hits({ hits, chosen, onChosen, grouped }: { hits: Hit[]; chosen: Set<st
           {g && <p className="sticky top-0 bg-card py-0.5 text-[11px] font-medium text-muted-foreground">{g}（{list.length}）</p>}
           {list.map((h) => (
             <label key={h.key} className="flex cursor-pointer gap-2 rounded-md px-1 py-1 text-xs hover:bg-muted">
-              <input type="checkbox" checked={chosen.has(h.key)} onChange={() => toggle(h.key)} className="mt-0.5" />
+              <input type="checkbox" checked={chosen.has(h.key)} onChange={() => toggle(h.key)} className="pith-check mt-0.5" />
               <span className="min-w-0 flex-1">
                 <span className="font-medium tabular-nums">{h.key}</span>
                 {h.role !== "body" && <span className="ml-1 text-muted-foreground">（{ROLE[h.role]}）</span>}

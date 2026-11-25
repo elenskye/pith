@@ -1,5 +1,5 @@
 // 顶栏：左边 Logo（点它回对话，打开时长一次、悬停再长），三个图标居中、不写字（悬停 0.35 秒后出名字）。
-// 整条能拖动窗口（标题栏藏在它下面，tauri.conf.json 的 titleBarStyle: Overlay）。
+// 整条能拖动窗口（标题栏藏在它下面，tauri.conf.json 的 titleBarStyle: Overlay）。右上角不放 ⌘K 的提示（1.0.3）。
 import { useEffect, useState } from "react";
 import { Mark } from "@/shared/marks";
 import { useNav, type Screen } from "@/app/nav";
@@ -48,11 +48,6 @@ export function TopBar({ kbRef, fed }: { kbRef: React.RefObject<HTMLButtonElemen
         <i className={`top-dot ${nav.screen !== "chat" ? `at-${nav.screen}` : ""}`} />
         <span className={`pith-badge ${fed ? "is-in" : ""}`}>+1</span>
       </nav>
-      <div className="top-right">
-        <button className="top-key" onClick={nav.openPalette} title="去任何地方">
-          ⌘K
-        </button>
-      </div>
     </header>
   );
 }

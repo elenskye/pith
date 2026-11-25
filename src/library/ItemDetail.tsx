@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, BookOpen, ExternalLink, FileText, Folder, Plus, RotateCcw, StickyNote, Trash2, X } from "lucide-react";
 import {
   api,
   type AttachmentDetail,
@@ -14,12 +13,14 @@ import {
   type Target,
 } from "@/shared/ipc";
 import { EditableText, TagInput, useMutate, useUi } from "@/shared/ui";
+import { Select } from "@/shared/controls";
+import { Mark } from "@/shared/marks";
 import { useRead } from "@/reader/useRead";
 import { MetadataBox } from "@/metadata/MetadataBox";
 import { ParseDialog } from "@/concept/ParseDialog";
 import { useMetadata } from "@/metadata/MetadataProvider";
 import { targetsOf, type Selection } from "./ItemList";
-import type { Scope } from "./Sidebar";
+import type { Scope } from "./scope";
 import {
   ADDABLE_FIELDS,
   DELETE_FOREVER_NOTE,
@@ -43,9 +44,9 @@ export function DetailPane({ selection, onSelection, scope }: Props) {
   const one = selection.length === 1 ? selection[0] : null;
   const open = (s: Selection) => onSelection([s]);
   return (
-    <aside className="flex min-h-0 flex-col">
+    <div className="pd-wrap">
       {selection.length === 0 ? (
-        <p className="m-auto text-muted-foreground">选择一条文献查看详情</p>
+        <p className="pd-none">选择一条文献查看详情</p>
       ) : !one ? (
         <BatchPanel selection={selection} onSelection={onSelection} scope={scope} />
       ) : one.kind === "item" ? (
@@ -61,36 +62,36 @@ export function DetailPane({ selection, onSelection, scope }: Props) {
       ) : (
         <Load key={`c${one.id}`} query={{ queryKey: ["collection", one.id], queryFn: () => api.collectionsGet(one.id) }} render={(d) => <Collection d={d} onGone={() => onSelection([])} />} />
       )}
-    </aside>
+    </div>
   );
 }
 
 function Load<T>({ query, render }: { query: { queryKey: unknown[]; queryFn: () => Promise<T> }; render: (d: T) => React.ReactNode }) {
   const q = useQuery(query);
-  if (q.error) return <p className="selectable p-5 text-destructive">{String(q.error)}</p>;
-  return q.data ? <div className="selectable px-4 pb-6">{render(q.data)}</div> : null;
+  if (q.error) return <p className="selectable pd-err">{String(q.error)}</p>;
+  return q.data ? <div className="selectable pd">{render(q.data)}</div> : null;
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return <dl className="mt-4 grid grid-cols-[84px_1fr] items-baseline gap-x-3 gap-y-1.5">{children}</dl>;
+  return <dl className="pd-grid">{children}</dl>;
 }
 
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="contents">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 break-words">{children}</dd>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section className="mt-5">
-      <div className="mb-1.5 flex items-center justify-between">
-        <h3 className="text-xs text-muted-foreground">{title}</h3>
+    <section className="pd-sec">
+      <header>
+        <h3>{title}</h3>
         {action}
-      </div>
+      </header>
       {children}
     </section>
   );
@@ -98,7 +99,7 @@ function Section({ title, children, action }: { title: string; children: React.R
 
 function SmallButton({ onClick, children, danger, title }: { onClick: () => void; children: React.ReactNode; danger?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} title={title} className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted ${danger ? "text-destructive" : ""}`}>
+    <button onClick={onClick} title={title} className={`pd-btn ${danger ? "is-danger" : ""}`}>
       {children}
     </button>
   );
@@ -109,12 +110,9 @@ function useTrashActions(target: Target, deletedAt: string | null, onGone: () =>
   const ui = useUi();
   const mutate = useMutate();
   const banner = deletedAt ? (
-    <div className="mb-3 flex items-center gap-2 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">
-      <span className="flex-1">在回收站（{formatTime(deletedAt)} 删除）</span>
-      <SmallButton onClick={() => mutate(() => api.trashRestore([target]), "已恢复")}>
-        <RotateCcw size={12} />
-        恢复
-      </SmallButton>
+    <div className="pd-banner">
+      <span>在回收站（{formatTime(deletedAt)} 删除）</span>
+      <SmallButton onClick={() => mutate(() => api.trashRestore([target]), "已恢复")}>恢复</SmallButton>
       <SmallButton
         danger
         onClick={async () => {
@@ -127,11 +125,10 @@ function useTrashActions(target: Target, deletedAt: string | null, onGone: () =>
     </div>
   ) : null;
   const footer = deletedAt ? null : (
-    <div className="mt-8 border-t pt-3">
-      <SmallButton danger onClick={() => mutate(() => api.trashMove([target]), "已移到回收站").then((r) => r !== undefined && onGone())}>
-        <Trash2 size={12} />
+    <div className="pd-foot">
+      <button className="pith-link is-danger" onClick={() => mutate(() => api.trashMove([target]), "已移到回收站").then((r) => r !== undefined && onGone())}>
         移到回收站
-      </SmallButton>
+      </button>
     </div>
   );
   return { banner, footer };
@@ -140,13 +137,12 @@ function useTrashActions(target: Target, deletedAt: string | null, onGone: () =>
 function ParentLink({ parent, onSelect }: { parent: Parent | null; onSelect: (s: Selection) => void }) {
   if (!parent) return null;
   return (
-    <button onClick={() => onSelect({ kind: parent.kind, id: parent.id })} className="mt-1 text-left text-xs text-muted-foreground hover:text-foreground hover:underline">
+    <button onClick={() => onSelect({ kind: parent.kind, id: parent.id })} className="pd-parent pith-link">
       所属{parent.kind === "item" ? "文献" : "笔记"}：{parent.title || "（无标题）"}
     </button>
   );
 }
 
-/** 在 App 的阅读器里打开 PDF */
 /** EPUB / PDF 附件：解析成文本（v0.4 概念研究）；解析过的显示「概念页」和「重新解析」 */
 function ParseButton({ id, title, contentType, status }: { id: number; title: string; contentType: string | null; status: string }) {
   const [open, setOpen] = useState(false);
@@ -158,15 +154,15 @@ function ParseButton({ id, title, contentType, status }: { id: number; title: st
     <>
       {parsed.data ? (
         <>
-          <button onClick={() => go(parsed.data!)} title="这个附件解析过了：在「概念」里读" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+          <button onClick={() => go(parsed.data!)} title="这个附件解析过了：在「概念」里读" className="pd-btn">
             概念页
           </button>
-          <button onClick={() => setOpen(true)} title="再解析一次：替换文本，旧卡片按引文重新找锚点" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+          <button onClick={() => setOpen(true)} title="再解析一次：替换文本，旧卡片按引文重新找锚点" className="pd-btn">
             重新解析
           </button>
         </>
       ) : (
-        <button onClick={() => setOpen(true)} title="解析成带段落号的文本，在「概念」里读和分析" className="shrink-0 rounded-md border px-2 py-0.5 text-xs hover:bg-background">
+        <button onClick={() => setOpen(true)} title="解析成带段落号的文本，在「概念」里读和分析" className="pd-btn">
           解析成文本
         </button>
       )}
@@ -184,9 +180,8 @@ function ReadButton({ id, primary }: { id: number; primary?: boolean }) {
         read(id);
       }}
       title="在阅读器里打开，可以高亮、摘录"
-      className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${primary ? "border-primary bg-primary text-primary-foreground hover:opacity-90" : "hover:bg-muted"}`}
+      className={`pd-btn ${primary ? "is-primary" : ""}`}
     >
-      <BookOpen size={12} />
       阅读
     </button>
   );
@@ -195,18 +190,17 @@ function ReadButton({ id, primary }: { id: number; primary?: boolean }) {
 function OpenButton({ id, label = "打开" }: { id: number; label?: string }) {
   const open = useMutation({ mutationFn: () => api.attachmentsOpen(id) });
   return (
-    <span className="inline-flex flex-col items-end">
+    <span className="pd-open">
       <button
         onClick={(e) => {
           e.stopPropagation();
           open.mutate();
         }}
-        className="flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted"
+        className="pd-btn"
       >
-        <ExternalLink size={12} />
         {label}
       </button>
-      {open.error && <span className="mt-0.5 text-[11px] text-destructive">{String(open.error)}</span>}
+      {open.error && <span className="pd-err-s">{String(open.error)}</span>}
     </span>
   );
 }
@@ -221,13 +215,13 @@ function TagEditor({ tags, target, disabled }: { tags: string[]; target: Target;
     if ((await mutate(() => api.tagsAdd([target], name))) !== undefined) setDraft("");
   };
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-1.5">
+    <div className="pd-tags">
       {tags.map((t) => (
-        <span key={t} className="flex items-center gap-0.5 rounded-full bg-muted py-0.5 pr-1 pl-2 text-xs">
+        <span key={t} className="pith-tag">
           {t}
           {!disabled && (
-            <button onClick={() => mutate(() => api.tagsRemove([target], t))} className="rounded-full text-muted-foreground hover:text-foreground" title="去掉这个标签">
-              <X size={11} />
+            <button onClick={() => mutate(() => api.tagsRemove([target], t))} className="pith-tag-x" title="去掉这个标签" aria-label={`去掉标签 ${t}`}>
+              ×
             </button>
           )}
         </span>
@@ -240,8 +234,8 @@ function TagEditor({ tags, target, disabled }: { tags: string[]; target: Target;
           onPick={(name) => void add(name)}
           onBlur={() => draft.trim() && void add()}
           exclude={tags}
-          placeholder="+ 标签"
-          className="selectable w-24 rounded-full border border-dashed bg-transparent px-2 py-0.5 text-xs outline-none focus:border-ring"
+          placeholder="＋ 标签"
+          className="selectable pith-tag-add"
         />
       )}
     </div>
@@ -253,15 +247,14 @@ function CollectionsEditor({ collections, target, disabled }: { collections: Nam
   const ui = useUi();
   const mutate = useMutate();
   return (
-    <span className="flex flex-wrap items-center gap-1">
-      {collections.length === 0 && <span className="text-muted-foreground">（未分类）</span>}
+    <span className="pd-tags is-inline">
+      {collections.length === 0 && <span className="pd-dim">未分类</span>}
       {collections.map((c) => (
-        <span key={c.id} className="flex items-center gap-0.5 rounded bg-muted py-0.5 pr-1 pl-1.5 text-xs">
-          <Folder size={11} className="text-muted-foreground" />
+        <span key={c.id} className="pith-tag is-col">
           {c.name}
           {!disabled && (
-            <button onClick={() => mutate(() => api.collectionsRemove(c.id, [target]))} className="text-muted-foreground hover:text-foreground" title="移出这个集合">
-              <X size={11} />
+            <button onClick={() => mutate(() => api.collectionsRemove(c.id, [target]))} className="pith-tag-x" title="移出这个集合" aria-label={`移出集合 ${c.name}`}>
+              ×
             </button>
           )}
         </span>
@@ -272,10 +265,10 @@ function CollectionsEditor({ collections, target, disabled }: { collections: Nam
             const cid = await ui.pickCollection({ title: "添加到集合", confirm: "添加" });
             if (cid) await mutate(() => api.collectionsAdd(cid, [target]));
           }}
-          className="rounded border border-dashed px-1 text-xs text-muted-foreground hover:text-foreground"
+          className="pith-tag-add is-btn"
           title="添加到集合"
         >
-          <Plus size={11} />
+          ＋
         </button>
       )}
     </span>
@@ -299,24 +292,24 @@ function CreatorsEditor({ d, disabled }: { d: ItemDetail; disabled: boolean }) {
     );
   if (!rows) {
     return (
-      <div className="mt-2 flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-muted-foreground">
-          {d.creators.length === 0 && <span>（没有作者）</span>}
+      <div className="pd-creators">
+        <p>
+          {d.creators.length === 0 && <span className="pd-dim">没有作者</span>}
           {(showAll ? d.creators : d.creators.slice(0, AUTHORS_SHOWN)).map((c, i) => (
             <span key={i}>
               {i > 0 && "；"}
               {c.name}
-              {c.role !== "author" && <span className="text-xs">（{roleLabel(c.role)}）</span>}
+              {c.role !== "author" && <small>（{roleLabel(c.role)}）</small>}
             </span>
           ))}
           {d.creators.length > AUTHORS_SHOWN && (
-            <button onClick={() => setShowAll(!showAll)} className="ml-1 text-xs hover:text-foreground">
+            <button onClick={() => setShowAll(!showAll)} className="pith-link pd-more-link">
               {showAll ? "收起" : `… 等 ${d.creators.length} 人，展开`}
             </button>
           )}
         </p>
         {!disabled && (
-          <button onClick={start} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
+          <button onClick={start} className="pith-link">
             编辑作者
           </button>
         )}
@@ -336,18 +329,18 @@ function CreatorsEditor({ d, disabled }: { d: ItemDetail; disabled: boolean }) {
     if ((await mutate(() => api.itemsUpdate(d.id, { creators }))) !== undefined) setRows(null);
   };
   const roles = Array.from(new Set([...ROLE_OPTIONS, ...rows.map((r) => r.role)]));
-  const input = "selectable min-w-0 flex-1 rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:border-ring";
+  const input = "selectable pith-field pith-field--s";
   return (
-    <div className="mt-2 space-y-1.5 rounded-md border p-2">
+    <div className="pd-box pd-crows">
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <select value={r.role} onChange={(e) => set(i, { role: e.target.value })} className="w-20 rounded border bg-background px-1 py-0.5 text-xs">
+        <div key={i} className="pd-crow">
+          <Select variant="field" className="pd-role" value={r.role} onChange={(v) => set(i, { role: v })}>
             {roles.map((x) => (
               <option key={x} value={x}>
                 {roleLabel(x)}
               </option>
             ))}
-          </select>
+          </Select>
           {r.single ? (
             <input value={r.literal} onChange={(e) => set(i, { literal: e.target.value })} placeholder="全名（机构、中文姓名）" className={input} />
           ) : (
@@ -359,31 +352,31 @@ function CreatorsEditor({ d, disabled }: { d: ItemDetail; disabled: boolean }) {
           <button
             onClick={() => set(i, r.single ? { single: false, family: r.literal, literal: "" } : { single: true, literal: [r.family, r.given].filter(Boolean).join(" "), family: "", given: "" })}
             title={r.single ? "改成姓、名两栏" : "改成单栏（不拆姓名）"}
-            className="w-7 shrink-0 rounded border px-0.5 text-[10px] text-muted-foreground hover:bg-muted"
+            className="pd-btn pd-btn--s"
           >
             {r.single ? "两栏" : "单栏"}
           </button>
-          <button onClick={() => move(i, -1)} className="text-muted-foreground hover:text-foreground" title="上移">
-            <ArrowUp size={12} />
+          <button onClick={() => move(i, -1)} className="pd-icon" title="上移" aria-label="上移">
+            ↑
           </button>
-          <button onClick={() => move(i, 1)} className="text-muted-foreground hover:text-foreground" title="下移">
-            <ArrowDown size={12} />
+          <button onClick={() => move(i, 1)} className="pd-icon" title="下移" aria-label="下移">
+            ↓
           </button>
-          <button onClick={() => setRows(rows.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive" title="删除">
-            <X size={12} />
+          <button onClick={() => setRows(rows.filter((_, j) => j !== i))} className="pd-icon is-danger" title="删掉这位" aria-label="删掉这位">
+            ×
           </button>
         </div>
       ))}
-      <div className="flex items-center gap-2 pt-1">
-        <button onClick={() => setRows([...rows, { role: "author", single: false, family: "", given: "", literal: "" }])} className="text-xs text-muted-foreground hover:text-foreground">
-          + 添加作者
+      <div className="pd-box-acts">
+        <button onClick={() => setRows([...rows, { role: "author", single: false, family: "", given: "", literal: "" }])} className="pith-link">
+          ＋ 添加作者
         </button>
         <span className="flex-1" />
-        <button onClick={() => setRows(null)} className="rounded-md border px-2 py-0.5 text-xs hover:bg-muted">
-          取消
+        <button onClick={() => setRows(null)} className="pith-button pith-button--quiet pith-button--s">
+          算了
         </button>
-        <button onClick={save} className="rounded-md bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-          保存
+        <button onClick={save} className="pith-button pith-button--s">
+          存好
         </button>
       </div>
     </div>
@@ -395,7 +388,7 @@ function ReadItem({ d }: { d: ItemDetail }) {
   const { openItem } = useRead();
   if (!d.attachments.some((a) => a.readable)) return null;
   return (
-    <p className="mt-4 mb-2">
+    <p className="pd-read">
       <button className="pith-button pith-sweep" onClick={() => void openItem(d.id)}>
         阅读 <i className="ar not-italic">→</i>
       </button>
@@ -429,18 +422,13 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
       <ReadItem d={d} />
       <Grid>
         <F label="类型">
-          <select
-            value={d.itemType}
-            disabled={locked}
-            onChange={(e) => mutate(() => api.itemsUpdate(d.id, { itemType: e.target.value }))}
-            className="-mx-1 rounded bg-transparent px-0.5 hover:bg-muted disabled:hover:bg-transparent"
-          >
+          <Select value={d.itemType} disabled={locked} onChange={(v) => mutate(() => api.itemsUpdate(d.id, { itemType: v }))} className="pd-inline-select" menuClassName="pith-menu--tall">
             {types.map((t) => (
               <option key={t} value={t}>
                 {itemTypeLabel(t)}
               </option>
             ))}
-          </select>
+          </Select>
         </F>
         <F label="日期">
           <EditableText value={d.date} onSave={save("date")} placeholder="如 2019-03、March 2019、2025年6月" disabled={locked} />
@@ -476,17 +464,17 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
                 const path = await api.pickAnyFile("选择要添加的文件（会复制进文献库，原文件不动）");
                 if (path) await mutate(() => api.attachmentsAdd(d.id, path), "已添加附件");
               }}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="pith-link"
             >
-              + 添加附件
+              ＋ 添加附件
             </button>
           )
         }
       >
         {d.attachments.length === 0 ? (
-          <p className="text-xs text-muted-foreground">没有附件</p>
+          <p className="pd-dim">没有附件</p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="pd-files">
             {d.attachments.map((a) => (
               <ChildRow key={a.id} a={a} onSelect={onSelect} />
             ))}
@@ -495,14 +483,14 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
       </Section>
       {d.notes.length > 0 && (
         <Section title={`笔记（${d.notes.length}）`}>
-          <ul className="space-y-1">
+          <ul className="pd-files">
             {d.notes.map((n) => (
               <li key={n.id}>
-                <button onClick={() => onSelect({ kind: "note", id: n.id })} className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted">
-                  <StickyNote size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0">
-                    <span className="block truncate">{n.title || "（无标题笔记）"}</span>
-                    {n.preview && <span className="line-clamp-2 text-xs text-muted-foreground">{n.preview}</span>}
+                <button onClick={() => onSelect({ kind: "note", id: n.id })} className="pd-note pith-row">
+                  <Mark path="types/note" className="tyi" />
+                  <span>
+                    <b>{n.title || "（无标题笔记）"}</b>
+                    {n.preview && <small>{n.preview}</small>}
                   </span>
                 </button>
               </li>
@@ -511,10 +499,10 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
         </Section>
       )}
       <Section title="摘要">
-        <EditableText value={d.abstract} onSave={save("abstractNote")} multiline placeholder="（没有摘要）" disabled={locked} className="leading-relaxed" />
+        <EditableText value={d.abstract} onSave={save("abstractNote")} multiline placeholder="没有摘要，点一下写" disabled={locked} className="pd-abstract" />
       </Section>
-      <details className="mt-5">
-        <summary className="cursor-default text-xs text-muted-foreground">其他字段（{d.otherFields.length + (d.extra ? 1 : 0)}）</summary>
+      <details className="pd-more">
+        <summary>其他字段 <span className="num">{d.otherFields.length + (d.extra ? 1 : 0)}</span></summary>
         <Grid>
           {d.otherFields.map((f) => (
             <F key={f.name} label={fieldLabel(f.name)}>
@@ -526,21 +514,16 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
           </F>
         </Grid>
         {!locked && (
-          <select
-            value=""
-            onChange={(e) => e.target.value && addField(e.target.value)}
-            className="mt-3 rounded-md border bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
-          >
-            <option value="">+ 添加字段…</option>
+          <Select value="" onChange={(v) => v && addField(v)} placeholder="＋ 添加字段" className="pd-add-field" menuClassName="pith-menu--tall" render={() => "＋ 添加字段"}>
             {ADDABLE_FIELDS.filter((f) => !d.otherFields.some((o) => o.name === f)).map((f) => (
               <option key={f} value={f}>
                 {fieldLabel(f)}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </details>
-      <p className="mt-5 text-[11px] text-muted-foreground">
+      <p className="pd-time">
         加入于 {formatTime(d.createdAt)} · 修改于 {formatTime(d.updatedAt)}
       </p>
       {footer}
@@ -551,19 +534,17 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
 function ChildRow({ a, onSelect }: { a: ChildAttachment; onSelect: (s: Selection) => void }) {
   const missing = a.status === "missing";
   return (
-    <li className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted">
-      <button onClick={() => onSelect({ kind: "attachment", id: a.id })} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-        <FileText size={14} className="shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate">{a.title || contentTypeLabel(a.contentType)}</span>
-        {a.annotationCount > 0 && <span className="shrink-0 text-xs text-muted-foreground tabular-nums" title="标注数">✎{a.annotationCount}</span>}
-        {missing ? (
-          <span className="shrink-0 rounded bg-destructive/10 px-1 text-[11px] text-destructive">文件缺失</span>
-        ) : (
-          a.size !== null && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatSize(a.size)}</span>
-        )}
+    <li className="pd-file">
+      <button onClick={() => onSelect({ kind: "attachment", id: a.id })} className="pd-file-name pith-row">
+        <Mark path="types/file" className="tyi" />
+        <b>{a.title || contentTypeLabel(a.contentType)}</b>
+        {a.annotationCount > 0 && <small title="标注数">{a.annotationCount} 处标注</small>}
+        {missing ? <small className="is-warn">文件缺失</small> : a.size !== null && <small className="num">{formatSize(a.size)}</small>}
       </button>
+      <span className="pd-file-acts">
       <ParseButton id={a.id} title={a.title || contentTypeLabel(a.contentType)} contentType={a.contentType} status={a.status} />
       {a.readable ? <ReadButton id={a.id} /> : !missing && <OpenButton id={a.id} label={a.kind === "linked_url" ? "网页" : "打开"} />}
+      </span>
     </li>
   );
 }
@@ -577,21 +558,15 @@ function Attachment({ d, onSelect, onGone }: { d: AttachmentDetail; onSelect: (s
   return (
     <>
       {banner}
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <EditableText
-            value={d.title || d.originalName}
-            onSave={(v) => mutate(() => api.attachmentsRename(d.id, v))}
-            disabled={locked}
-            className="text-base leading-snug font-semibold"
-          />
-        </div>
+      <p className="panel-k">附件 · {contentTypeLabel(d.contentType)}</p>
+      <EditableText value={d.title || d.originalName} onSave={(v) => mutate(() => api.attachmentsRename(d.id, v))} disabled={locked} className="panel-title" />
+      <div className="pd-row-acts">
         <ParseButton id={d.id} title={d.title || d.originalName || ""} contentType={d.contentType} status={d.status} />
         {d.readable && <ReadButton id={d.id} primary />}
         {!missing && <OpenButton id={d.id} label={d.kind === "linked_url" ? "网页" : d.readable ? "系统程序" : "打开"} />}
       </div>
       <ParentLink parent={d.parent} onSelect={onSelect} />
-      {missing && <p className="mt-3 rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">文件缺失：导入时没有找到这个文件。条目照常保留；需要的话在 Zotero 里下载后重新导入。</p>}
+      {missing && <p className="pd-banner">文件缺失：导入时没有找到这个文件。条目照常保留；需要的话在 Zotero 里下载后重新导入。</p>}
       <Grid>
         <F label="类型">{contentTypeLabel(d.contentType)}</F>
         <F label="存放">{attachmentKindLabel(d.kind)}</F>
@@ -610,7 +585,7 @@ function Attachment({ d, onSelect, onGone }: { d: AttachmentDetail; onSelect: (s
       <TagEditor tags={d.tags} target={target} disabled={locked} />
       {d.note && (
         <Section title="附件笔记">
-          <p className="leading-relaxed whitespace-pre-wrap">{d.note}</p>
+          <p className="pd-text">{d.note}</p>
         </Section>
       )}
       {footer}
@@ -625,7 +600,8 @@ function Note({ d, onSelect, onGone }: { d: NoteDetail; onSelect: (s: Selection)
   return (
     <>
       {banner}
-      <h2 className="text-base leading-snug font-semibold">{d.title || "（无标题笔记）"}</h2>
+      <p className="panel-k">笔记</p>
+      <h2 className="panel-title">{d.title || "（无标题笔记）"}</h2>
       <ParentLink parent={d.parent} onSelect={onSelect} />
       <Grid>
         {!d.parent && (
@@ -638,7 +614,7 @@ function Note({ d, onSelect, onGone }: { d: NoteDetail; onSelect: (s: Selection)
       </Grid>
       <TagEditor tags={d.tags} target={target} disabled={locked} />
       <Section title="内容（只读）">
-        <p className="leading-relaxed whitespace-pre-wrap">{d.text || <span className="text-muted-foreground">（空）</span>}</p>
+        <p className="pd-text">{d.text || <span className="pd-dim">（空）</span>}</p>
       </Section>
       {footer}
     </>
@@ -650,16 +626,14 @@ function Collection({ d, onGone }: { d: CollectionDetail; onGone: () => void }) 
   return (
     <>
       {banner}
-      <h2 className="flex items-center gap-2 text-base leading-snug font-semibold">
-        <Folder size={16} className="text-muted-foreground" />
-        {d.name}
-      </h2>
+      <p className="panel-k">集合</p>
+      <h2 className="panel-title">{d.name}</h2>
       <Grid>
         {d.parentName && <F label="上级集合">{d.parentName}</F>}
         {d.children > 0 && <F label="下级集合">{d.children} 个（随它一起在回收站）</F>}
         <F label="直接成员">{d.members} 条</F>
       </Grid>
-      <p className="mt-4 text-xs text-muted-foreground">集合在回收站时，里面的文献仍在「全部文献」里。恢复集合时，在回收站里的上级集合一起恢复。</p>
+      <p className="pd-note-s">集合在回收站时，里面的文献仍在「全部文献」里。恢复集合时，在回收站里的上级集合一起恢复。</p>
     </>
   );
 }
@@ -694,14 +668,12 @@ function BatchPanel({ selection, onSelection, scope }: Props) {
 
   if (trash) {
     return (
-      <div className="p-5">
-        <p className="font-medium">已选 {selection.length} 项</p>
-        <p className="mt-1 text-xs text-muted-foreground">{parts}</p>
-        <div className="mt-4 flex gap-2">
-          <SmallButton onClick={() => mutate(() => api.trashRestore(targetsOf(selection)), "已恢复").then((r) => r !== undefined && onSelection([]))}>
-            <RotateCcw size={12} />
-            恢复
-          </SmallButton>
+      <div className="pd">
+        <p className="panel-k">回收站</p>
+        <h2 className="panel-title">已选 {selection.length} 项</h2>
+        <p className="pd-sub">{parts}</p>
+        <div className="pd-row-acts">
+          <SmallButton onClick={() => mutate(() => api.trashRestore(targetsOf(selection)), "已恢复").then((r) => r !== undefined && onSelection([]))}>恢复</SmallButton>
           <SmallButton
             danger
             onClick={async () => {
@@ -717,29 +689,23 @@ function BatchPanel({ selection, onSelection, scope }: Props) {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-5">
-      <p className="font-medium">已选 {selection.length} 项</p>
-      <p className="mt-1 text-xs text-muted-foreground">{parts}</p>
+    <div className="pd">
+      <p className="panel-k">一起改</p>
+      <h2 className="panel-title">已选 {selection.length} 项</h2>
+      <p className="pd-sub">{parts}</p>
 
       {items.length >= 2 && <MergeBox ids={items.map((s) => s.id)} duplicates={scope.kind === "duplicates"} onDone={(master) => onSelection([{ kind: "item", id: master }])} />}
 
       <Section title="标签">
-        <div className="flex gap-1.5">
-          <TagInput
-            value={tag}
-            onChange={setTag}
-            onEnter={() => {}}
-            boxClassName="flex-1"
-            placeholder="标签名"
-            className="selectable w-full min-w-0 rounded-md border bg-background px-2 py-0.5 text-xs outline-none focus:border-ring"
-          />
+        <div className="pd-line">
+          <TagInput value={tag} onChange={setTag} onEnter={() => {}} boxClassName="flex-1" placeholder="标签名" className="selectable pith-field pith-field--s w-full" />
           <SmallButton onClick={() => tag.trim() && mutate(() => api.tagsAdd(targetsOf(taggable), tag), `已给 ${taggable.length} 项加上「${tag.trim()}」`)}>添加</SmallButton>
           <SmallButton onClick={() => tag.trim() && mutate(() => api.tagsRemove(targetsOf(taggable), tag.trim()), `已去掉「${tag.trim()}」`)}>去掉</SmallButton>
         </div>
       </Section>
 
       <Section title="集合">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="pd-line">
           <SmallButton
             onClick={async () => {
               const cid = await ui.pickCollection({ title: `把 ${selection.length} 项添加到集合`, confirm: "添加" });
@@ -758,44 +724,38 @@ function BatchPanel({ selection, onSelection, scope }: Props) {
 
       {items.length > 0 && (
         <Section title="联网补全">
-          <p className="mb-1.5 text-xs text-muted-foreground">按 DOI / ISBN 查，只补空着的字段；和现有不同的放进「待确认」。没有 DOI / ISBN 的跳过。</p>
+          <p className="pd-note-s">按 DOI / ISBN 查，只补空着的字段；和现有不同的放进「待确认」。没有 DOI / ISBN 的跳过。</p>
           <SmallButton onClick={() => void metadata.lookup(items.map((s) => s.id))}>联网补全 {items.length} 条</SmallButton>
         </Section>
       )}
 
       {items.length > 0 && (
         <Section title={`修改字段（${items.length} 条文献）`}>
-          <div className="flex gap-1.5">
-            <select
+          <div className="pd-line">
+            <Select
+              variant="field"
               value={field}
-              onChange={(e) => {
-                setField(e.target.value);
+              onChange={(v) => {
+                setField(v);
                 setValue("");
               }}
-              className="rounded-md border bg-background px-1 py-0.5 text-xs"
             >
               {BATCH_FIELDS.map((f) => (
                 <option key={f.field} value={f.field}>
                   {f.label}
                 </option>
               ))}
-            </select>
+            </Select>
             {def.options ? (
-              <select value={value} onChange={(e) => setValue(e.target.value)} className="min-w-0 flex-1 rounded-md border bg-background px-1 py-0.5 text-xs">
-                <option value="">选择…</option>
+              <Select variant="field" className="flex-1" value={value} onChange={setValue} placeholder="选择…" menuClassName="pith-menu--tall">
                 {def.options.map((o) => (
                   <option key={o} value={o}>
                     {itemTypeLabel(o)}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
-              <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="新值（空 = 清空）"
-                className="selectable min-w-0 flex-1 rounded-md border bg-background px-2 py-0.5 text-xs outline-none focus:border-ring"
-              />
+              <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="新值（空 = 清空）" className="selectable pith-field pith-field--s flex-1" />
             )}
             <SmallButton
               onClick={async () => {
@@ -810,11 +770,10 @@ function BatchPanel({ selection, onSelection, scope }: Props) {
         </Section>
       )}
 
-      <div className="mt-8 border-t pt-3">
-        <SmallButton danger onClick={() => mutate(() => api.trashMove(targetsOf(selection)), `${selection.length} 项已移到回收站`).then((r) => r !== undefined && onSelection([]))}>
-          <Trash2 size={12} />
+      <div className="pd-foot">
+        <button className="pith-link is-danger" onClick={() => mutate(() => api.trashMove(targetsOf(selection)), `${selection.length} 项已移到回收站`).then((r) => r !== undefined && onSelection([]))}>
           移到回收站
-        </SmallButton>
+        </button>
       </div>
     </div>
   );
@@ -829,23 +788,23 @@ function MergeBox({ ids, duplicates, onDone }: { ids: number[]; duplicates: bool
   const loaded = details.map((d) => d.data).filter((d): d is ItemDetail => !!d);
   return (
     <Section title="合并为一条">
-      <ul className="space-y-1 rounded-md border p-1.5">
+      <ul className="pd-box pd-merge">
         {loaded.map((d) => (
           <li key={d.id}>
-            <label className="flex items-start gap-2 rounded px-1 py-0.5 hover:bg-muted">
-              <input type="radio" checked={master === d.id} onChange={() => setMaster(d.id)} className="mt-1" />
-              <span className="min-w-0 text-xs">
-                <span className="block truncate font-medium">{d.title || "（无标题）"}</span>
-                <span className="text-muted-foreground">
+            <label>
+              <input type="radio" className="pith-radio" checked={master === d.id} onChange={() => setMaster(d.id)} />
+              <span>
+                <b>{d.title || "（无标题）"}</b>
+                <small>
                   {[d.year, itemTypeLabel(d.itemType), `${d.attachments.length} 个附件`, d.doi].filter(Boolean).join(" · ")}
-                </span>
+                </small>
               </span>
             </label>
           </li>
         ))}
       </ul>
-      <p className="mt-1 text-[11px] text-muted-foreground">保留选中的这条；其余的附件、笔记、标签、集合并过来，缺的字段补上（不覆盖已有的），然后移进回收站。</p>
-      <div className="mt-2 flex gap-1.5">
+      <p className="pd-note-s">保留选中的这条；其余的附件、笔记、标签、集合并过来，缺的字段补上（不覆盖已有的），然后移进回收站。</p>
+      <div className="pd-line">
         <SmallButton
           onClick={async () => {
             const ok = await ui.confirm({ title: `把 ${ids.length} 条合并成一条？`, message: "被合并的条目会进回收站，需要时可以恢复。" });

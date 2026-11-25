@@ -289,12 +289,12 @@ function FileStep({ path, onCancel, onDone }: { path: string; onCancel: () => vo
           <div className="mt-4 space-y-1.5">
             {p.duplicates.length > 0 && (
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={skipDuplicates} onChange={(e) => setSkip(e.target.checked)} />
+                <input type="checkbox" className="pith-check" checked={skipDuplicates} onChange={(e) => setSkip(e.target.checked)} />
                 跳过可能重复的 {p.duplicates.length} 条
               </label>
             )}
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={intoCollection} onChange={(e) => setInto(e.target.checked)} />
+              <input type="checkbox" className="pith-check" checked={intoCollection} onChange={(e) => setInto(e.target.checked)} />
               放进新集合「导入：{p.fileName}」
             </label>
           </div>

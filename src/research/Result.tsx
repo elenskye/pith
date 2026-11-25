@@ -332,7 +332,7 @@ export function Process({ report, selected, onSelect }: { report: ResearchReport
           {report.sources.map((s) => (
             <tr key={s.id} className="border-b border-border/60 align-top">
               <td className="py-1 pr-1">
-                <input type="checkbox" checked={selected.includes(s.id)} disabled={s.state === "failed" || s.state === "pending"} onChange={() => toggle(s.id)} aria-label={`选择 ${s.id}`} />
+                <input type="checkbox" className="pith-check" checked={selected.includes(s.id)} disabled={s.state === "failed" || s.state === "pending"} onChange={() => toggle(s.id)} aria-label={`选择 ${s.id}`} />
               </td>
               <td className="py-1 pr-3 font-mono">{s.id}</td>
               <td className="py-1 pr-3">{s.tier ? <Badge tone={TIER_TONE[s.tier]}>{TIER[s.tier]}</Badge> : <span className="text-muted-foreground">—</span>}</td>

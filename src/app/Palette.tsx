@@ -1,5 +1,7 @@
 // ⌘K：去任何一屏、任何一段对话、任何一个知识库、设置的任何一页；换配色、明暗；打两个字以上也搜文献库。Esc 关上。
+// 出来从上往下落一点，关上时往上收、淡出（usePresence 留 0.18 秒演退场）。
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePresence } from "@/shared/controls";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/ipc";
 import { PALETTES, useLook } from "@/shared/theme";
@@ -13,11 +15,18 @@ const SECTIONS: [SetSection, string][] = [
   ["kb", "知识库与检索"],
   ["keys", "模型与费用"],
   ["word", "Word 与引文"],
+  ["import", "导入"],
   ["data", "数据"],
   ["look", "外观"],
 ];
 
-export function Palette({ onClose }: { onClose: () => void }) {
+export function Palette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { mounted, leaving } = usePresence(open, 180);
+  if (!mounted) return null;
+  return <PaletteBox leaving={leaving} onClose={onClose} />;
+}
+
+function PaletteBox({ leaving, onClose }: { leaving: boolean; onClose: () => void }) {
   const nav = useNav();
   const [look, setLook] = useLook();
   const [q, setQ] = useState("");
@@ -49,7 +58,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       })),
       { g: "去", k: "知识库", n: "知识库", run: close(() => nav.go("kb")) },
       { g: "去", k: "文献库", n: "文献库", run: close(() => nav.go("lib")) },
-      { g: "去", k: "文献库", n: "从 Zotero、BibTeX 导入", run: close(() => nav.openLibrary({ kind: "import" })) },
+      { g: "去", k: "设置", n: "从 Zotero、BibTeX 导入文献", run: close(() => nav.openSettings("import")) },
       ...SECTIONS.map(([s, n]) => ({ g: "去", k: "设置", n, run: close(() => nav.openSettings(s)) })),
       ...(kbs.data ?? []).map((k) => ({ g: "知识库", k: "知识库", n: k.name, r: `${k.count} 份`, run: close(() => nav.openKb(k.uid)) })),
       ...PALETTES.filter((p) => p.id !== look.palette).map((p) => ({
@@ -59,13 +68,22 @@ export function Palette({ onClose }: { onClose: () => void }) {
         r: p.line,
         run: (e?: { x: number; y: number }) => {
           onClose();
-          nav.lake(e?.x ?? innerWidth / 2, e?.y ?? innerHeight / 3);
-          setLook({ ...look, palette: p.id });
+          const at = { x: e?.x ?? innerWidth / 2, y: e?.y ?? innerHeight / 3 };
+          nav.lake(at.x, at.y);
+          setLook({ ...look, palette: p.id }, at);
         },
       })),
       ...(["system", "light", "dark"] as const)
         .filter((t) => t !== look.theme)
-        .map((t) => ({ g: "外观", k: "明暗", n: { system: "跟随系统", light: "亮", dark: "暗" }[t], run: close(() => setLook({ ...look, theme: t })) })),
+        .map((t) => ({
+          g: "外观",
+          k: "明暗",
+          n: { system: "跟随系统", light: "亮", dark: "暗" }[t],
+          run: (e?: { x: number; y: number }) => {
+            onClose();
+            setLook({ ...look, theme: t }, e && e.x > 0 ? e : undefined);
+          },
+        })),
       ...(items.data ?? [])
         .filter((r) => r.kind === "item")
         .slice(0, 8)
@@ -98,10 +116,10 @@ export function Palette({ onClose }: { onClose: () => void }) {
   let lastG = "";
   return (
     <>
-      <div className="pal-scrim" onClick={onClose} />
-      <div className="palette" role="dialog" aria-label="去任何地方">
+      <div className={`pal-scrim ${leaving ? "is-out" : ""}`} onClick={onClose} />
+      <div className={`palette ${leaving ? "is-out" : ""}`} role="dialog" aria-label="去任何地方">
         <div className="palette-in">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder="去哪？对话、知识库、设置，或者搜文献……" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} readOnly={leaving} placeholder="去哪？对话、知识库、设置，或者搜文献……" />
           <kbd>esc</kbd>
         </div>
         <div className="palette-list" ref={listRef}>

@@ -9,6 +9,7 @@ import { api, type ConceptExisting, type ConceptNumbering, type ConceptPrepared,
 import { Modal, useUi } from "@/shared/ui";
 import { Badge, Notice } from "@/format/parts";
 import { money } from "@/research/labels";
+import { Select } from "@/shared/controls";
 
 const KIND: Record<string, string> = { book: "篇", chapter: "章", section: "节", part: "正文", container: "", guide: "导读", notes: "注释", matter: "前后附" };
 
@@ -71,14 +72,14 @@ function Preview({ p, onNumbering, original, onOriginal }: { p: ConceptTextPrevi
       {!p.existing && p.candidates.length > 0 && (
         <label className="flex items-center gap-2">
           <span className="text-muted-foreground">这是译本？对应的原著：</span>
-          <select value={original ?? ""} onChange={(e) => onOriginal(e.target.value || null)} className="rounded-md border bg-background px-2 py-1">
+          <Select variant="field" value={original ?? ""} onChange={(v) => onOriginal(v || null)}>
             <option value="">（不是译本 / 以后再关联）</option>
             {p.candidates.map((c) => (
               <option key={c.uid} value={c.uid}>
                 {c.title || c.itemTitle}（{c.language === "zh" ? "中文" : "英文"}）
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       )}
     </div>

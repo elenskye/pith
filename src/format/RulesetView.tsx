@@ -16,6 +16,7 @@ import { EditableText, useUi } from "@/shared/ui";
 import { CERTAINTY, CERTAINTY_HINT, CHECK_KIND, count, HANDLING, HANDLING_HINT, HANDLING_ORDER, MODE, propLabel, RUN_STATE, targetLabel, usd, valueChoices, when } from "@/format/labels";
 import { Badge, CommitInput, Notice, Page, SectionTitle, Switch } from "@/format/parts";
 import { PlanSend } from "@/format/SendConfirm";
+import { Select } from "@/shared/controls";
 
 type Tab = "requirements" | "spec" | "runs";
 
@@ -358,13 +359,13 @@ function SettingValue({ s, disabled, onCommit }: { s: FormatSetting; disabled: b
   const bad = s.error ? "border-destructive text-destructive" : "";
   if (choices?.some((c) => c[0] === s.value.toLowerCase())) {
     return (
-      <select value={s.value.toLowerCase()} disabled={disabled} onChange={(e) => onCommit(e.target.value)} className={`rounded border bg-background px-1 py-0.5 outline-none focus:border-ring ${bad}`}>
+      <Select variant="field" className={`pith-select--s ${s.error ? "is-bad" : ""}`} value={s.value.toLowerCase()} disabled={disabled} onChange={onCommit}>
         {choices.map(([value, label]) => (
           <option key={value} value={value}>
             {label}
           </option>
         ))}
-      </select>
+      </Select>
     );
   }
   return <CommitInput value={s.value} disabled={disabled} onCommit={onCommit} className={`w-36 ${bad}`} />;
