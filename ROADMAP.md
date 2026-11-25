@@ -4,7 +4,7 @@
 
 ## 现在：1.0.2（2026-11-25）
 
-界面照 Explore R1 做好了，对话、角色、知识库真存，回答还是演示的（`0031`）。下一步照规划问卷（`docs/questionnaire/v2-plan.html`，云端那份给你填）定到 2.0.0 的顺序，然后开 1.1.0。
+界面照 Explore R1 做好了，对话、角色、知识库真存，回答还是演示的（`0031`）。下一步照规划问卷（https://claude.ai/artifact/HG1MF86byAvZQZVTojni68 ，源在 `docs/questionnaire/v2-plan.html`）定到 2.0.0 的顺序，然后开 1.1.0。
 
 ## 到 2.0.0（草案，等规划问卷定）
 

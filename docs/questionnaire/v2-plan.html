@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>问卷</title>
+<script>
+// 明暗：Vermilion 的 tokens 按 data-theme 切。跟系统走；地址带 ?theme=dark / light 时照它。
+(() => {
+  const q = new URLSearchParams(location.search).get('theme');
+  const m = window.matchMedia('(prefers-color-scheme: dark)');
+  const set = () => { document.documentElement.dataset.theme = q === 'dark' || q === 'light' ? q : m.matches ? 'dark' : 'light'; };
+  set();
+  if (m.addEventListener) m.addEventListener('change', set);
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- vermilion:fonts -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap">
+<!-- /vermilion:fonts -->
+<style>
+/* visual-atelier 通用问卷模板（skills/questionnaire/template/survey.html），用 Design System「Vermilion 朱红」做的（站主 2026-11-13）。
+   版面：单栏，一次一页。暖纸的底；页码是一条漫游路径（点线连着时间线的空心圆，到了的那页圆心变朱红）；每道题一张卡，
+   说明是一张纸片。青绿管结构和建议，朱红只在悬停、选中、焦点和「没答」时出现。
+   下面 vermilion:tokens 那一段是 Vermilion 的 tokens，由 node skills/questionnaire/template/vermilion.mjs 从构建好的
+   Design System 写进来，别手改；别的样式不用改，要改的只有 <script> 开头「改这里」那一段。 */
+/* vermilion:tokens */
+/* Vermilion 朱红 — generated from tokens.json */
+:root, [data-theme="light"] {
+  --color-page: #f6efe2;
+  --color-surface: #fdf9f0;
+  --color-surface-cool: #ece0cb;
+  --color-text: #1b1d1c;
+  --color-muted: #686359;
+  --color-line: #ddd2bf;
+  --color-soft-line: #e6dfd3;
+  --color-accent: #2d6f6a;
+  --color-accent-strong: #28625d;
+  --color-accent-soft: #daddd1;
+  --color-ember: #bf2929;
+  --color-focus: var(--color-ember);
+  --shadow-soft: 0 18px 42px rgba(27, 29, 28, 0.08);
+}
+[data-theme="dark"] {
+  --color-page: #14201f;
+  --color-surface: #233230;
+  --color-surface-cool: #1d2b29;
+  --color-text: #f2ece0;
+  --color-muted: #c1b9ac;
+  --color-line: #384340;
+  --color-soft-line: #343e3b;
+  --color-accent: #77c8c2;
+  --color-accent-strong: #87cfc9;
+  --color-accent-soft: #263e3c;
+  --color-ember: #ffa196;
+  --color-focus: var(--color-ember);
+  --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.4);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+  --space-9: 96px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --width-chrome: 1320px;
+  --width-wide: 1240px;
+  --text-xs: 0.82rem;
+  --text-sm: 0.94rem;
+  --text-md: 1rem;
+  --text-lg: 1.18rem;
+  --text-xl: 1.5rem;
+  --text-display: 4.2rem;
+  --text-display-mobile: 2.9rem;
+  --font-sans: "Work Sans", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Source Serif 4", "Noto Serif SC", ui-serif, "Iowan Old Style", Georgia, "Times New Roman", "Songti SC", "Noto Serif CJK SC", serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+/* /vermilion:tokens */
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+body { margin: 0; background: var(--color-page); color: var(--color-text); font: var(--text-md)/1.7 var(--font-sans); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--color-accent-soft); color: var(--color-text); }
+b, strong { font-weight: 500; }
+code { font: 0.9em var(--font-mono); background: var(--color-surface-cool); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { width: 100%; max-width: 820px; margin: 0 auto; padding-inline: var(--space-5); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* 页头：横线只在页头底部 */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--color-page); border-bottom: 1px solid var(--color-line); }
+.bar .wrap { display: flex; align-items: center; gap: var(--space-2) var(--space-5); padding-block: var(--space-3); flex-wrap: wrap; }
+.bar h1 { margin: 0; font: 400 var(--text-lg)/1.3 var(--font-serif); white-space: nowrap; }
+.save { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
+.save.warn { color: var(--color-ember); }
+
+/* 页码：一条漫游路径，空心圆是时间线的节点 */
+.steps { position: relative; display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); min-width: 0; }
+.step {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 var(--space-1);
+  border: 0; background: none; color: var(--color-muted); font: var(--text-xs)/1 var(--font-sans); cursor: pointer;
+}
+.step + .step::before { content: ""; width: 18px; border-top: 2px dotted var(--color-line); margin-right: 3px; }
+.node { width: 13px; height: 13px; flex: none; border: 2px solid var(--color-accent); border-radius: 50%; background: var(--color-page); display: grid; place-items: center; }
+.node::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--color-ember); transform: scale(0); transition: transform 180ms ease; }
+.step.done .node { background: var(--color-accent); }
+.step[aria-current="step"] { color: var(--color-text); }
+.step[aria-current="step"] .node { border-color: var(--color-ember); background: var(--color-page); }
+.step[aria-current="step"] .node::after { transform: scale(1); }
+.step:hover { color: var(--color-text); }
+.step:hover .node { border-color: var(--color-ember); }
+.step .name { display: none; }
+.step[aria-current="step"] .name { display: inline; }
+
+/* 页的开头 */
+main { padding-block: var(--space-7) var(--space-9); }
+.page-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-5); }
+.eyebrow { margin: 0; font-size: var(--text-xs); color: var(--color-muted); }
+h2 { margin: 0; display: flex; align-items: flex-start; gap: var(--space-2); font: 400 clamp(1.55rem, 1.3rem + 1.1vw, 2rem)/1.3 var(--font-serif); text-wrap: balance; }
+h2 .glyph { width: 0.9em; height: 0.9em; margin-top: 0.22em; flex: none; color: var(--color-accent); }
+.lead { margin: 0; color: var(--color-muted); max-width: 62ch; }
+.fill-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-6); }
+.fill-info { font-size: var(--text-sm); color: var(--color-muted); }
+
+/* 纸片：给站主的背景 */
+.note { background: var(--color-surface-cool); color: var(--color-text); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); border-radius: var(--radius-md); }
+.note-t { margin: 0 0 var(--space-1); font: 400 var(--text-lg)/1.4 var(--font-serif); }
+.note ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: var(--text-sm); }
+.note code { background: var(--color-surface); }
+
+/* 一道题一张卡 */
+.frame { margin: 0 0 var(--space-6); min-width: 0; }
+.strip { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; margin: 0 0 6px 2px; font-size: var(--text-xs); line-height: 1.4; color: var(--color-muted); }
+.strip b { color: var(--color-accent-strong); font-weight: 500; letter-spacing: 0.04em; }
+.board { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-5); }
+.q-title { margin: 0; font: 400 var(--text-lg)/1.5 var(--font-serif); }
+.hint { margin: 4px 0 0; color: var(--color-muted); font-size: var(--text-sm); }
+.hint-list { padding-left: 1.1em; display: grid; gap: 4px; margin-top: var(--space-2); }
+
+/* 选项：悬停、选中是朱红的细边和圆点 */
+.opts { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.opts.cards { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.opt {
+  position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px var(--space-3); align-items: start;
+  min-height: 44px; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  background: var(--color-surface); cursor: pointer; transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.opt:hover { border-color: var(--color-ember); }
+.opt input { position: absolute; opacity: 0; pointer-events: none; }
+.mark { width: 16px; height: 16px; margin-top: 5px; border: 1.5px solid var(--color-muted); border-radius: 50%; display: grid; place-items: center; }
+.multi .mark { border-radius: 4px; }
+.mark::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--color-ember); transform: scale(0); transition: transform 180ms ease; }
+.multi .mark::after { border-radius: 2px; }
+.opt:has(input:checked) { border-color: var(--color-ember); box-shadow: 0 0 0 1px var(--color-ember); }
+.opt:has(input:checked) .mark { border-color: var(--color-ember); }
+.opt:has(input:checked) .mark::after { transform: scale(1); }
+.opt:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.opt-t { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); }
+.opt-t b { font-weight: 500; }
+.opt-d { grid-column: 2; color: var(--color-muted); font-size: var(--text-sm); }
+.opt-fig { grid-column: 1 / -1; margin-bottom: var(--space-2); min-width: 0; }
+.opt-fig img, .opt-fig svg { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.tag { font-size: 0.75rem; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--color-accent); color: var(--color-accent-strong); white-space: nowrap; }
+
+/* 矩阵：每行选一个 */
+.rows { display: grid; }
+.rowq { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-5); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--color-soft-line); }
+.rowq:first-child { border-top: 0; padding-top: 0; }
+.rowq:last-child { padding-bottom: 0; }
+.rowq-no { font-size: var(--text-xs); color: var(--color-accent-strong); margin-right: 6px; letter-spacing: 0.04em; }
+.rowq-t b { font-weight: 500; }
+.why { display: block; color: var(--color-muted); font-size: var(--text-sm); margin-top: 2px; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: hidden; }
+.seg label { position: relative; cursor: pointer; }
+.seg label + label { border-left: 1px solid var(--color-line); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span.lb { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 5px var(--space-3); font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; transition: color 180ms ease, background 180ms ease; }
+.seg .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); flex: none; }
+.seg label:hover span.lb { color: var(--color-text); box-shadow: inset 0 -2px 0 var(--color-ember); }
+.seg input:checked + span.lb { background: var(--color-accent-soft); color: var(--color-text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--color-ember); }
+.seg input:focus-visible + span.lb { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.legend { margin: 0 0 var(--space-3); font-size: var(--text-xs); color: var(--color-muted); display: flex; align-items: center; gap: 6px; }
+.legend .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); display: inline-block; }
+
+textarea {
+  display: block; width: 100%; min-height: 80px; margin-top: var(--space-3); padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-page); color: var(--color-text); font: inherit;
+}
+textarea:hover { border-color: var(--color-accent); }
+.board > textarea:first-child { margin-top: 0; }
+
+/* 按钮：Design System 的 ButtonLink（青绿描边，悬停铺一层浅青）；往下走的那个实心 */
+.btn {
+  display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 var(--space-4);
+  border: 1px solid var(--color-accent); border-radius: var(--radius-sm); background: transparent; color: var(--color-accent-strong);
+  font: 500 var(--text-sm) var(--font-sans); cursor: pointer; transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+.btn:hover { border-color: var(--color-accent-strong); background: var(--color-accent-soft); color: var(--color-text); }
+.btn.primary { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-page); }
+.btn.primary:hover { background: var(--color-accent-soft); color: var(--color-text); }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-2); }
+.pager-info { font-size: var(--text-xs); color: var(--color-muted); }
+
+/* 核对与提交 */
+.review summary { cursor: pointer; font: 400 var(--text-lg) var(--font-serif); }
+.review h3 { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-5) 0 var(--space-1); font-size: var(--text-sm); font-weight: 500; }
+.review dl { margin: 0; display: grid; gap: var(--space-2); }
+.review dt { font-size: var(--text-xs); color: var(--color-muted); }
+.review dd { margin: 0; font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review dd.empty { color: var(--color-ember); }
+.review .go { min-height: 0; padding: 0; border: 0; background: none; color: var(--color-accent-strong); font: inherit; font-size: var(--text-xs); cursor: pointer; text-decoration: underline; text-underline-offset: 0.22em; }
+.review .go:hover { color: var(--color-ember); }
+.done-box { background: var(--color-surface-cool); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); }
+.done-box p { margin: 0; }
+.copy-row { margin-top: var(--space-4); display: grid; gap: 6px; }
+.copy-row .hint { margin: 0; }
+
+@media (max-width: 640px) {
+  .rowq { grid-template-columns: minmax(0, 1fr); }
+  .seg { display: grid; }
+  .wrap { padding-inline: var(--space-4); }
+  .board { padding: var(--space-4); }
+  .note { padding: var(--space-3) var(--space-4); }
+  .bar h1 { white-space: normal; }
+  .step + .step::before { width: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <h1 id="title">问卷</h1>
+    <nav class="steps" id="steps" aria-label="页码"></nav>
+    <span class="save" id="save" role="status">连接存储中…</span>
+  </div>
+</header>
+<div class="wrap"><main id="main"></main></div>
+<!-- 漫游路径：Vermilion 的 marks/route-glyph.svg，放在每页大标题前 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="route-glyph" viewBox="0 0 32 32"><path d="M5 27c7-2 4-8 9-11s10-2 10-8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" stroke-dasharray="0.5 4.4"/><circle cx="24.5" cy="6" r="3.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/></symbol></svg>
+
+<script>
+// ==================== 改这里 ====================
+// Pith 到 2.0.0 的规划问卷（2026-11-25）。源在 Pith 仓库 docs/questionnaire/v2-plan.html，发在 Claude 云端（不放 Atelier）。
+// 示意图用下面几个小函数画，颜色取页面自己的变量。
+const C = { a: 'var(--color-accent)', e: 'var(--color-ember)', m: 'var(--color-muted)', l: 'var(--color-line)', s: 'var(--color-surface)', t: 'var(--color-text)' };
+// 一条版本路：[['1.1', '对话'], …]；hi 是要突出的那几站（卡片只有一百多像素宽，字要大）
+function road(stops, hi = []) {
+  const w = 200, gap = (w - 44) / (stops.length - 1);
+  const dots = stops.map(([v, t], i) => {
+    const x = 22 + i * gap, on = hi.includes(i);
+    return `<text x="${x}" y="12" text-anchor="middle" font-size="11" fill="${C.m}">${v}</text>`
+      + `<circle cx="${x}" cy="26" r="${on ? 7.5 : 5.5}" fill="${on ? C.a : C.s}" stroke="${C.a}" stroke-width="2"/>`
+      + `<text x="${x}" y="52" text-anchor="middle" font-size="14" font-weight="${on ? 600 : 400}" fill="${on ? C.a : C.t}">${t}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} 60" width="100%" role="img"><path d="M22 26H${w - 22}" stroke="${C.l}" stroke-width="2" stroke-dasharray="2 4"/>${dots}</svg>`;
+}
+// 几块方块：[['宽', '字', 突出?], …]，宽是比例
+function blocks(parts, h = 30) {
+  const total = parts.reduce((s, p) => s + p[0], 0); let x = 2;
+  const r = parts.map(([w, t, hot]) => { const ww = (w / total) * 196 - 3; const g = `<rect x="${x}" y="4" width="${ww}" height="${h}" rx="5" fill="${hot ? C.a : C.s}" stroke="${C.a}" stroke-width="1.4"/><text x="${x + ww / 2}" y="${4 + h / 2 + 5}" text-anchor="middle" font-size="13" fill="${hot ? C.s : C.t}">${t}</text>`; x += ww + 3; return g; }).join('');
+  return `<svg viewBox="0 0 200 ${h + 8}" width="100%" role="img">${r}</svg>`;
+}
+// 一个小窗：密度、留白的示意
+function screen(rows, pad) {
+  const lines = Array.from({ length: rows }, (_, i) => `<rect x="${20 + pad}" y="${18 + i * (60 / rows)}" width="${200 - pad * 2}" height="${Math.max(3, 30 / rows)}" rx="2" fill="${i === 0 ? C.a : C.l}"/>`).join('');
+  return `<svg viewBox="0 0 240 96" width="100%" role="img"><rect x="4" y="4" width="232" height="88" rx="8" fill="${C.s}" stroke="${C.l}"/>${lines}</svg>`;
+}
+// 一排圆点：动效多少
+function dots(n, label) {
+  const d = Array.from({ length: 6 }, (_, i) => `<circle cx="${20 + i * 32}" cy="20" r="10" fill="${i < n ? C.a : C.s}" stroke="${C.a}" stroke-width="1.5"/>`).join('');
+  return `<svg viewBox="0 0 200 56" width="100%" role="img">${d}<text x="100" y="51" text-anchor="middle" font-size="14" fill="${C.m}">${label}</text></svg>`;
+}
+
+const SURVEY = {
+  title: 'Pith · 到 2.0.0 的计划',
+  key: 'pith-v2-plan-2026-11-25',
+};
+
+const PAGES = [
+  {
+    name: '顺序', title: '到 2.0.0：先做什么、后做什么',
+    lead: '这份问卷之后，你只定「每一版做什么、先做什么」，别的我照下面几页你说的理念自己定、做完在 HANDOFF 汇报。',
+    note: { t: '已经定了的（不再问）', items: [
+      '<b>2.0.0 = 新架构全部落地</b>：对话 Agent、技能、角色、知识库都是真的，旧功能全改成技能，加 Word 润色和 WonderLab；学术研究、自我改进在 2.0.0 以后。',
+      '程序不限制模型：只给检索、读原文、引用、计算的工具，写回 Word 和文献库之前给你看（<code>decisions/0030</code>）。',
+      'Agent 循环用 Rust 自己写，做好 Prompt Cache 和递归的小子任务；花钱只看月上限。',
+      '1.0.2 已经照 Explore R1 做好了界面，对话、角色、知识库真存，回答还是演示的。',
+    ] },
+    items: [
+      { id: 'order', type: 'single', layout: 'cards', title: '版本的先后', hint: '蓝色实心的那站是这条路的重点。', rec: 'chat', options: [
+        { v: 'chat', t: '先真对话，再改技能', d: '1.1 Agent 循环 + 知识库检索 → 1.2 技能新格式、摘抄导入 → 1.3 Word 润色、后台任务 → 1.4 WonderLab → 2.0 收口。最快用上「问自己的知识库」。', fig: road([['1.1', '对话'], ['1.2', '技能'], ['1.3', '润色'], ['1.4', '图解'], ['2.0', '收口']], [0]) },
+        { v: 'skills', t: '先改技能，再接对话', d: '1.1 把调查、概念、排版改成新格式 → 1.2 Agent 循环 → …。旧流程先变干净，但真对话晚一版。', fig: road([['1.1', '技能'], ['1.2', '对话'], ['1.3', '润色'], ['1.4', '图解'], ['2.0', '收口']], [0]) },
+        { v: 'kb', t: '先把知识库填满，再对话', d: '1.1 摘抄、笔记、网页导入和检索 → 1.2 Agent 循环 → …。对话一接上就有很多东西可问。', fig: road([['1.1', '知识'], ['1.2', '对话'], ['1.3', '技能'], ['1.4', '润色'], ['2.0', '图解']], [0]) },
+        { v: 'polish', t: '先 Word 润色（论文急）', d: '1.1 Word 润色（先用现成的单次调用） → 1.2 真对话 → …。论文的事先解决。', fig: road([['1.1', '润色'], ['1.2', '对话'], ['1.3', '技能'], ['1.4', '图解'], ['2.0', '收口']], [0]) },
+      ] },
+      { id: 'size', type: 'single', layout: 'cards', title: '一个版本多大', rec: 'mid', options: [
+        { v: 'small', t: '小步：一版一件事', d: '版本多（可能到 1.7、1.8），每版很快能用。', fig: blocks([[1, '1.1'], [1, '1.2'], [1, '1.3'], [1, '1.4'], [1, '1.5'], [1, '2.0']]) },
+        { v: 'mid', t: '中步：四版到 2.0', d: '照上面那条路，一版三到五期。', fig: blocks([[2, '1.1'], [2, '1.2'], [2, '1.3'], [1.5, '1.4'], [1, '2.0']]) },
+        { v: 'big', t: '大步：两版到 2.0', d: '每版很大，中间不装正式版。', fig: blocks([[4, '1.1'], [4, '1.2'], [1, '2.0']]) },
+      ] },
+      { id: 'scope', type: 'rows', title: '这些放在哪', hint: '2.0.0 之前做、之后做，还是不要。', scale: [{ v: 'before', t: '2.0 之前' }, { v: 'after', t: '2.0 之后' }, { v: 'no', t: '不要' }], groups: [
+        { label: '对话', rows: [
+          { id: 's_meter', t: '<b>用量圈</b>：输入框下面看本月花了多少、点开看明细', rec: 'before' },
+          { id: 's_bg', t: '<b>后台任务</b>：整本书的研究、一次调查放后台，对话里一张任务卡', rec: 'before' },
+          { id: 's_sub', t: '<b>递归的小子任务</b>：Pith 自己拆活、分头查', rec: 'before' },
+          { id: 's_mem', t: '<b>跨对话的记忆</b>：记住你的偏好、上次读到哪', rec: 'before' },
+          { id: 's_rolecard', t: '<b>在对话里建角色</b>：说一句，Pith 拟一张角色名片', rec: 'before' },
+          { id: 's_team', t: '<b>多个角色一起干活</b>（审稿人和编辑分头）', rec: 'after' },
+          { id: 's_local', t: '<b>本机模型回答</b>（不联网、不花钱，但慢、弱一些）', rec: 'after' },
+        ] },
+        { label: '知识库和文献库', rows: [
+          { id: 's_import', t: '<b>导入摘抄、笔记</b>：Flomo、Obsidian 导出的 Markdown', rec: 'before' },
+          { id: 's_clip', t: '<b>网页剪藏</b>：一个网址存成快照进知识库', rec: 'before' },
+          { id: 's_pdfsearch', t: '<b>PDF 全文搜索</b>（文献库里搜 PDF 里的字）', rec: 'after' },
+          { id: 's_zotinc', t: '<b>Zotero 增量导入</b>（Zotero 里新加的再导一次）', rec: 'after' },
+          { id: 's_undo', t: '<b>撤销</b>（文献库的改动能撤回）', rec: 'after' },
+        ] },
+        { label: '更远的', rows: [
+          { id: 's_wonder', t: '<b>WonderLab</b>：能拖动的图解、模型', rec: 'before' },
+          { id: 's_academic', t: '<b>学术研究</b>：政治效能感，数据、统计、可复现脚本', rec: 'after' },
+          { id: 's_adaptive', t: '<b>自我改进</b>：技能自己改、固定测试集对比', rec: 'after' },
+          { id: 's_mobile', t: '<b>手机上用</b>', rec: 'no' },
+        ] },
+      ] },
+    ],
+  },
+  {
+    name: '1.1.0', title: '下一版（1.1.0）怎么做',
+    lead: '假设下一版是「真对话」（第一页选了别的，这页照样有用，挪到那一版）。',
+    items: [
+      { id: 'apis', type: 'multi', max: 3, title: '第一批接哪几家的模型', hint: '最多 3 家；你已经有 Anthropic、OpenAI、DeepSeek 的密钥。', rec: ['anthropic', 'openai', 'deepseek'], options: [
+        { v: 'anthropic', t: 'Anthropic（Claude）', d: '现在排版、调查在用。' },
+        { v: 'openai', t: 'OpenAI', d: '现在概念研究在用。' },
+        { v: 'deepseek', t: 'DeepSeek', d: '便宜，调查里摘证据在用。' },
+        { v: 'google', t: 'Google（Gemini）', d: '要一把新密钥。' },
+        { v: 'local', t: '本机模型', d: '不花钱，慢一些。' },
+      ] },
+      { id: 'model', type: 'single', layout: 'cards', title: '对话默认用多强的模型', rec: 'mid', options: [
+        { v: 'top', t: '最强的', d: '每句都用 Opus 级，月上限 $30 大概够一两百问。', fig: blocks([[6, '强', true], [1, '']]) },
+        { v: 'mid', t: '均衡，难的再换', d: '平时用中档，读整章、写长东西时 Pith 自己换强的。', fig: blocks([[3, '中', true], [2, '强'], [2, '便宜']]) },
+        { v: 'cheap', t: '尽量便宜', d: '平时用 DeepSeek 一类，要你点名才换强的。', fig: blocks([[6, '便宜', true], [1, '']]) },
+      ] },
+      { id: 'tools', type: 'rows', title: '1.1.0 里 Pith 能用的工具', scale: [{ v: 'now', t: '1.1 就要' }, { v: 'later', t: '以后' }], rows: [
+        { id: 't_search', t: '<b>检索知识库</b>（按意思找段落）', rec: 'now' },
+        { id: 't_read', t: '<b>读原文</b>（一段的上下文、整章、对照的译文）', rec: 'now' },
+        { id: 't_cite', t: '<b>引用编号</b>（点开是那一段，再一步到文献库）', rec: 'now' },
+        { id: 't_lib', t: '<b>查文献库</b>', rec: 'now' },
+        { id: 't_calc', t: '<b>计算</b>（数字不口算）', rec: 'now' },
+        { id: 't_web', t: '<b>联网搜索、存快照</b>', rec: 'now' },
+        { id: 't_ask', t: '<b>问题卡</b>（要你拍板时给几个选项）', rec: 'now' },
+        { id: 't_save', t: '<b>存进知识库</b>（模型自己存，还是交给你点）', rec: 'now' },
+        { id: 't_word', t: '<b>改 Word</b>（出修订预览，点头才写）', rec: 'later' },
+      ] },
+      { id: 'autosave', type: 'single', layout: 'cards', title: '回答、卡片要不要自动存进知识库', rec: 'card', options: [
+        { v: 'card', t: '给一张交付卡，你点「存进」', d: '现在 1.0.2 的样子。', fig: blocks([[5, '回答'], [2, '存进 →', true]]) },
+        { v: 'auto', t: '模型觉得有用就自己存', d: '存了告诉你一声，能撤。', fig: blocks([[5, '回答'], [2, '已存 ✓', true]]) },
+        { v: 'ask', t: '每次先问一句存到哪', d: '多一步，不会存错库。', fig: blocks([[4, '回答'], [3, '存到哪？', true]]) },
+      ] },
+      { id: 'books', type: 'single', title: 'v0.4 解析好的书怎么进知识库', rec: 'move', options: [
+        { v: 'move', t: '1.1 里迁成知识库的材料（段落块），概念研究以后从知识库读', d: '只迁一次，不重新解析。' },
+        { v: 'both', t: '先两边都留着，1.2 改技能时再迁' },
+      ] },
+      { id: 'spend', type: 'single', layout: 'cards', title: '1.1.0 真实验收能花多少', hint: '用真实的书、真实的模型跑一遍再交给你（现在每版默认 $5）。', rec: 'ten', options: [
+        { v: 'five', t: '$5', d: '够跑十几轮对话。', fig: blocks([[1, '$5', true], [3, '']]) },
+        { v: 'ten', t: '$10', d: '几家模型各试一遍，再跑一整章。', fig: blocks([[2, '$10', true], [2, '']]) },
+        { v: 'twenty', t: '$20', d: '多试几家、几种长度。', fig: blocks([[4, '$20', true]]) },
+      ] },
+    ],
+  },
+  {
+    name: '开发', title: '开发上，你想怎么配合',
+    lead: '定下来以后写进 CLAUDE.md，之后每轮照这个来，不再问。',
+    items: [
+      { id: 'pace', type: 'single', layout: 'cards', title: '一个版本分几期，期和期之间', rec: 'flow', options: [
+        { v: 'flow', t: '连着做完，有事才问', d: '每期做完写 HANDOFF、提交，直接开下一期；整版做完装正式版给你看。', fig: road([['P1', ''], ['P2', ''], ['P3', ''], ['P4', ''], ['装', '你看']], [4]) },
+        { v: 'stop', t: '每期停下来，你看过再开下一期', d: '更稳，但每期都要等你。', fig: road([['P1', '你看'], ['P2', '你看'], ['P3', '你看'], ['P4', '你看'], ['装', '']], [0, 1, 2, 3]) },
+        { v: 'mid', t: '关键的几期停一下', d: '我在计划里标出要你看的那几期。', fig: road([['P1', ''], ['P2', '你看'], ['P3', ''], ['P4', ''], ['装', '你看']], [1, 4]) },
+      ] },
+      { id: 'decide', type: 'rows', title: '这些我自己定，还是先问你', hint: '你说过只定范围和顺序；这几样比较大，再确认一下。', scale: [{ v: 'me', t: '你定' }, { v: 'ask', t: '先问我' }], rows: [
+        { id: 'd_dep', t: '<b>加一个大的依赖</b>（比如一个向量库、一个解析库）', rec: 'me' },
+        { id: 'd_schema', t: '<b>改数据库的表</b>（加 migration）', rec: 'me' },
+        { id: 'd_remove', t: '<b>拿掉旧功能的页面、旧代码</b>（功能挪进技能以后）', rec: 'me' },
+        { id: 'd_scheme', t: '<b>给 Pith 的视觉方案加东西</b>（新图标、新组件，在 Atelier 里做）', why: '方案里的资产只有你能批准。', rec: 'ask' },
+        { id: 'd_cost', t: '<b>验收要花的钱超过那一版的上限</b>', rec: 'ask' },
+        { id: 'd_prod', t: '<b>往正式数据里导东西</b>（~/Pith）', rec: 'ask' },
+      ] },
+      { id: 'tradeoff', type: 'multi', max: 3, title: '要取舍时，你最在意哪几样', hint: '最多 3 个。', rec: ['true', 'simple', 'beauty'], options: [
+        { v: 'true', t: '准、能核对', d: '编号点得回原文，数字算得对。' },
+        { v: 'simple', t: '简单、少按钮', d: '能说话就不画按钮。' },
+        { v: 'beauty', t: '好看、灵动', d: '动效、生长、湖面这些。' },
+        { v: 'fast', t: '快', d: '打开快、回答快。' },
+        { v: 'cheap', t: '省钱', d: '能用便宜的就用便宜的。' },
+        { v: 'offline', t: '能离线', d: '没网也能读、能问一部分。' },
+      ] },
+      { id: 'show', type: 'single', title: '做好了怎么给你看', rec: 'app', options: [
+        { v: 'app', t: '装好正式版，验收清单写清点哪里，你自己点' },
+        { v: 'shots', t: '我录几张截图、一段录屏放进 HANDOFF' },
+        { v: 'both', t: '两样都要' },
+      ] },
+    ],
+  },
+  {
+    name: '设计', title: '界面上，你想怎么定',
+    lead: 'R1 没画到的地方（用量圈、问题卡、任务卡、技能的设置、改技能后的旧结果页）怎么出。',
+    items: [
+      { id: 'newui', type: 'single', layout: 'cards', title: '新界面怎么出', rec: 'direct', options: [
+        { v: 'direct', t: '照方案和 R1 直接做，做完给你看', d: '最快；不满意再改。', fig: road([['做', ''], ['给你看', '']], [1]) },
+        { v: 'board', t: '先在 Atelier 画一张板，你批了再做', d: '每样新东西都多一轮。', fig: road([['画板', ''], ['你批', ''], ['做', '']], [1]) },
+        { v: 'big', t: '大的先画板，小的直接做', d: '我判断哪些算大（新的一屏、新的动效算大）。', fig: road([['大：画板', ''], ['你批', ''], ['做', '']], [1]) },
+      ] },
+      { id: 'density', type: 'single', layout: 'cards', title: '信息密度', rec: 'airy', options: [
+        { v: 'airy', t: '像 R1：大留白、大字', d: '一屏只放这一步要的东西。', fig: screen(3, 34) },
+        { v: 'dense', t: '工作台：紧一点、多一点', d: '一屏看得多，像以前的文献库。', fig: screen(9, 8) },
+        { v: 'mix', t: '对话、知识库留白，文献库、设置紧一点', fig: screen(5, 20) },
+      ] },
+      { id: 'motion', type: 'single', layout: 'cards', title: '动效多少', rec: 'all', options: [
+        { v: 'all', t: '照 R1 全上', d: '叶子长出来、种子飞、湖面、上墨。', fig: dots(6, '全部') },
+        { v: 'key', t: '只在关键的时刻', d: '打开、存卡、换配色；悬停简单些。', fig: dots(3, '一半') },
+        { v: 'few', t: '尽量少', fig: dots(1, '很少') },
+      ] },
+      { id: 'oldpages', type: 'single', title: '旧功能的结果页（调查报告、概念卡和关系图、排版规则）', hint: '1.0.2 只是原样放进了对话，里面还是旧的小字。', rec: 'withskill', options: [
+        { v: 'withskill', t: '改成新格式技能的时候一起照 R1 重画' },
+        { v: 'next', t: '下一版先重画，不等技能' },
+        { v: 'keep', t: '能用就行，不重画' },
+      ] },
+    ],
+  },
+  {
+    name: '用途', title: '接下来你真正要拿它做什么',
+    lead: '照这个排每一版的验收：用你真会做的事来试。',
+    items: [
+      { id: 'first', type: 'multi', max: 2, title: '最想先用上的', hint: '最多 2 个。', rec: ['askbook', 'polish'], options: [
+        { v: 'askbook', t: '问知识库里的书', d: '「斯密为什么说分工受市场范围限制」带出处地答。' },
+        { v: 'polish', t: '论文的 Word 润色', d: '在选区上改，修订预览，点头才写。' },
+        { v: 'research', t: '事实调查', d: '一个问题查证到底。' },
+        { v: 'cards', t: '读书做卡片', d: '一章读完留下概念卡、关系图。' },
+        { v: 'notes', t: '整理摘抄、笔记', d: 'Flomo、Obsidian 的东西有个家。' },
+        { v: 'wonder', t: 'WonderLab 的图解', d: '能拖动的模型。' },
+      ] },
+      { id: 'sources', type: 'multi', title: '手上有哪些要导进来的', hint: '可以多选；导入要你把导出的文件放进 local/，我只读副本。', options: [
+        { v: 'flomo', t: 'Flomo 导出' }, { v: 'obsidian', t: 'Obsidian 库' }, { v: 'weread', t: '微信读书的划线' },
+        { v: 'web', t: '网页剪藏、收藏夹' }, { v: 'files', t: '本机的 PDF、Word 文件夹' }, { v: 'zotero', t: 'Zotero 里后来新加的' },
+      ] },
+      { id: 'thesis', type: 'single', title: '论文那边多急', rec: 'normal', options: [
+        { v: 'urgent', t: '很急：润色排到下一版' },
+        { v: 'normal', t: '不急：照路线走' },
+        { v: 'done', t: '论文已经交了，润色以后给别的文章用' },
+      ] },
+      { id: 'week', type: 'text', title: '你理想中的一周，Pith 帮你做了什么', hint: '随便写几句；我照这个定验收的例子。' },
+    ],
+  },
+];
+// ==================== 下面不用改 ====================
+
+// 最后一页是核对
+PAGES.push({ name: '核对', title: '核对一遍再提交', lead: '下面是全部答案。没选的点「去改」回到那一页；也可以一次按建议填完。提交以后还能改，改了自动更新。', items: [], review: true });
+
+// ---------- 状态 ----------
+const DOC = 'survey/answers';
+let state = { answers: {}, page: 0, submitted: false, submittedAt: null, updatedAt: null };
+try { const s = JSON.parse(localStorage.getItem(SURVEY.key) || 'null'); if (s && s.answers) state = Object.assign(state, s); } catch (e) {}
+if (!(state.page >= 0 && state.page < PAGES.length)) state.page = 0;
+let db = null; let dbState = 'pending';
+const saveEl = document.getElementById('save');
+const main = document.getElementById('main');
+const stepsEl = document.getElementById('steps');
+document.title = SURVEY.title;
+document.getElementById('title').textContent = SURVEY.title;
+function setSave(text, warn) { saveEl.textContent = text; saveEl.classList.toggle('warn', !!warn); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function plain(s) { return String(s).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'); }
+function groupsOf(q) { return q.groups || [{ label: q.title || '', sub: q.hint, rows: q.rows || [] }]; }
+
+// 所有要答的项：选择题、文字题，矩阵摊成一行一项
+function itemsOf(pi) {
+  const out = [];
+  PAGES[pi].items.forEach((q) => {
+    if (q.type === 'rows') groupsOf(q).forEach((g) => g.rows.forEach((r) => out.push({ id: r.id, label: plain(r.t), scale: q.scale, rec: r.rec })));
+    else out.push({ id: q.id, label: plain(q.title), q, rec: q.rec });
+  });
+  return out;
+}
+function allItems() { return PAGES.flatMap((_, i) => itemsOf(i).map((it) => Object.assign({ page: i }, it))); }
+function answered(it) { const v = state.answers[it.id]; return !(v == null || v === '' || (Array.isArray(v) && !v.length)); }
+function required(it) { return !(it.q && it.q.type === 'text'); }
+function answerText(it) {
+  if (!answered(it)) return '';
+  const v = state.answers[it.id];
+  if (it.scale) return (it.scale.find((s) => s.v === v) || {}).t || v;
+  if (it.q.type === 'text') return v;
+  const pick = (x) => { const o = it.q.options.find((o) => o.v === x); return o ? plain(o.t) : x; };
+  return Array.isArray(v) ? v.map(pick).join('；') : pick(v);
+}
+function left(pi) { return itemsOf(pi).filter((it) => required(it) && !answered(it)).length; }
+function summary() {
+  const s = {};
+  allItems().forEach((it) => { s[it.id + ' ' + it.label] = answerText(it) || '（未答）'; });
+  PAGES.forEach((p, i) => { const n = state.answers['note' + (i + 1)]; if (n) s['第 ' + (i + 1) + ' 页补充'] = n; });
+  return s;
+}
+function summaryText() { return SURVEY.title + '\n' + Object.entries(summary()).map(([k, v]) => k + '：' + v).join('\n'); }
+
+// ---------- 保存 ----------
+let saveTimer = null; let writing = false; let dirty = false;
+function persist(immediate) {
+  state.updatedAt = new Date().toISOString();
+  saveLocal();
+  renderSteps();
+  clearTimeout(saveTimer);
+  if (!db) { if (dbState === 'none') setSave('答案只存在这台设备上'); return; }
+  setSave('保存中…');
+  saveTimer = setTimeout(writeDb, immediate ? 0 : 500);
+}
+function saveLocal() { try { localStorage.setItem(SURVEY.key, JSON.stringify(state)); } catch (e) {} }
+async function writeDb(retry) {
+  if (writing) { dirty = true; return; }
+  writing = true;
+  const body = { answers: state.answers, summary: summary(), submitted: state.submitted, submittedAt: state.submittedAt, updatedAt: state.updatedAt };
+  try {
+    await db.doc(DOC).set(body);
+    setSave('已保存 · ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    if (e && e.code === 'unavailable' && !retry) { writing = false; setTimeout(() => writeDb(true), 800 + Math.random() * 800); return; }
+    setSave('保存失败，答案暂存在这台设备上', true);
+  }
+  writing = false;
+  if (dirty) { dirty = false; writeDb(); }
+}
+
+// ---------- 渲染 ----------
+function strip(no, kind) { return `<p class="strip"><b>${no}</b><span>${kind}</span></p>`; }
+function kindOf(q) {
+  if (q.type === 'multi') return q.max ? `可多选，最多 ${q.max} 个` : '可多选';
+  if (q.type === 'text') return '可不填';
+  if (q.type === 'rows') return '每行选一个';
+  return '单选';
+}
+function optHtml(q, o) {
+  const type = q.type === 'multi' ? 'checkbox' : 'radio';
+  const isRec = Array.isArray(q.rec) ? q.rec.includes(o.v) : q.rec === o.v;
+  return `<label class="opt">${o.fig ? `<span class="opt-fig">${o.fig}</span>` : ''}
+    <input type="${type}" name="${q.id}" value="${o.v}" id="${q.id}-${o.v}"><span class="mark" aria-hidden="true"></span>
+    <span class="opt-t"><b>${o.t}</b>${isRec ? '<span class="tag">建议</span>' : ''}</span>
+    ${o.d ? `<span class="opt-d">${o.d}</span>` : ''}</label>`;
+}
+function rowsHtml(q) {
+  const hasRec = groupsOf(q).some((g) => g.rows.some((r) => r.rec));
+  return groupsOf(q).map((g, gi) => `<section class="frame" aria-label="${esc(plain(g.label || q.id))}">
+    <p class="strip"><b>${g.label || q.id.toUpperCase()}</b><span>${g.sub ? g.sub + ' · ' : ''}${kindOf(q)}</span></p>
+    <div class="board">${hasRec && gi === 0 ? '<p class="legend"><i class="rec-dot" aria-hidden="true"></i>带圆点的是建议</p>' : ''}<div class="rows">${g.rows.map((r) => `<div class="rowq" role="radiogroup" aria-labelledby="${r.id}-t">
+      <div class="rowq-t" id="${r.id}-t"><span class="rowq-no">${r.id}</span>${r.t}${r.why ? `<span class="why">${r.why}</span>` : ''}</div>
+      <div class="seg">${q.scale.map((s) => `<label><input type="radio" name="${r.id}" value="${s.v}" id="${r.id}-${s.v}"><span class="lb">${r.rec === s.v ? '<i class="rec-dot" aria-hidden="true"></i>' : ''}${s.t}${r.rec === s.v ? '<span class="sr">（建议）</span>' : ''}</span></label>`).join('')}</div>
+    </div>`).join('')}</div></div></section>`).join('');
+}
+function qHtml(q) {
+  if (q.type === 'rows') return rowsHtml(q);
+  const no = q.id.toUpperCase();
+  const head = `<p class="q-title" id="${q.id}-t">${q.title}</p>${q.hint ? `<p class="hint">${q.hint}</p>` : ''}`;
+  if (q.type === 'text') {
+    return `<section class="frame">${strip(no, kindOf(q))}<div class="board">${head}
+      ${q.list ? `<ul class="hint hint-list">${q.list.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
+      <textarea id="${q.id}" name="${q.id}" aria-labelledby="${q.id}-t"></textarea></div></section>`;
+  }
+  const multi = q.type === 'multi';
+  return `<section class="frame ${multi ? 'multi' : ''}" role="${multi ? 'group' : 'radiogroup'}" aria-labelledby="${q.id}-t">${strip(no, kindOf(q))}
+    <div class="board">${head}<div class="opts ${q.layout === 'cards' ? 'cards' : ''}">${q.options.map((o) => optHtml(q, o)).join('')}</div></div></section>`;
+}
+function renderSteps() {
+  stepsEl.innerHTML = PAGES.map((p, i) => {
+    const done = p.review ? state.submitted : left(i) === 0;
+    return `<button type="button" class="step ${done ? 'done' : ''}" data-page="${i}" ${i === state.page ? 'aria-current="step"' : ''} aria-label="第 ${i + 1} 页：${p.name}${done ? '，已完成' : ''}"><span class="node" aria-hidden="true"></span>${i + 1}<span class="name">${p.name}</span></button>`;
+  }).join('');
+}
+function missingAll() { return allItems().filter((it) => required(it) && !answered(it)).length; }
+function recLeft(all) { return (all ? allItems() : itemsOf(state.page)).filter((it) => it.rec && !answered(it)).length; }
+function fillInfo(pi) {
+  if (PAGES[pi].review) { const n = missingAll(); return n ? `全卷还差 ${n} 项` : '全卷都选完了'; }
+  const n = left(pi); return n ? `这一页还差 ${n} 项` : '这一页选完了';
+}
+function reviewHtml() {
+  const missing = missingAll();
+  const body = PAGES.map((p, pi) => {
+    if (p.review) return '';
+    const items = itemsOf(pi); const note = state.answers['note' + (pi + 1)];
+    if (!items.length && !note) return '';
+    return `<h3>第 ${pi + 1} 页 · ${esc(p.name)}<button type="button" class="go" data-page="${pi}">去改</button></h3><dl>${items.map((it) => `<div><dt>${esc(it.id.toUpperCase())} ${esc(it.label)}</dt><dd class="${answered(it) || !required(it) ? '' : 'empty'}">${answered(it) ? esc(answerText(it)) : (required(it) ? '未答' : '没填')}</dd></div>`).join('')}${note ? `<div><dt>这一页想补充的</dt><dd>${esc(note)}</dd></div>` : ''}</dl>`;
+  }).join('');
+  return `<details class="review" open><summary>全部答案${missing ? `（还有 ${missing} 项没选）` : '（都选完了）'}</summary>${body}</details>`;
+}
+function doneHtml() {
+  if (!state.submitted) return '';
+  const when = state.submittedAt ? new Date(state.submittedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div class="done-box"><p>已提交（${when}）。回到对话告诉 Agent「问卷填好了」。${db ? '之后改答案会自动更新。' : '这个页面连不上存储，请点下面的「复制答案」，贴回对话。'}</p></div>`;
+}
+function submitBoard() {
+  return `<section class="frame">${strip('提交', '')}<div class="board" id="review-board">${doneHtml()}${reviewHtml()}
+    <div class="copy-row"><p class="hint">${db ? '答案自动存进了页面存储，Agent 能直接读。' : '连不上存储时，复制答案贴回对话。'}</p>
+    <div><button type="button" class="btn" id="copy">复制答案</button></div><textarea id="copy-text" readonly aria-label="答案文本"></textarea></div></div></section>`;
+}
+function render() {
+  const p = PAGES[state.page]; const pi = state.page; const last = pi === PAGES.length - 1;
+  main.innerHTML = `<section aria-labelledby="ph">
+    <div class="page-head"><p class="eyebrow">第 ${pi + 1} 页，共 ${PAGES.length} 页</p><h2 id="ph"><svg class="glyph" aria-hidden="true"><use href="#route-glyph"></use></svg><span>${p.title}</span></h2>${p.lead ? `<p class="lead">${p.lead}</p>` : ''}</div>
+    ${p.note ? `<aside class="note"><p class="note-t">${p.note.t}</p><ul>${p.note.items.map((x) => `<li>${x}</li>`).join('')}</ul></aside>` : ''}
+    ${(p.review ? recLeft(true) : itemsOf(pi).some((it) => it.rec)) ? `<div class="fill-row"><button type="button" class="btn" id="fill">${p.review ? '全卷没选的都按建议填' : '没选的都按建议填'}</button><span class="fill-info" id="fill-info" role="status">${fillInfo(pi)}</span></div>` : `<div class="fill-row"><span class="fill-info" id="fill-info" role="status">${fillInfo(pi)}</span></div>`}
+    ${p.items.map(qHtml).join('')}
+    ${p.review ? submitBoard() : `<section class="frame">${strip('这一页想补充的', '可不填')}<div class="board"><textarea id="note${pi + 1}" name="note${pi + 1}" aria-label="这一页想补充的"></textarea></div></section>`}
+    <div class="pager">
+      ${pi > 0 ? '<button type="button" class="btn" id="prev">上一页</button>' : '<span></span>'}
+      <span class="pager-info">${pi + 1} / ${PAGES.length}</span>
+      ${last ? `<button type="button" class="btn primary" id="submit">${state.submitted ? '更新提交' : '提交问卷'}</button>` : '<button type="button" class="btn primary" id="next">下一页</button>'}
+    </div></section>`;
+  main.querySelectorAll('input').forEach((inp) => {
+    const v = state.answers[inp.name];
+    inp.checked = Array.isArray(v) ? v.includes(inp.value) : v === inp.value;
+  });
+  main.querySelectorAll('textarea[name]').forEach((t) => { t.value = state.answers[t.name] || ''; });
+  const ct = document.getElementById('copy-text');
+  if (ct) ct.value = summaryText();
+  renderSteps();
+}
+function afterChange() {
+  const info = document.getElementById('fill-info'); if (info) info.textContent = fillInfo(state.page);
+}
+function go(i) { state.page = Math.max(0, Math.min(PAGES.length - 1, i)); saveLocal(); render(); window.scrollTo(0, 0); }
+function fillRec() {
+  const all = !!PAGES[state.page].review;
+  let n = 0;
+  (all ? allItems() : itemsOf(state.page)).forEach((it) => {
+    if (it.rec && !answered(it)) { state.answers[it.id] = Array.isArray(it.rec) ? it.rec.slice() : it.rec; n += 1; }
+  });
+  const y = window.scrollY;
+  persist(); render(); window.scrollTo(0, y);
+  const info = document.getElementById('fill-info');
+  if (info) info.textContent = (n ? `按建议填了 ${n} 项，随时能改。` : '没有可以按建议填的了。') + fillInfo(state.page);
+}
+
+main.addEventListener('change', (e) => {
+  const t = e.target; if (!t.name || t.tagName !== 'INPUT') return;
+  if (t.type === 'checkbox') {
+    const q = PAGES.flatMap((p) => p.items).find((x) => x.id === t.name);
+    let arr = Array.isArray(state.answers[t.name]) ? state.answers[t.name].slice() : [];
+    if (t.checked) {
+      if (q && q.max && arr.length >= q.max) {
+        t.checked = false;
+        const info = document.getElementById('fill-info');
+        if (info) info.textContent = `${t.name.toUpperCase()} 最多选 ${q.max} 个，先取消一个。`;
+        return;
+      }
+      arr.push(t.value);
+    } else arr = arr.filter((x) => x !== t.value);
+    state.answers[t.name] = arr;
+  } else state.answers[t.name] = t.value;
+  persist(); afterChange();
+});
+main.addEventListener('input', (e) => {
+  if (e.target.tagName === 'TEXTAREA' && e.target.name) { state.answers[e.target.name] = e.target.value; persist(); afterChange(); }
+});
+main.addEventListener('click', async (e) => {
+  const id = e.target.id;
+  if (id === 'next') go(state.page + 1);
+  if (id === 'prev') go(state.page - 1);
+  if (id === 'fill') fillRec();
+  if (e.target.classList.contains('go')) go(Number(e.target.dataset.page));
+  if (id === 'submit') {
+    state.submitted = true; state.submittedAt = new Date().toISOString();
+    persist(true); render();
+    const rb = document.getElementById('review-board'); if (rb) rb.scrollIntoView({ block: 'start' });
+  }
+  if (id === 'copy') {
+    const ta = document.getElementById('copy-text');
+    try { await navigator.clipboard.writeText(ta.value); e.target.textContent = '已复制'; }
+    catch (err) { ta.focus(); ta.select(); e.target.textContent = '请按 ⌘C 复制已选中的文字'; }
+  }
+});
+stepsEl.addEventListener('click', (e) => { const b = e.target.closest('.step'); if (b) go(Number(b.dataset.page)); });
+
+render();
+
+// ---------- 连接存储 ----------
+// 云端的运行时比页面脚本晚一点才把 window.claude 放上来：每 100ms 看一次，等满 10 秒还没有才算没有存储。
+async function connectDb() {
+  for (let i = 0; i < 100; i += 1) {
+    // 照字面写 window.claude.use(：本地 dw serve 看到这几个字才注入本地版存储
+    if (window.claude && typeof window.claude.use === 'function') { try { return await window.claude.use('db'); } catch (e) { return null; } }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
+}
+(async () => {
+  db = await connectDb();
+  if (!db) { dbState = 'none'; setSave('答案只存在这台设备上'); render(); return; }
+  dbState = 'ok';
+  try {
+    const snap = await db.doc(DOC).get();
+    if (snap.exists) {
+      const d = snap.data();
+      if (!state.updatedAt || (d.updatedAt && d.updatedAt > state.updatedAt)) {
+        state.answers = JSON.parse(JSON.stringify(d.answers || {}));
+        state.submitted = !!d.submitted; state.submittedAt = d.submittedAt || null; state.updatedAt = d.updatedAt || null;
+        saveLocal();
+      } else if (state.updatedAt && (!d.updatedAt || state.updatedAt > d.updatedAt)) writeDb();
+    } else if (Object.keys(state.answers).length) writeDb();
+    setSave('已连接 · 答案自动保存');
+  } catch (e) { setSave('暂时连不上存储，答案先存在这台设备上', true); }
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+})();
+</script>
+</body>
+</html>

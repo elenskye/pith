@@ -2,61 +2,72 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.0.1 做完（2026-11-25）
+## 现在：1.0.2 做完（2026-11-25）
 
-视觉方案 `pith` 1.0.1 同步进来、接上了变量、字、明暗和 App 图标。界面照新架构重做是 1.1.0 的事，开工前先合成 `0030`。
+界面照 Explore R1 重做了，调查、概念、排版进了对话，对话、角色、知识库真存（回答还是演示的）。代码和文档都精简过一遍。到 2.0.0 的规划问卷发在云端等你填。
 
-### 本轮：Pith 1.0.1（Atelier 不升版本，还是 1.0.1）
+### 本轮做了什么
 
-**Atelier**（提交 `e5f8fbd`，tag `pith-v1.0.1`）
+**1. 前端照 Explore R1**（`decisions/0031`）
 
-1. 两条新规矩（用户定）：
-   - 除非用户明确要求，画布和 Design System 不和云端同步（不拉回、不发回、不在云端新建或更新）：`CLAUDE.md`「画布与 bench」、`docs/cloud.md`、`skills/design-loop`。
-   - 只有本体（`bench/`、共用的 `tooling/`、`skills/`、`docs/`、根目录）的开发才升仓库的版本号；方案、画布这类平时的更新不升，只升方案自己的：`CLAUDE.md`「版本与 Git」。
-   - `ROADMAP.md`「已拍板的决定」记了；`build:ds` 和 bench 在「本地改了、云端没更新」时的提示跟着改了。
-2. **TopBar 第二个图看不到**：`marks/icons/lib.svg` 的叶书签一个元素有两个 `style`，单独打开就解析失败。在 `tooling/pith/build.mjs` 里并成一个；以后生成的 SVG 有重复的属性就直接报错（拿旧文件试过，抓得到）。
-3. **封面加叶子**：首页叶子的几何从画布挪进 `tooling/pith/glyphs.mjs`（`homeLeaf`），单独成一张 `marks/garden/leaf.svg`（新资产，几何就是你 11-24 验收的 EX11 首页那片，标成已批）；画布 R1 改成从这里取，6 张板逐字节不变。Design System 的 Cover：叶柄从「Pith」字标右上角长出去，主脉横过封面，副标题在句号处换行。
-4. 方案 `pith` 1.0.0 → **1.0.1**；`DESIGN.md` 加第 9 节「在 Pith 里怎么接」（shadcn ↔ `--color-*` 的对照）、第 8 节加一条待确认（要不要危险色）；`sync.json` 加上叶子；`CHANGELOG.md`、`ROADMAP.md`、`docs/adoption.md` 跟着改。
-5. 云端的 Design System **没更新**（新规矩），还是 1.0.0：TopBar 那张图在云端照旧看不到。
+- 外框：顶栏（会长的 Logo + 知识库、文献库、设置三个图标，悬停各自长出来）、⌘K、⌘\ 或两指往右滑叫出对话历史的枝桠、⌘N。标题栏藏到顶栏下面（`titleBarStyle: Overlay`），顶栏能拖窗口；阅读器的工具栏让出了红绿灯。
+- 对话：叶子首页（问候、叶子长出来、五颗芽是最近照料的材料）、输入框（`/` 技能、`@` 角色、`#` 知识库）、一段对话（状态行、编号点开页边注、反问、交付卡「存进」→ 种子飞到知识库图标、+1）。
+- 技能进对话（你在 ASK 选的）：`/调查` 先给一张问题卡，确认后原来的调查流程在对话里跑；`/概念` 是书架 → 书 → 章 → 研究，左边是书的目录；`/排版` 是规范和排过的。旧流程的逻辑没改；三个旧页面和侧栏删了。以前的调查、研究在对话历史里照样列着。
+- 知识库：一排知识库、卡片墙（十种记录各一种样子，标题字重跟着生长阶段）、右边的面板（编辑、换阶段、打开原处、拿掉）、「种进来」（解析好的书、做完的调查、概念研究的卡片，或者自己写笔记、摘抄）。
+- 文献库：页头、范围、表格（书脊色块、衬线题名）、右边滑出的面板（阅读、编辑元信息、附件……原来的详情全在）；原来左边那一栏收进「集合与标签」下拉；导入在页头。
+- 设置：常驻的枝桠，七页（角色、技能、知识库与检索、模型与费用、Word 与引文、数据、外观）。原来八页的内容分进去；角色（看、改、新建、改回默认）、知识库管理、外观（两块色板 + 明暗，换配色有湖面波纹）是新的。
+- 样式：`src/styles/app.css`（版面，跟着窗口伸缩）+ 同步来的 `bundle.css`；图形只从 `shared/marks.tsx` 取。
 
-**Pith**
+**2. 后端：框架和模拟接口**（你在 ASK 选了「真存储」）
 
-1. 照你这次说的，`pith-v1.0.1` 同步进 `src/vendor/pith/`（`npm run sync -- --scheme pith --to pith --tag pith-v1.0.1`，`--check` 一致）。
-2. `src/index.css`：先引 `vendor/pith/pith.css`，shadcn 变量全指到 `--color-*`（对照在 `vendor/pith/DESIGN.md` 第 9 节）。注意 shadcn 的 `accent` 是淡底，Pith 的 `--color-accent` 是海蓝，`@theme inline` 让两边不打架。界面字号 13 → 13.5（`--text-ui`）。
-3. 字：新依赖 `@fontsource/lato`、`@fontsource-variable/newsreader`（OFL，登记在 `THIRD_PARTY.md`），`src/fonts.css` 把 Newsreader 登记成 pith.css 认的名字；中文还是系统字体。
-4. 明暗：`src/shared/theme.ts` 跟着系统写根上的 `data-theme`，Tailwind 的 `dark:` 也改成看它。
-5. App 图标换成蕨芽：`scripts/app-icon.sh`（`pnpm app:icon`）把同步来的 1024 图缩到 macOS 图标网格（主体 824/1024，四周透明）再 `tauri icon`。
-6. 版本 1.0.0 → 1.0.1（`package.json`、`Cargo.toml`、`tauri.conf.json`、`Cargo.lock`）。`.claude/launch.json` 加了 `web-mock-alt`（端口 1432）：1430 常被 Peck 的开发服务器占着。
-7. 文档：`CLAUDE.md` 规则 9「现在」、`ROADMAP.md`（现在、已完成、验收清单）、`docs/architecture.md`、`THIRD_PARTY.md`。
+- 冻结了 v9 样本库（`src-tauri/fixtures/library-v9.json`），migration `0010_chat.sql`：对话、消息、角色、知识库、材料五张表，只建表。
+- `src-tauri/src/chat/`：存取、20 个命令（`chat_*`、`role_*`、`kb_*`）、模拟的回答（照真回答的形状：状态行、段落、编号指向知识库里真的材料、交付卡，标「演示回答」）。内置四个角色在代码里。
+- `?mock` 的假后端 `src/dev/mockChat.ts`，内容照 R1（四个知识库、十种记录、读《国富论》那段对话）。
+
+**3. 代码精简**
+
+- 删了没人用的：`Rail.tsx`、`ResearchSidebar.tsx`、`ResearchPage.tsx`（调查的问题列表）、四个前端不再调的命令（`agent_key_set`、`agent_key_clear`、`research_question_get`、`concept_index_status`）和几个没人用的导出。现在前端调的命令和 Rust 注册的一一对应。
+- 颜色：Tailwind 的琥珀、翠绿、蓝、紫、黄全部换成从方案混出来的几种语气（`bg-warn`、`text-ok`、概念研究四类句子的 `cat-*`……），组件里没有写死的颜色了。
+
+**4. 文档精简**
+
+- 合成 `decisions/0030`（新架构，取代 `0028`，以 Atelier 那份交接为主）；新开 `0031`（1.0.2 的做法）；`decisions/README.md` 是索引，标了哪些现行、哪些被取代。
+- 删了 `docs/atelier-handoff-2026-11-22.md`、`feasibility.md`、`open-source-evaluation.md`、`brief-digest.md`（还管用的原则、学术研究、自我改进并进了 `requirements.md`）。
+- `requirements.md` 重写（只留还管用的，不再重复 CLAUDE.md 的协作规矩）；`README.md` 加「文档分工」；`ROADMAP.md` 改成「现在 → 到 2.0.0 → 做完的 → 验收清单」；`architecture.md`、`schema.md`、`testing.md` 跟着代码改；`CLAUDE.md`：规则 3（你只定范围和顺序、不每轮出问卷）、规则 4（「程序不限制模型」换掉「确定性工具验证」）、规则 9 的状态挪走。
+- 文档少了约 340 行（-635 / +293）。
+
+**5. 规划问卷**：`docs/questionnaire/v2-plan.html`，发在云端 https://claude.ai/artifact/HG1MF86byAvZQZVTojni68 ，五页（顺序、1.1.0、开发、设计、用途），能一键按建议填。说明在 `docs/questionnaire/README.md`。
 
 ### 测试
 
-- Pith：`pnpm check` 全过：`pith` 281 通过、25 项默认忽略，其余 crate 全过，前端 17 + 29 通过。
-- 浏览器 `?mock`（1440 宽，亮、暗都看了）：变量、Lato、明暗跟系统切换都对；文献库、详情、调查页的颜色正常。
-- Atelier：`node tooling/pith/build.mjs --check`（37 个资产）；`npm run qa -- --scheme pith` 163 项全过；`check:ds` 12 个预览明暗都过，封面看过截图；`dw check pith-explore` 6 张全过；`check:canvases` 一致；`npm test` 37/37。没跑 `npm run all`、`build:motion`（动效没改）。
+- `pnpm check` 全过：`pith` 288 通过、25 项默认忽略（新的 7 个 `chat::` 测试；升级、导出恢复都带上了五张新表），其余 crate 全过，前端 17 + 29。
+- 浏览器 `?mock`（1280 × 800，亮、暗）走了一遍：首页叶子和芽、⌘\ 枝桠、打开对话看状态行和页边注、存卡（种子 + 已种下）、知识库卡片墙、文献库表格和面板、设置角色和外观（换雾与赭有湖面）、`/调查` 走到计划页、`/概念` 打开书架。
+- 问卷：本地看过每页的样子，云端发了、声明了存储，`db_get` 读得到（现在是空的）。
+
+### 提交
+
+- `e0fef91 v1.0.2: rebuild ui as explore r1, add chat and knowledge base`
+- `4f1c546 v1.0.2: remove dead code, move colors to scheme`
+- `78afa44 v1.0.2: streamline docs`
+- 最后一个提交是问卷和这份 HANDOFF（见 `git log`）。正式版装了 1.0.2。
 
 ## 等你
 
-1. **推送**：Pith `main`；Atelier `main` 和 tag（`pith-v1.0.1` 是新的，之前的几个也还没推）：
-   `git -C ~/Documents/GitHub/visual-atelier push && git -C ~/Documents/GitHub/visual-atelier push --tags`
-2. **看新样子**：`ROADMAP.md`「用户验收清单」1.0.1 的两条（正式版的配色、字、图标；bench 里的 Design System 封面和 TopBar）。
-3. 云端的 Design System 要不要按 1.0.1 重发（新规矩下没让就不动）；Peck 的 Design System 要不要按 1.0.0 重发（共享给了组织外的人）。
-4. **正式版**：第一次打开会先备份、把数据升到 v9（以前 0.4.1 就该做的）；之后 Word 模板点「更新」，两本《国富论》各「重新解析」一次。
-5. **摘抄、笔记的导出文件夹**（1.1.0 做导入时要）：Flomo、Obsidian 导出的 Markdown，放到 `local/` 下，我只读副本。
+1. **填规划问卷**：https://claude.ai/artifact/HG1MF86byAvZQZVTojni68 。填完说一声，我读回答案，写进 `ROADMAP.md` 和决策，再写 1.1.0 的计划开工。
+2. **推送**：Pith `main`；Atelier 上一轮的 `main` 和 tag 如果还没推，一起推。
+3. **看新样子**：`ROADMAP.md`「用户验收清单」1.0.2 的三条。正式版第一次打开会先备份、把数据升到 v10。
+4. 之前留下的：Peck 的 Design System 云端要不要重发；Flomo、Obsidian 的导出（等问卷定了哪一版做导入）。
 
 ## 已知的、没做的
 
-- **文献库表格窄了标题列会塌**：窗口宽度在 1100 以下（最小 960）时标题列被挤没，作者压在图标上。以前就这样（换回旧字体量过，列宽一样），不是这轮改的。
-- 琥珀、翠绿这些提示、完成的颜色还是 Tailwind 的色板（约 90 处），等 1.1.0 照 Pith 重做界面时一起换。
-- `destructive` 借了 `color-second`（纸与海是绯红）；要不要一个危险色，记在方案 `DESIGN.md` 第 8 节。
-- 中文字体先用系统的（宋体、苹方）；要不要随 App 带 Noto Serif SC、Noto Sans SC 待定（`DESIGN.md` 第 8 节）。
-- 首页叶子打开时的生长动画还没做成方案的动效零件（现在只在画布 R1 里），做 1.1.0 首页时再做。
-- 文档里引用的旧提交号、第五轮问卷的偏好只在旧 `.git` 备份里（11-24 重建 Git）。
-- 11-15 那四个修复留下的没做的照旧（`decisions/0025`）。
+- 回答是演示的，问题本身没被回答（1.1.0 接 Agent 循环）。接着问一段调查、研究，也是演示回答。
+- 技能里面那几页（调查的计划和结果、概念卡和关系图、排版规则）还是旧的小字，只换了配色；问卷里问了什么时候照 R1 重画。
+- 文献库窗口窄（1100 以下）时标题列会塌，以前就有。
+- **Atelier 那边要改的**（下次动方案时做，要发版、再同步）：`pith.css` 的默认配色只写在 `:root` 上，没有元素级的块——外观页的色板预览现在从 `pith.css` 里读值绕过去了；`DESIGN.md` 第 1 节还指着已删的 `atelier-handoff`，改成 `decisions/0030`。
+- 知识库的材料先一库一份；共享、段落块、检索在 1.1.0。
+- 角色的「偏好模型」「默认知识库」现在只是记下来，回答还用不上。
 
 ## 下一轮
 
-- **先问开发程度**（`CLAUDE.md` 规则 7）。
-- 先把 `docs/atelier-handoff-2026-11-22.md` 和 `0028` 合成 `decisions/0030`，改 `CLAUDE.md` 规则 4、`requirements.md`、`ROADMAP.md`，删掉搬来的那份。
-- 再写 1.1.0 的计划（新的决策文件、`ROADMAP.md` 分 Phase），版本号改 1.1.0，加 migration 0010 前先冻结 v9 样本库。大致顺序（待计划确认）：模型接口抽象 → Agent 循环和子任务 → 技能运行时 → 对话页和研究主题（首页的叶子、顶栏三个图标用 `vendor/pith/marks/`）→ 知识库 → 旧功能改成技能 → Word 润色。
-- 界面只用 shadcn 变量和 `vendor/pith/bundle.css` 的 `pith-` 类；方案要改回 Atelier 改、发版、再同步。
+- 读回问卷答案（`db_get` `survey/answers` 的 `summary`），写进 `ROADMAP.md`「到 2.0.0」和一份新决策（0032），`CLAUDE.md` 照「开发」那页改。
+- 1.1.0 照问卷定的开工（升版本号、分 Phase；加 migration 前冻结 v10 样本库）。如果是「真对话」：模型接口抽象和账本 → Agent 循环和工具 → 知识库检索（段落块、本机向量、v0.4 的书迁进来）→ 对话接真回答 → 真实验收。
