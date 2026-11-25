@@ -25,7 +25,7 @@ pith/
 │   │                           Transfer、WordSettings、CiteSettings、KeysSettings、ResearchSettings、ConceptSettings、AgentSettings
 │   ├── shared/                 ipc.ts（带类型的 api 对象，唯一的 invoke 入口）、ui.tsx（弹窗、右键菜单、提示条、就地编辑、标签输入）、
 │   │                           controls.tsx（下拉框 Select、弹出列表 Menu、退场 usePresence、横排滚轮 useWheelX；不用系统的 <select>）、
-│   │                           marks.tsx（内联 vendor/pith/marks 的图形）、theme.ts（配色和明暗，记在 localStorage；换的时候用 View Transitions 洇开）、plainInputs.ts
+│   │                           marks.tsx（内联 vendor/pith/marks 的图形）、masonry.ts（知识库的瀑布流：绝对定位，宽变了卡片滑过去，不用 CSS 多栏）、theme.ts（配色和明暗，记在 localStorage；换的时候用 View Transitions 洇开）、plainInputs.ts
 │   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
 │   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、
 │   │                           mockResearch / mockConcept / mockAgent（三个技能，数据由各自的引擎生成）；perfProbe（?perf 量换配色的帧）

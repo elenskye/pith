@@ -220,7 +220,9 @@
 .br-empty { position: absolute; left: 100px; top: 96px; width: 220px; font: 400 14.5px/1.6 var(--font-serif); color: var(--color-text-3); }
 
 /* ---------- 知识库、文献库、设置：一页的头 ---------- */
-.page { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 34px var(--gutter) 0; transition: padding-right .5s var(--out); }
+.page { --page-pr: var(--gutter); position: absolute; inset: 0; display: flex; flex-direction: column; padding: 34px var(--page-pr) 0 var(--gutter); transition: padding-right .5s var(--out); }
+/* 内容最后有多宽：面板滑出来时 padding 慢慢变，这把尺一下就到最后的宽（--page-pr 不过渡），瀑布流按它排一次就滑过去，不跟着一帧帧重排 */
+.page-ruler { position: absolute; left: var(--gutter); right: calc(var(--page-pr) + 6px); top: 0; height: 0; visibility: hidden; pointer-events: none; }
 .page-count { font: 400 15px/1 var(--font-serif); color: var(--color-accent-text); }
 .page-h1 { margin-top: 10px; font: 600 clamp(40px, 4.4vw, 58px)/1.08 var(--font-serif); letter-spacing: -.015em; }
 .page-line { margin-top: 6px; font: 300 19px/1.4 var(--font-serif); color: var(--color-text-3); }
@@ -239,8 +241,11 @@
 .empty .empty-sub { margin-top: 4px; font-size: 14.5px; color: var(--color-text-4); }
 
 /* ---------- 知识库：卡片墙，十种记录各一种样子 ---------- */
-.wall { columns: 4 240px; column-gap: 18px; }
-.kc { position: relative; display: block; width: 100%; break-inside: avoid; margin-bottom: 16px; border-radius: var(--radius-m); text-align: left; animation: kc-up .6s var(--out) both; animation-delay: calc(var(--i, 0) * 50ms); transition: transform .3s var(--out), box-shadow .3s; }
+/* 瀑布流由 shared/masonry 排：卡片绝对定位，宽、位置写在行内；面板滑出来时卡片从原处滑到新位置，滑的时候不响应悬停 */
+.wall { position: relative; }
+.page-body:has(> .wall) { overflow-x: hidden; }
+.kc { position: absolute; left: 0; top: 0; display: block; border-radius: var(--radius-m); text-align: left; animation: kc-up .6s var(--out) backwards; animation-delay: calc(var(--i, 0) * 50ms); transition: transform .3s var(--out), box-shadow .3s; }
+.wall.is-moving .kc { pointer-events: none; }
 @keyframes kc-up { from { opacity: 0; transform: translateY(14px); } }
 .kc:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
 .kc.is-on { box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-lg); }
@@ -277,14 +282,12 @@
 .t-report .ev { display: flex; gap: 4px; margin-top: 10px; }
 .t-report .ev i { flex: 1; height: 4px; border-radius: 2px; background: var(--color-accent); }
 .t-report .ev i:last-child { background: var(--color-line-2); }
-.t-wonder .art { position: relative; display: block; height: 150px; border-radius: var(--radius-m) var(--radius-m) 0 0; background: var(--color-app-ink); overflow: hidden; }
-.t-wonder .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.t-wonder .art rect { fill: var(--color-gold); }
+.t-wonder .plot { position: relative; display: block; height: 150px; border-radius: var(--radius-m) var(--radius-m) 0 0; background: var(--color-app-ink); overflow: hidden; }
+.t-wonder .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.t-wonder .plot rect { fill: var(--color-gold); }
 .t-answer .q { display: block; margin-top: 8px; font: 700 12px/1.4 var(--font-sans); color: var(--color-text-2); }
 .t-answer .q::before { content: "问 "; color: var(--color-second); }
 .t-answer .an { display: block; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--color-line-2); font: 400 15px/1.6 var(--font-serif); color: var(--color-text); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
-.kc.fresh { animation: sprout .9s var(--spring) both; }
-@keyframes sprout { from { opacity: 0; transform: translateY(16px) scale(.94); } }
 
 /* ---------- 右边滑出来的面板：知识库的材料、文献库的一条 ---------- */
 .panel { position: absolute; right: 0; top: 0; bottom: 0; z-index: 18; width: min(460px, 46vw); padding: 30px 34px 40px; overflow-y: auto; background: var(--color-raised); box-shadow: var(--shadow-lg); transform: translateX(105%); visibility: hidden; transition: transform .5s var(--out), visibility 0s .5s; scrollbar-width: none; }
@@ -306,7 +309,7 @@
 .kb-stage .stg { width: 15px; height: 15px; align-self: center; }
 .kb-stage:disabled { opacity: .4; }
 .kb-stage:disabled:hover { background: none; color: var(--color-text-3); }
-.has-panel .page { padding-right: calc(min(460px, 46vw) + 24px); }
+.has-panel .page { --page-pr: calc(min(460px, 46vw) + 24px); }
 .seg { display: inline-flex; padding: 3px; border-radius: var(--radius-pill); background: var(--color-tint); }
 .seg button { height: 30px; padding: 0 14px; border-radius: var(--radius-pill); font: 400 13px/1 var(--font-sans); color: var(--color-text-2); transition: background .25s, color .25s, box-shadow .25s; }
 .seg button.is-on { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-sm); font-weight: 700; }

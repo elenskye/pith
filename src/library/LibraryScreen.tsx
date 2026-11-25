@@ -11,7 +11,7 @@ import { DetailPane } from "@/library/ItemDetail";
 import { Collections } from "@/library/Collections";
 import { TagTree } from "@/library/TagTree";
 import { ITEM_TYPE_OPTIONS, itemTypeLabel } from "@/library/labels";
-import { scopeKey, type Scope } from "@/library/scope";
+import type { Scope } from "@/library/scope";
 import { LookupStatus } from "@/metadata/LookupStatus";
 import { useStoredState } from "@/shared/ui";
 import { Mark } from "@/shared/marks";
@@ -160,7 +160,6 @@ export function LibraryScreen({ request, onDone }: { request: LibRequest | null;
       <TagTree open={nav.tags} tags={tags} onTags={setTags} />
       <main ref={pageRef} className="page lib-page page-enter" data-w={w}>
         <ItemList
-          key={scopeKey(scope)}
           scope={scope}
           tags={tags}
           q={q}

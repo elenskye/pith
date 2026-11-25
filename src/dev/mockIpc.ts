@@ -73,6 +73,7 @@ const notes: MNote[] = [
 const colls: MColl[] = [
   { id: 1, parentId: null, name: "毕业论文", createdAt: t("2026-10-01"), deletedAt: null },
   { id: 2, parentId: 1, name: "文献综述", createdAt: t("2026-10-01"), deletedAt: null },
+  { id: 4, parentId: 1, name: "理论框架", createdAt: t("2026-10-01"), deletedAt: null },
   { id: 3, parentId: null, name: "方法论", createdAt: t("2026-10-01"), deletedAt: null },
   { id: 9, parentId: null, name: "已删除的集合", createdAt: t("2026-10-01"), deletedAt: t("2026-11-05") },
 ];

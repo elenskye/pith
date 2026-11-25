@@ -5,7 +5,7 @@ import { api, type ListQuery, type ListRow, type RowKind, type Target } from "@/
 import { childrenMap, useMutate, useUi } from "@/shared/ui";
 import { useRead } from "@/reader/useRead";
 import { useMetadata } from "@/metadata/MetadataProvider";
-import type { Scope } from "./scope";
+import { scopeKey, type Scope } from "./scope";
 import { DELETE_FOREVER_NOTE, NEW_ITEM_TYPES, contentTypeLabel, creatorsSummary, formatTime, itemTypeLabel } from "./labels";
 
 export type Selection = { kind: RowKind; id: number };
@@ -33,7 +33,7 @@ function toQueryScope(s: Scope, includeChildren: boolean): ListQuery["scope"] {
   return s.kind === "collection" ? { kind: "collection", id: s.id, includeChildren } : { kind: s.kind };
 }
 
-/** 中间的列表。切换范围时由外层用 key 重建，搜索词、筛选、排序随之清空。 */
+/** 中间的列表。切换范围时排序、Shift 选的起点清空，表格回到顶上；不整个重建（页头下面的两栏也在这里，重建会让集合的枝桠再长一遍）。 */
 export function ItemList({ scope, tags, q, itemType, includeChildren, onShowSubcollections, selection, onSelection, onImport, bars, status }: Props) {
   const ui = useUi();
   const mutate = useMutate();
@@ -42,6 +42,16 @@ export function ItemList({ scope, tags, q, itemType, includeChildren, onShowSubc
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
   const anchor = useRef<number | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const sk = scopeKey(scope);
+  const [shownScope, setShownScope] = useState(sk);
+  if (sk !== shownScope) {
+    setShownScope(sk);
+    setSort(null);
+  }
+  useEffect(() => {
+    anchor.current = null;
+    tableRef.current?.scrollTo({ top: 0 });
+  }, [sk]);
 
   const query: ListQuery = { scope: toQueryScope(scope, includeChildren), q, tags, itemType: itemType || null, sort: sort?.key ?? null, desc: sort?.desc ?? false };
   const items = useQuery({ queryKey: ["items", query], queryFn: () => api.itemsList(query), placeholderData: (prev) => prev });

@@ -186,7 +186,7 @@ pub fn add_message(c: &Connection, uid: &str, author: &str, body: &Value, now: &
         params![id, author, body.to_string(), now],
     )
     .map_err(err)?;
-    // 对话越常被照料长得越好：三问以上「长着」，十问以上「常青」
+    // 对话越常被照料长得越好：三问以上「生长」，十问以上「常青」
     c.execute(
         "UPDATE conversations SET updated_at = ?2,
            stage = (SELECT CASE WHEN n >= 20 THEN 2 WHEN n >= 6 THEN 1 ELSE 0 END FROM (SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ?1))

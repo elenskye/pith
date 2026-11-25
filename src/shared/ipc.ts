@@ -1394,7 +1394,7 @@ export type ChatSummary = {
   role: string;
   skill: SkillId | null;
   refUid: string | null;
-  /** 生长阶段：0 刚种下、1 长着、2 常青 */
+  /** 生长阶段：0 发芽、1 生长、2 常青 */
   stage: number;
   createdAt: string;
   updatedAt: string;

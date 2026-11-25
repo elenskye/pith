@@ -18,7 +18,7 @@ export function Mark({ path, className, svgClass, style }: { path: string; class
 }
 
 const STAGES = ["seed", "sprout", "evergreen"];
-export const STAGE_NAMES = ["刚种下", "长着", "常青"];
+export const STAGE_NAMES = ["发芽", "生长", "常青"];
 
 /** 生长阶段：种子 → 四瓣 → 八瓣 */
 export function Stage({ stage, className }: { stage: number; className?: string }) {

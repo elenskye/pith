@@ -1,5 +1,5 @@
 // 知识库（R1，1.0.3 借文献库的两栏）：第一栏左边是一排知识库，右边是种类和搜索；第二栏是生长阶段；
-// 下面是卡片墙，十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
+// 下面是卡片墙（瀑布流，shared/masonry），十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
 // 点一张卡，右边滑出面板：正文、从哪来、在哪个库，能改、能照料（换阶段）、能打开原处。
 // 「种进来」：解析好的书（全文）、做完的调查（调查报告）、概念研究的卡片（概念卡），或者自己写一条笔记、记一条摘抄。
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import { api, type KnowledgeBase, type Material, type MaterialKind } from "@/shared/ipc";
 import { Modal, useUi } from "@/shared/ui";
 import { Select, useWheelX } from "@/shared/controls";
+import { useMasonry } from "@/shared/masonry";
 import { KindIcon, KIND_NAMES, Mark, Stage, STAGE_NAMES } from "@/shared/marks";
 import { useNav, dateOf } from "@/app/nav";
 
@@ -40,6 +41,9 @@ export function KnowledgePage() {
   const term = q.trim().toLowerCase();
   const shown = all.filter((m) => (!kind || m.kind === kind) && (stage < 0 || m.stage === stage) && (!term || `${m.title} ${m.body} ${m.sub}`.toLowerCase().includes(term)));
   const kinds = (Object.keys(KIND_NAMES) as MaterialKind[]).filter((k) => all.some((m) => m.kind === k));
+  const wallRef = useRef<HTMLDivElement>(null);
+  const rulerRef = useRef<HTMLElement>(null);
+  useMasonry(wallRef, shown.map((m) => m.uid).join(","), rulerRef);
 
   const create = async () => {
     const name = await ui.prompt({ title: "新建知识库", label: "名字", placeholder: "例如：读《国富论》、毕业论文", confirm: "建好" });
@@ -56,6 +60,7 @@ export function KnowledgePage() {
   return (
     <div className={current ? "has-panel" : ""}>
       <main className="page page-enter">
+        <i className="page-ruler" ref={rulerRef} aria-hidden="true" />
         <p className="page-count num">{sel ? (shown.length === all.length ? `${sel.count} 份` : `${shown.length} / ${all.length} 份`) : " "}</p>
         <div className="lib-head">
           <h1 className="page-h1 truncate">{sel?.name ?? "知识库"}</h1>
@@ -142,7 +147,7 @@ export function KnowledgePage() {
               <p className="empty-sub">换个搜索词，或者去掉种类、阶段的筛选。</p>
             </div>
           ) : (
-            <div className="wall">
+            <div className="wall" ref={wallRef}>
               {shown.map((m, i) => (
                 <Card key={m.uid} m={m} i={i} on={m.uid === open} onClick={() => setOpen(m.uid === open ? null : m.uid)} />
               ))}
@@ -284,7 +289,7 @@ function Card({ m, i, on, onClick }: { m: Material; i: number; on: boolean; onCl
     case "wonder":
       inner = (
         <>
-          <span className="art">
+          <span className="plot">
             <svg viewBox="0 0 240 150" aria-hidden="true">
               {Array.from({ length: 10 }, (_, c) => (
                 <rect key={c} x={18 + c * 21} y={118 - (c + 1) * 9} width={7} height={(c + 1) * 9} rx={2} />
