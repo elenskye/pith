@@ -1,9 +1,11 @@
-// 文献库的第二栏：集合，一栏左右滑的（pith-strip）。有子集合的点开，子集合接在它后面、从一根小枝上长出来；
-// 选中的那条一路展开。右键：新建子集合、改名、移动、移到回收站；最后一个是「＋ 集合」。
+// 文献库的第二栏：集合，一栏左右滑的（pith-strip）。有子集合的点开，长出一小段枝桠：从它身上分出一根带叶的岔、
+// 底下一根茎，每个子集合下面一颗节点，茎的尽头一个芽（pith-strip-sub）；选中的那条一路展开。
+// 右键：新建子集合、改名、移动、移到回收站；最后一个是「＋ 集合」。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type CollectionNode } from "@/shared/ipc";
 import { childrenMap, useMutate, useUi } from "@/shared/ui";
+import { useWheelX } from "@/shared/controls";
 import type { Scope } from "./scope";
 
 export function Collections({ scope, onScope, extra }: { scope: Scope; onScope: (s: Scope) => void; extra?: React.ReactNode }) {
@@ -25,18 +27,7 @@ export function Collections({ scope, onScope, extra }: { scope: Scope; onScope: 
     setOpen((o) => new Set([...o, ...up]));
   }, [active, byId]);
 
-  // 鼠标滚轮竖着滚也能左右走（触控板两指横滑本来就行）
-  useEffect(() => {
-    const el = strip.current;
-    if (!el) return;
-    const wheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener("wheel", wheel, { passive: false });
-    return () => el.removeEventListener("wheel", wheel);
-  }, []);
+  useWheelX(strip);
   useEffect(() => {
     strip.current?.querySelector(".is-on")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
   }, [active, open]);
@@ -77,13 +68,14 @@ export function Collections({ scope, onScope, extra }: { scope: Scope; onScope: 
     ]);
 
   const render = (parent: number | null, depth: number): React.ReactNode[] =>
-    (kids.get(parent) ?? []).flatMap((n) => {
+    (kids.get(parent) ?? []).flatMap((n, i) => {
       const sub = kids.get(n.id);
       const isOpen = !!sub && open.has(n.id);
       const out: React.ReactNode[] = [
         <button
           key={n.id}
-          className={`pith-strip-item ${depth > 0 ? "is-sub" : ""} ${active === n.id ? "is-on" : ""} ${sub ? "has-kids" : ""} ${isOpen ? "is-open" : ""}`}
+          style={depth > 0 ? ({ "--i": i } as React.CSSProperties) : undefined}
+          className={`pith-strip-item pith-ink ${depth > 0 ? "is-sub" : ""} ${active === n.id ? "is-on" : ""} ${sub ? "has-kids" : ""} ${isOpen ? "is-open" : ""}`}
           onClick={() => {
             if (active === n.id && sub) setOpen((o) => (o.has(n.id) ? new Set([...o].filter((x) => x !== n.id)) : new Set([...o, n.id])));
             else onScope({ kind: "collection", id: n.id, name: n.name });
@@ -91,15 +83,21 @@ export function Collections({ scope, onScope, extra }: { scope: Scope; onScope: 
           onContextMenu={(e) => menu(e, n)}
           title={sub ? `${n.name}（再点一下${isOpen ? "收起" : "展开"}子集合）` : n.name}
         >
+          {depth > 0 && <i className="pith-strip-node" aria-hidden="true" />}
           {n.name}
           {n.itemCount > 0 && <em className="num">{n.itemCount}</em>}
         </button>,
       ];
       if (isOpen)
         out.push(
-          <span key={`t${n.id}`} className="pith-strip-twig" aria-hidden="true" />,
-          ...render(n.id, depth + 1),
-          <span key={`e${n.id}`} className="pith-strip-end" aria-hidden="true" />,
+          <span key={`s${n.id}`} className="pith-strip-sub" style={{ "--n": sub.length } as React.CSSProperties}>
+            <svg className="pith-strip-fork" viewBox="0 0 24 36" aria-hidden="true">
+              <path className="st" pathLength={1} d="M0 18C7.5 18 9 31.4 24 31.4" />
+              <path className="lf" d="M9.4 25.2C8.2 20.6 10.6 17.6 15 16.6C15.8 20.8 13.8 24.2 9.4 25.2Z" />
+            </svg>
+            {render(n.id, depth + 1)}
+            <i className="pith-strip-bud" aria-hidden="true" />
+          </span>,
         );
       return out;
     });
@@ -109,7 +107,7 @@ export function Collections({ scope, onScope, extra }: { scope: Scope; onScope: 
       <div ref={strip} className="pith-strip" role="toolbar" aria-label="集合">
         {nodes.length === 0 && list.data && <span className="pith-strip-empty">还没有集合</span>}
         {render(null, 0)}
-        <button className="pith-strip-item is-add" onClick={() => create(null)} title="新建集合">
+        <button className="pith-strip-item pith-ink is-add" onClick={() => create(null)} title="新建集合">
           ＋ 集合
         </button>
       </div>

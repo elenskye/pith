@@ -21,6 +21,7 @@ mod protocol;
 mod reader;
 mod research;
 mod search;
+mod snapshot;
 mod store;
 mod text;
 mod transfer;
@@ -694,6 +695,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_info,
+            snapshot::app_snapshot,
             app_reveal_data_dir,
             library_overview,
             items_list,

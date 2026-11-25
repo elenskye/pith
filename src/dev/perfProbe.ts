@@ -25,8 +25,10 @@ function clickAt(el: Element) {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: r.left + 40, clientY: r.top + 12 }));
 }
 
-export async function runPerfProbe() {
-  const variants = (new URLSearchParams(location.search).get("perf") || "small,big").split(",");
+const post = (body: string) => fetch("http://127.0.0.1:7788/", { method: "POST", body }).catch(() => {});
+
+export async function runPerfProbe(fromEnv?: string) {
+  const variants = (new URLSearchParams(location.search).get("perf") || fromEnv || "small,big").split(",");
   await wait(4000);
   const out: unknown[] = [{ viewTransitions: "startViewTransition" in document, w: innerWidth, h: innerHeight, dpr: devicePixelRatio }];
   for (const v of variants) {
@@ -35,9 +37,17 @@ export async function runPerfProbe() {
     ([...document.querySelectorAll(".br-st")].find((b) => b.textContent?.includes("外观")) as HTMLElement)?.click();
     await wait(1500);
     const card = () => [...document.querySelectorAll(".pal-card")].find((c) => !c.classList.contains("is-on"))!;
-    const look1 = await frames(() => clickAt(card()));
-    await wait(800);
-    const look2 = await frames(() => clickAt(card()));
+    await post("go look1");
+    await wait(300);
+    const look1 = { ...(await frames(() => clickAt(card()))), water: (window as unknown as { __water?: unknown }).__water };
+    await wait(1500);
+    await post("go look2");
+    await wait(300);
+    const look2 = { ...(await frames(() => clickAt(card()))), water: (window as unknown as { __water?: unknown }).__water };
+    if (v === "water") {
+      out.push({ v, look1, look2 });
+      continue;
+    }
     (document.querySelector('[aria-label="文献库"]') as HTMLElement).click();
     await wait(2000);
     if (v === "big") {
@@ -54,6 +64,6 @@ export async function runPerfProbe() {
     out.push({ v, look1, look2, lib });
   }
   const body = JSON.stringify(out);
-  await fetch("http://127.0.0.1:7788/", { method: "POST", body }).catch(() => {});
+  await post(body);
   (window as unknown as { webkit?: { messageHandlers?: { done?: { postMessage: (b: string) => void } } } }).webkit?.messageHandlers?.done?.postMessage(body);
 }

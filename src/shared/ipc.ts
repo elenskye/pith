@@ -1479,6 +1479,8 @@ export const api = {
   /** 能种进知识库的：解析好的书、做完的调查、概念研究的卡片 */
   kbCandidates: () => invoke<Material[]>("kb_candidates"),
   appInfo: () => invoke<AppInfo>("app_info"),
+  /** 网页当前样子的截图（换配色的水面扭曲用）：前 12 字节是宽、高、像素排法（u32 小端），后面是像素；只在 macOS 的 App 里有 */
+  appSnapshot: () => invoke<ArrayBuffer>("app_snapshot"),
   revealDataDir: () => invoke<void>("app_reveal_data_dir"),
   overview: () => invoke<Overview>("library_overview"),
   itemsList: (query: ListQuery) => invoke<ListRow[]>("items_list", { query }),

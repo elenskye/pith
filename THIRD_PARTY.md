@@ -17,6 +17,8 @@
 | sha2 / md-5 | 0.11.1 / 0.11.0 | MIT OR Apache-2.0 | 附件复制进文件库时边写边算 SHA-256 / MD5（Phase 2） | https://github.com/RustCrypto/hashes |
 | ureq（features: native-tls、gzip） | 3.5.1 | MIT OR Apache-2.0 | 联网补全的 HTTP 请求（Phase 5，`decisions/0012`）；v0.2 W3 起也用来调用 Anthropic 的 Messages API（流式，`decisions/0018`） | https://github.com/algesten/ureq |
 | security-framework | 3.7.0 | MIT OR Apache-2.0 | 正式版把 Anthropic API 密钥存进 macOS 钥匙串（v0.2 W3，`decisions/0018`；此前已是 native-tls 的间接依赖） | https://github.com/kornelski/rust-security-framework |
+| objc2 / block2 / objc2-foundation | 0.6.5 / 0.6.2 / 0.3.2 | MIT | 换配色的水面：调 WKWebView 的 `takeSnapshot`（1.0.4，`decisions/0033`；本来就是 Tauri（wry）的间接依赖，只在 macOS 上编译） | https://github.com/madsmtm/objc2 |
+| objc2-app-kit / objc2-web-kit / objc2-core-graphics / objc2-core-foundation | 0.3.2 | Zlib OR Apache-2.0 OR MIT | 同上：NSImage → CGImage → 原始像素（只开用到的几项特性） | https://github.com/madsmtm/objc2 |
 | regex | 1.13.1 | MIT OR Apache-2.0 | 排版 Agent：核对模型给的文字规则、模拟模型认题注（v0.2 W3；文档引擎已在用） | https://github.com/rust-lang/regex |
 | zotero-import（本仓库 `crates/zotero-import`） | 0.0.1 | 本项目 | Zotero 只读读取与审计（Phase 2 起由 App 引用） | — |
 | docx-engine（本仓库 `crates/docx-engine`） | 0.2.0 | 本项目 | Word 文档引擎：引文写入与核对、VBA 工程与 Word 模板生成（v0.2 起由 App 引用，`decisions/0016`） | — |

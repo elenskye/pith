@@ -2738,6 +2738,7 @@ dependencies = [
  "block2",
  "objc2",
  "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-foundation",
  "objc2-quartz-core",
 ]
@@ -3155,15 +3156,22 @@ dependencies = [
 
 [[package]]
 name = "pith"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "biblatex",
+ "block2",
  "calamine",
  "concept-engine",
  "docx-engine",
  "encoding_rs",
  "getrandom 0.3.4",
  "md-5 0.11.0",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
+ "objc2-web-kit",
  "pdf-extract",
  "regex",
  "research-engine",

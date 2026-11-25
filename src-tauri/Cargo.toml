@@ -1,6 +1,6 @@
 [package]
 name = "pith"
-version = "1.0.3"
+version = "1.0.4"
 description = "Pith：本地优先的研究工作台"
 edition.workspace = true
 publish.workspace = true
@@ -37,6 +37,14 @@ pdf-extract = "0.12.1"
 # 只有 Mac 用得上的依赖（钥匙串）。Linux 上不编译，云端开发环境才编得过（CLAUDE.md 规则 7）
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3"
+# 换配色的水面扭曲：让 WKWebView 拍一张当前的样子（src/snapshot.rs）。都是 Tauri（wry）已经在用的版本，只开要的几项
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSGraphicsContext", "NSView", "NSResponder", "objc2-core-graphics"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-app-kit", "WKWebView", "WKSnapshotConfiguration"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGImage", "CGDataProvider"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFData"] }
 
 [dev-dependencies]
 roxmltree = "0.21"

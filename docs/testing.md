@@ -222,4 +222,16 @@ swiftc -O scripts/webkit-perf.swift -o /tmp/pith-wk
 /tmp/pith-wk "http://localhost:1430/?mock&perf"
 ```
 
+这个小窗口里没有 Tauri，换配色走的是浏览器的洇开；**整页水面**（`decisions/0033`，原生截图 + WebGL）要在真 App 里量：打一个开发模式、带探针的测试包（换了包名，不会盖掉正式版），数据放临时目录（可以先用 `prepare_e2e_library` 把 Zotero 副本导进去），探针启动后自己去外观页换两次，结果 POST 到本机 7788（自己开一个收集请求的小服务）：
+
+```bash
+pnpm tauri build --debug --bundles app --no-sign --config '{"identifier":"com.elenskye.pith.check","productName":"Pith Check","build":{"beforeBuildCommand":"NODE_ENV=development VITE_PITH_PERF=water pnpm exec vite build --mode development"},"bundle":{"macOS":{"signingIdentity":null}}}'
+```
+
+```bash
+open -n --env PITH_DATA_DIR=<临时目录> "target/debug/bundle/macos/Pith Check.app"
+```
+
+结果里的 `water` 是拍照、上传到 GPU、点下去到开始动各花的毫秒数。要看样子就在探针发出「go look1」后用 `screencapture -l <窗口号>` 按时间截。用完删掉 `target/debug/bundle/macos/Pith Check.app`（不然 macOS 会多列一个 App）。
+
 先 `pnpm dev`。`?perf` 默认量两遍：`small`（假数据原样）、`big`（文献库表格复制到 1500 行）；每遍在 设置 › 外观点两次色板、在文献库用 ⌘K 换一次，各记 2.4 秒里的帧数、点下去到第一帧、超过 34 毫秒的帧。满帧是 144 左右。

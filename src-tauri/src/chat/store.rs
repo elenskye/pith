@@ -32,8 +32,11 @@ pub struct Role {
     pub edited: bool,
 }
 
-/// 四个初始角色（docs/decisions/0030「角色」）：uid、名字、头像字、一句话、提示词、默认知识库、常用技能
-const BUILTIN: [(&str, &str, &str, &str, &str, &str, &[&str]); 4] = [
+/// 一个初始角色：uid、名字、头像字、一句话、提示词、默认知识库、常用技能
+type BuiltinRole = (&'static str, &'static str, &'static str, &'static str, &'static str, &'static str, &'static [&'static str]);
+
+/// 四个初始角色（docs/decisions/0030「角色」）
+const BUILTIN: [BuiltinRole; 4] = [
     ("pith", "Pith", "P", "研究助手 · 默认", "你是站主的研究助手。什么都能问：先给结论，再给依据和编号；该用哪个技能自己挑。", "上一次勾的", &[]),
     ("companion", "伴读", "伴", "读一本书的时候", "你陪站主读书：讲清一个概念的来龙去脉，反过来问他，帮他整理摘抄、做概念卡。不急着替他下结论。", "在读的那本书", &["问这本书", "整章分析", "追踪概念"]),
     ("reviewer", "审稿人", "审", "专挑刺", "你是站主的审稿人。先找这个判断最弱的地方，再找反例和后世的批评；有出处就给编号。站主的判断你先唱反调，但别为反对而反对。", "跟着对话", &["事实调查", "反方与后世评论", "假设推演"]),

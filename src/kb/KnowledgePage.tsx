@@ -2,12 +2,12 @@
 // 下面是卡片墙，十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
 // 点一张卡，右边滑出面板：正文、从哪来、在哪个库，能改、能照料（换阶段）、能打开原处。
 // 「种进来」：解析好的书（全文）、做完的调查（调查报告）、概念研究的卡片（概念卡），或者自己写一条笔记、记一条摘抄。
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { api, type KnowledgeBase, type Material, type MaterialKind } from "@/shared/ipc";
 import { Modal, useUi } from "@/shared/ui";
-import { Select } from "@/shared/controls";
+import { Select, useWheelX } from "@/shared/controls";
 import { KindIcon, KIND_NAMES, Mark, Stage, STAGE_NAMES } from "@/shared/marks";
 import { useNav, dateOf } from "@/app/nav";
 
@@ -24,6 +24,8 @@ export function KnowledgePage() {
   const mats = useQuery({ queryKey: ["materials", sel?.uid ?? ""], queryFn: () => api.kbMaterials(sel!.uid), enabled: !!sel });
   const [open, setOpen] = useState<string | null>(nav.kb.material);
   const [planting, setPlanting] = useState(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useWheelX(tabsRef);
   const [kind, setKind] = useState("");
   const [stage, setStage] = useState(-1);
   const [q, setQ] = useState("");
@@ -67,14 +69,14 @@ export function KnowledgePage() {
         </div>
         {sel?.note && <p className="page-line">{sel.note}</p>}
         <div className="lib-bar">
-          <div className="tabs">
+          <div className="tabs" ref={tabsRef}>
             {list.map((k) => (
               <button key={k.uid} className={k.uid === sel?.uid ? "is-on" : ""} onClick={() => nav.openKb(k.uid)}>
                 {k.name}
                 <span className="num">{k.count}</span>
               </button>
             ))}
-            <button className="act" onClick={create}>
+            <button className="tabs-add" onClick={create}>
               ＋ 知识库
             </button>
           </div>
@@ -103,13 +105,13 @@ export function KnowledgePage() {
         {sel && all.length > 0 && (
           <div className="lib-cols">
             <div className="pith-strip" role="toolbar" aria-label="生长阶段">
-              <button className={`pith-strip-item ${stage < 0 ? "is-on" : ""}`} onClick={() => setStage(-1)}>
+              <button className={`pith-strip-item pith-ink ${stage < 0 ? "is-on" : ""}`} onClick={() => setStage(-1)}>
                 全部
               </button>
               {STAGE_NAMES.map((n, i) => {
                 const c = all.filter((m) => m.stage === i).length;
                 return (
-                  <button key={n} className={`pith-strip-item kb-stage ${stage === i ? "is-on" : ""}`} onClick={() => setStage(stage === i ? -1 : i)} disabled={c === 0}>
+                  <button key={n} className={`pith-strip-item pith-ink kb-stage ${stage === i ? "is-on" : ""}`} onClick={() => setStage(stage === i ? -1 : i)} disabled={c === 0}>
                     <Stage stage={i} />
                     {n}
                     <em className="num">{c}</em>

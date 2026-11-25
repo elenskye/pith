@@ -9,6 +9,7 @@ import { useNav, roleTone, type SetSection } from "@/app/nav";
 import { branch, labelDelay } from "@/app/branch";
 import { SettingsPage, type SettingsSection } from "@/settings/SettingsPage";
 import { ImportPage } from "@/import/ImportPage";
+import { warmWater } from "@/app/water";
 
 const PAGES: { id: SetSection; name: string; line: string; blocks?: [SettingsSection, string][] }[] = [
   { id: "roles", name: "角色", line: "请谁来答：每个角色有自己的说话方式、默认的知识库和常用的技能。" },
@@ -273,6 +274,7 @@ const LEAF_MINI = (
 function Appearance() {
   const nav = useNav();
   const [look, setLook] = useLook();
+  useEffect(warmWater, []);
   const [theme, setTheme] = useState(document.documentElement.dataset.theme ?? "light");
   useEffect(() => setTheme(document.documentElement.dataset.theme ?? "light"), [look]);
   return (
@@ -314,7 +316,15 @@ function Appearance() {
             ["dark", "暗"],
           ] as [ThemePref, string][]
         ).map(([t, n]) => (
-          <button key={t} className={look.theme === t ? "is-on" : ""} onClick={(e) => setLook({ ...look, theme: t }, { x: e.clientX, y: e.clientY })}>
+          <button
+            key={t}
+            className={look.theme === t ? "is-on" : ""}
+            onClick={(e) => {
+              if (look.theme === t) return;
+              nav.lake(e.clientX, e.clientY);
+              setLook({ ...look, theme: t }, { x: e.clientX, y: e.clientY });
+            }}
+          >
             {n}
           </button>
         ))}

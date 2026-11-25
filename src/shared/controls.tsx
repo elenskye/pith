@@ -28,6 +28,21 @@ export function usePresence(open: boolean, ms = 160) {
   return { mounted, leaving };
 }
 
+/** 一栏横着放不下的（集合、知识库、范围）：鼠标滚轮竖着滚也能左右走（触控板两指横滑本来就行） */
+export function useWheelX(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [ref]);
+}
+
 export type Option = { value: string; label: React.ReactNode; hint?: React.ReactNode; disabled?: boolean };
 
 /** 从 <option> 子元素读出选项（这样换掉 <select> 时选项照原样写） */

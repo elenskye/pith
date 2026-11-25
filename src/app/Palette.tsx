@@ -2,6 +2,7 @@
 // 出来从上往下落一点，关上时往上收、淡出（usePresence 留 0.18 秒演退场）。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePresence } from "@/shared/controls";
+import { warmWater } from "@/app/water";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/ipc";
 import { PALETTES, useLook } from "@/shared/theme";
@@ -27,6 +28,7 @@ export function Palette({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 function PaletteBox({ leaving, onClose }: { leaving: boolean; onClose: () => void }) {
+  useEffect(warmWater, []);
   const nav = useNav();
   const [look, setLook] = useLook();
   const [q, setQ] = useState("");
@@ -68,9 +70,12 @@ function PaletteBox({ leaving, onClose }: { leaving: boolean; onClose: () => voi
         r: p.line,
         run: (e?: { x: number; y: number }) => {
           onClose();
+          // 等 ⌘K 退场完再换：水面要拍一张旧样子，别把半透明的 ⌘K 拍进去
           const at = { x: e?.x ?? innerWidth / 2, y: e?.y ?? innerHeight / 3 };
-          nav.lake(at.x, at.y);
-          setLook({ ...look, palette: p.id }, at);
+          setTimeout(() => {
+            nav.lake(at.x, at.y);
+            setLook({ ...look, palette: p.id }, at);
+          }, 200);
         },
       })),
       ...(["system", "light", "dark"] as const)
@@ -81,7 +86,11 @@ function PaletteBox({ leaving, onClose }: { leaving: boolean; onClose: () => voi
           n: { system: "跟随系统", light: "亮", dark: "暗" }[t],
           run: (e?: { x: number; y: number }) => {
             onClose();
-            setLook({ ...look, theme: t }, e && e.x > 0 ? e : undefined);
+            const at = e && e.x > 0 ? e : { x: innerWidth / 2, y: innerHeight / 3 };
+            setTimeout(() => {
+              nav.lake(at.x, at.y);
+              setLook({ ...look, theme: t }, at);
+            }, 200);
           },
         })),
       ...(items.data ?? [])

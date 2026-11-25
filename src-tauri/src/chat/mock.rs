@@ -81,7 +81,7 @@ pub fn answer(c: &Connection, question: &str, role: &Role, kbs: &[String]) -> Re
     }
     let ts = terms(question);
     let mut ranked: Vec<(usize, Material)> = pool.iter().map(|m| (score(m, &ts), m.clone())).collect();
-    ranked.sort_by(|a, b| b.0.cmp(&a.0));
+    ranked.sort_by_key(|r| std::cmp::Reverse(r.0));
     let mut hits: Vec<Material> = ranked.iter().filter(|(s, _)| *s > 0).map(|(_, m)| m.clone()).take(3).collect();
     if hits.is_empty() {
         hits = pool.iter().take(2).cloned().collect();

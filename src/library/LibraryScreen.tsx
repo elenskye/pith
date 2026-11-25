@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/ipc";
-import { Select } from "@/shared/controls";
+import { Select, useWheelX } from "@/shared/controls";
 import { useNav, type LibRequest } from "@/app/nav";
 import { ItemList, type Selection } from "@/library/ItemList";
 import { DetailPane } from "@/library/ItemDetail";
@@ -35,6 +35,8 @@ export function LibraryScreen({ request, onDone }: { request: LibRequest | null;
   // 「含子集合」记住，不用每进一个集合勾一次
   const [includeChildren, setIncludeChildren] = useStoredState("includeChildren", false);
   const o = useQuery({ queryKey: ["overview"], queryFn: api.overview }).data;
+  const scopesRef = useRef<HTMLDivElement>(null);
+  useWheelX(scopesRef);
   // 页面的内容有多宽（标签树、面板开着会挤）：m 藏类型列，s 再藏作者列
   const pageRef = useRef<HTMLElement>(null);
   const [w, setW] = useState<"l" | "m" | "s">("l");
@@ -82,7 +84,7 @@ export function LibraryScreen({ request, onDone }: { request: LibRequest | null;
   const bars = (
     <>
       <div className="lib-bar">
-        <div className="tabs lib-scopes">
+        <div className="tabs lib-scopes" ref={scopesRef}>
           <button className={scope.kind === "all" ? "is-on" : ""} onClick={() => choose({ kind: "all" })}>
             全部<span className="num">{o?.items ?? ""}</span>
           </button>

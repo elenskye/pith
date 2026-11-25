@@ -14,6 +14,7 @@ pith/
 │   │                           带 VERSION、SHA256SUMS，不手改（CLAUDE.md 规则 9）；App 图标由 scripts/app-icon.sh（pnpm app:icon）缩到 macOS 网格再出 src-tauri/icons/
 │   ├── styles/app.css          外框和几屏的版面（照 Explore R1，跟着窗口伸缩）；组件的样子（含下拉框、勾选框这些控件）和动效零件在 vendor/pith/bundle.css
 │   ├── app/                    外框（`0031`）：App（顶栏 + 一屏；⌘K、⌘\、⌘N、两指横滑：文献库里叫标签树、别处叫对话历史；阅读器占满窗口；存卡的种子、换配色的波纹）、nav（几屏之间跳、技能清单）、
+│   │                           water（换配色的整页水面：原生截图 + WebGL 着色器，`0033`）、
 │   │                           TopBar、History（对话历史的枝桠）、Palette（⌘K）、branch（枝桠的画法，历史和设置共用）、SideNav（技能左边那一列）
 │   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
 │   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）
@@ -23,7 +24,7 @@ pith/
 │   ├── settings/               SettingsScreen（枝桠 + 八页；角色、知识库、外观是新的，导入 1.0.3 从文献库挪来）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
 │   │                           Transfer、WordSettings、CiteSettings、KeysSettings、ResearchSettings、ConceptSettings、AgentSettings
 │   ├── shared/                 ipc.ts（带类型的 api 对象，唯一的 invoke 入口）、ui.tsx（弹窗、右键菜单、提示条、就地编辑、标签输入）、
-│   │                           controls.tsx（下拉框 Select、弹出列表 Menu、退场 usePresence；不用系统的 <select>）、
+│   │                           controls.tsx（下拉框 Select、弹出列表 Menu、退场 usePresence、横排滚轮 useWheelX；不用系统的 <select>）、
 │   │                           marks.tsx（内联 vendor/pith/marks 的图形）、theme.ts（配色和明暗，记在 localStorage；换的时候用 View Transitions 洇开）、plainInputs.ts
 │   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
 │   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、
@@ -63,6 +64,7 @@ pith/
 │       ├── metadata/           联网补全：mod（设置、比较与合并、记录、撤销、待确认、后台队列、按标识新建）、
 │       │                       net（doi.org / Open Library、节流与重试、换成 Zotero 字段）
 │       ├── protocol.rs         rl-file:// 协议：按附件 id 给文件库里的 PDF / 图片
+│       ├── snapshot.rs         app_snapshot：让 WKWebView 拍一张网页当前的样子，原始像素给换配色的水面（1.0.4，`decisions/0033`；只在 macOS）
 │       ├── store.rs            附件文件库：按 SHA-256 存一份，写入后只读
 │       ├── text.rs             标题规范化、语言判定、日期解析、DOI / ISBN、HTML → 纯文本
 │       ├── import/             mod（写入工具、导入记录、核对）、zotero（Zotero 副本）、file（文件写入层）、
@@ -92,7 +94,7 @@ pith/
 │                               vba（生成 vbaProject.bin）、template（生成 .dotm）
 ├── poc/
 │   └── word-addin/             0-B：citeproc 引文引擎、Word 外直写、宏桥接、Office.js（保留待用）；独立 pnpm 包
-├── scripts/                   install-app.sh（打包、签名、装进「应用程序」）、app-icon.sh（App 图标缩到 macOS 网格再出 src-tauri/icons/）、clean-build.sh（清编译缓存）、phase0-check.sh（Phase 0 端到端自检）、cite-render.ts（Node 里排版，测试与命令行用）、
+├── scripts/                   webkit-perf.swift（WKWebView 小窗跑 ?perf 量帧，docs/testing.md）、install-app.sh（打包、签名、装进「应用程序」）、app-icon.sh（App 图标缩到 macOS 网格再出 src-tauri/icons/）、clean-build.sh（清编译缓存）、phase0-check.sh（Phase 0 端到端自检）、cite-render.ts（Node 里排版，测试与命令行用）、
 │                               word-icons.mjs / .swift（生成 Word 选项卡图标）
 ├── local/                      本机私有（真实论文、样例、证书），gitignore
 └── docs/
@@ -226,7 +228,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 ## 本机模型与语义检索（2026-11-15 修 `0025` 的已知问题）
 
 - **本机模型**（`src-tauri/src/local/`）：用户的 `~/Documents/LLM`（和柚儿园共用）里的向量模型（8081，`/v1/embeddings`）和重排模型（8082，`/v1/rerank`）。Pith 只读清单 `config/models.json`（每类用第一个）、只经 `scripts/llmctl.sh` 启停，不改那个文件夹。用到时才启动（`ensure`：先看 `/health`，没开就 `start <key> --by pith`，最多等 45 秒）；只停自己启动的（`status` 里有 `By: pith`）：闲置 15 分钟停，退出 Pith 时停。只连 `127.0.0.1`，不走代理，不花钱。三种模式：`Real`、`Mock`（测试和 `PITH_LOCAL_MODELS=mock`：按字散列的 256 维向量）、`Off`（找不到文件夹或 `PITH_LOCAL_MODELS=off`）。`PITH_LLM_DIR` 可以另指位置。`AppState.local` 拿着它。
-- **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`，App 现在没喂，只用长度和锚点）。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
+- **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`，App 现在没喂，只用长度和锚点；用户 11-25 定要补上，排在 1.1.0 的知识库检索里，`requirements.md`「以后」）。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
 - **向量是派生数据**：`search.concept_vecs(para_id, model, sig, vec)`，在 `search.db`，不写 migration。按模型的 key 分开存；`sig` 是段落文字的散列，段落换了（重新解析）就当作没有，重新算。归一化的 f32 小端连起来存，检索时整本书扫一遍算点积（一本书几千段，几十毫秒）。以后的内部知识库量大了再换存法。
 - **建索引**在后台线程（`concept::semantic`，命令 `concept_index_start`，事件 `concept-index`），一批 16 段，读库和写库各拿一次锁、联本机服务时不拿锁。真实的两本《国富论》9265 段约 6 分钟。
 - **「问这本书」**（`concept_ask_search`）：问题的向量 → 原著里最像的 40 段 + 译本里最像的 24 段（按对齐映射回原著）+ 按词检索的命中 → 重排模型打分 → 按相关度给前几段，只给正文段（旁注、注释算到它挂的正文段，编者的导读不要）。中文问题、有对齐的中译时重排比的是中译。退路：本机模型用不了、或索引还一段都没有 → 按词检索并说明原因；重排用不了 → 按向量相似度排。「追踪概念」仍按词（要的就是这个词出现在哪）。
