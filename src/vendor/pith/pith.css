@@ -1,0 +1,130 @@
+/* 生成文件，请勿手改。源：schemes/pith/tokens/ ；由 tooling/tokens/build.mjs 生成。 */
+:root {
+  --width-content: 640px;
+  --width-sidenote: 270px;
+  --width-composer: 720px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 14px;
+  --radius-pill: 999px;
+  --font-serif: "Newsreader", "Noto Serif SC", "Songti SC", serif;
+  --font-sans: "Lato", "Noto Sans SC", "PingFang SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --text-tiny: 11px;
+  --text-small: 12.5px;
+  --text-ui: 13.5px;
+  --text-body: 17px;
+  --text-lead: 24px;
+  --text-title: 32px;
+  --text-display: 60px;
+  --leading-body: 1.9;
+  --leading-ui: 1.5;
+  --leading-title: 1.15;
+}
+
+:root, :root[data-palette='paper-sea'] {
+  color-scheme: light;
+  --color-page: #f6f5f1;
+  --color-surface: #fcfbf7;
+  --color-raised: #ffffff;
+  --color-tint: #ebe8e3;
+  --color-line: #e3e3e0;
+  --color-line-2: #d3d3d1;
+  --color-text: #353534;
+  --color-text-2: #4a4a46;
+  --color-text-3: #6b6865;
+  --color-text-4: #72706d;
+  --color-accent: #04a5bb;
+  --color-accent-text: #00758f;
+  --color-on-accent: #ffffff;
+  --color-second: #960462;
+  --color-coral: #f4806b;
+  --color-gold: #ffd09c;
+  --color-app-ink: #2b2a27;
+  --color-app-paper: #fcfbf7;
+  --color-app-coral: #ff8a72;
+  --shadow-sm: .2px .2px .8px -10px rgb(40 10 0 / .02), .8px .8px 3.8px -10px rgb(40 10 0 / .024), 2.5px 2.5px 12.5px -10px rgb(40 10 0 / .035), 6px 6px 30px -10px rgb(40 10 0 / .05);
+  --shadow-lg: 2.4px 2.2px 5.5px -3px rgb(30 10 10 / .05), 8px 7.4px 18.5px -3px rgb(30 10 10 / .07), 36px 33px 83px -3px rgb(30 10 10 / .2);
+}
+
+:root[data-theme='dark'], :root[data-palette='paper-sea'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-page: #1d1c1a;
+  --color-surface: #252422;
+  --color-raised: #2b2a27;
+  --color-tint: #33312d;
+  --color-line: #36342f;
+  --color-line-2: #4a4741;
+  --color-text: #efede8;
+  --color-text-2: #dcd9d2;
+  --color-text-3: #c4c0b8;
+  --color-text-4: #bfbbb3;
+  --color-accent: #2ec4d8;
+  --color-accent-text: #6fdbe9;
+  --color-on-accent: #04191d;
+  --color-second: #ef9fcc;
+  --color-coral: #ff9b86;
+  --color-gold: #7a5c33;
+  --color-app-ink: #2b2a27;
+  --color-app-paper: #fcfbf7;
+  --color-app-coral: #ff8a72;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-lg: 0 18px 50px -12px rgb(0 0 0 / .8);
+}
+
+:root[data-palette='mist-ochre'] {
+  color-scheme: light;
+  --color-page: #eef0f2;
+  --color-surface: #f7f8fa;
+  --color-raised: #ffffff;
+  --color-tint: #e2e6eb;
+  --color-line: #dde1e6;
+  --color-line-2: #c8cdd4;
+  --color-text: #22272e;
+  --color-text-2: #3a414b;
+  --color-text-3: #58606b;
+  --color-text-4: #656e77;
+  --color-accent: #c26a26;
+  --color-accent-text: #9a4f14;
+  --color-on-accent: #ffffff;
+  --color-second: #34558c;
+  --color-coral: #de6a55;
+  --color-gold: #f0d3a4;
+  --color-app-ink: #22272e;
+  --color-app-paper: #f7f8fa;
+  --color-app-coral: #f08a74;
+  --shadow-sm: .2px .2px .8px -10px rgb(40 10 0 / .02), .8px .8px 3.8px -10px rgb(40 10 0 / .024), 2.5px 2.5px 12.5px -10px rgb(40 10 0 / .035), 6px 6px 30px -10px rgb(40 10 0 / .05);
+  --shadow-lg: 2.4px 2.2px 5.5px -3px rgb(30 10 10 / .05), 8px 7.4px 18.5px -3px rgb(30 10 10 / .07), 36px 33px 83px -3px rgb(30 10 10 / .2);
+}
+
+:root[data-palette='mist-ochre'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-page: #191c21;
+  --color-surface: #20242a;
+  --color-raised: #262b32;
+  --color-tint: #2a2f36;
+  --color-line: #2d3239;
+  --color-line-2: #414851;
+  --color-text: #e9ecf0;
+  --color-text-2: #d2d7de;
+  --color-text-3: #b6bdc7;
+  --color-text-4: #b4bbc5;
+  --color-accent: #e8a265;
+  --color-accent-text: #f0b57e;
+  --color-on-accent: #1a1006;
+  --color-second: #a3bce8;
+  --color-coral: #f59a85;
+  --color-gold: #6a5230;
+  --color-app-ink: #22272e;
+  --color-app-paper: #f7f8fa;
+  --color-app-coral: #f08a74;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-lg: 0 18px 50px -12px rgb(0 0 0 / .8);
+}

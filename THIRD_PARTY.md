@@ -47,6 +47,10 @@ Phase 5 新增的间接依赖：ureq-proto、native-tls、security-framework / s
 | @types/react / @types/react-dom（开发） | 19.3.0 | MIT | 类型 | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | citeproc（citeproc-js） | 2.4.63 | CPAL-1.0 OR AGPL-1.0（包内声明） | Word 引文排版，在 WebView 里跑（v0.2，`decisions/0006`、`0016`）；个人使用不分发没有问题，分发前需复核 | https://github.com/Juris-M/citeproc-js |
 | @types/node（开发） | 26.6.6 | MIT | 前端引文排版测试（node --test）的类型 | https://github.com/DefinitelyTyped/DefinitelyTyped |
+| @fontsource/lato | 5.3.0 | OFL-1.1 | 界面的字 Lato（300 / 400 / 700），随 App 打包（1.0.1，`src/fonts.css`、`vendor/pith/DESIGN.md` 第 3 节） | https://fontsource.org/fonts/lato |
+| @fontsource-variable/newsreader | 5.3.0 | OFL-1.1 | 读的字 Newsreader，可变字重、带光学尺寸，随 App 打包；在 `src/fonts.css` 里改登记成「Newsreader」（1.0.1） | https://fontsource.org/fonts/newsreader |
+
+视觉方案 `src/vendor/pith/`：从本人的 visual-atelier 仓库按 tag 同步来的已发版本（方案 `pith`，样式、图形、App 图标），不是第三方，不手改（`CLAUDE.md` 规则 9）。
 
 引文样式与语言文件（`src/cite/csl/`、`src/cite/locales/`，打包进 App）：citation-style-language 官方仓库，CC BY-SA 3.0，按提交固定，来源与哈希见 `src/cite/SOURCES.md`。
 

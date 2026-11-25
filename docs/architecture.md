@@ -8,6 +8,10 @@
 pith/
 ├── src/                        前端（React 19 + TypeScript + Tailwind v4）
 │   ├── main.tsx                入口；?mock 时装上浏览器内的假后端；?window=picker 是置顶搜索窗；关掉文本框的系统输入辅助（shared/plainInputs.ts）
+│   ├── index.css、fonts.css    样式入口：先引 vendor/pith/pith.css，再把 shadcn 命名的变量指到 pith 的 --color-*（对照在 vendor/pith/DESIGN.md 第 9 节）；
+│   │                           fonts.css 登记随 App 打包的 Lato、Newsreader（@fontsource）；明暗跟着系统写根上的 data-theme（shared/theme.ts）
+│   ├── vendor/pith/            视觉方案 pith 的已发版本（Atelier 按 tag 同步：pith.css、bundle.css、tokens.ts、DESIGN.md、marks/、App 图标 PNG），
+│   │                           带 VERSION、SHA256SUMS，不手改（CLAUDE.md 规则 9）；App 图标由 scripts/app-icon.sh（pnpm app:icon）缩到 macOS 网格再出 src-tauri/icons/
 │   ├── app/                    App.tsx（外框：最左一列切换主页面，各主页面有自己的侧栏；阅读时阅读器占满窗口）、
 │   │                           Rail（文献库 / 排版 / 调查 / 概念 + 设置，`decisions/0023`）、SideNav（各主页面和设置共用的侧栏外框与条目）
 │   ├── library/                Sidebar（文献库视图、集合树、标签筛选）、ItemList（搜索、筛选、排序、多选、右键菜单）、

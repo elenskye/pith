@@ -2,98 +2,61 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.0.0；Atelier 1.0.1 做完，下一步 Pith 前端 UI（2026-11-24）
+## 现在：1.0.1 做完（2026-11-25）
 
-### 本轮（2026-11-24）：Atelier v1.0.1
+视觉方案 `pith` 1.0.1 同步进来、接上了变量、字、明暗和 App 图标。界面照新架构重做是 1.1.0 的事，开工前先合成 `0030`。
 
-- Atelier：文档、代码精简；方案 `pith` 定为 1.0.0（用户批了 `logo-grow`），补了 `sync.json`，Design System「Pith」和 Pith Explore（R1）发到 Claude 现用账号；Pomelo 的 fold 进方案（pomelo 1.0.1）；tag `v1.0.1`、`pith-v1.0.0`、`pomelo-v1.0.1`、`peck-v1.0.0`、`vermilion-v1.5.0`（都没推送）。细节看 Atelier 的 `CHANGELOG.md`。
-- Atelier 收尾（同一天，还是 1.0.1）：`npm run all` 全过；一个新开的 Agent 只照文档冷启动跑通，验收问卷删了；Pomelo Explore 旧了的 11 张板重跑生成器更新到方案最新的样子；新加 `npm run check:canvases`（`npm run all` 里），以后板和生成器对不上会报出来。Peck 的 Design System 云端那份只差一个版本号，共享给了组织外的人，没重发（等你说）。
-- 本仓库：Atelier 的 `HANDOFF.md` 搬来成 `docs/atelier-handoff-2026-11-22.md`。用户定：和 `0028` 合并，**以它为主**；`ROADMAP.md`、`README.md` 跟着改。代码没改，`pnpm check` 没跑。
+### 本轮：Pith 1.0.1（Atelier 不升版本，还是 1.0.1）
 
-### 等你
+**Atelier**（提交 `e5f8fbd`，tag `pith-v1.0.1`）
 
-1. 推送两个仓库。Atelier 的 tag 还没推（`main` 已经推了）：`git -C ~/Documents/GitHub/visual-atelier push --tags`。
-2. 下一轮做前端 UI：开工前先问开发程度；同步 `pith-v1.0.0` 进 `src/vendor/pith/` 要你说一声。
-3. Peck 的 Design System 要不要按 1.0.0 重发（只改 `tokens.json` 里的版本号；它共享给了组织外的人）。
+1. 两条新规矩（用户定）：
+   - 除非用户明确要求，画布和 Design System 不和云端同步（不拉回、不发回、不在云端新建或更新）：`CLAUDE.md`「画布与 bench」、`docs/cloud.md`、`skills/design-loop`。
+   - 只有本体（`bench/`、共用的 `tooling/`、`skills/`、`docs/`、根目录）的开发才升仓库的版本号；方案、画布这类平时的更新不升，只升方案自己的：`CLAUDE.md`「版本与 Git」。
+   - `ROADMAP.md`「已拍板的决定」记了；`build:ds` 和 bench 在「本地改了、云端没更新」时的提示跟着改了。
+2. **TopBar 第二个图看不到**：`marks/icons/lib.svg` 的叶书签一个元素有两个 `style`，单独打开就解析失败。在 `tooling/pith/build.mjs` 里并成一个；以后生成的 SVG 有重复的属性就直接报错（拿旧文件试过，抓得到）。
+3. **封面加叶子**：首页叶子的几何从画布挪进 `tooling/pith/glyphs.mjs`（`homeLeaf`），单独成一张 `marks/garden/leaf.svg`（新资产，几何就是你 11-24 验收的 EX11 首页那片，标成已批）；画布 R1 改成从这里取，6 张板逐字节不变。Design System 的 Cover：叶柄从「Pith」字标右上角长出去，主脉横过封面，副标题在句号处换行。
+4. 方案 `pith` 1.0.0 → **1.0.1**；`DESIGN.md` 加第 9 节「在 Pith 里怎么接」（shadcn ↔ `--color-*` 的对照）、第 8 节加一条待确认（要不要危险色）；`sync.json` 加上叶子；`CHANGELOG.md`、`ROADMAP.md`、`docs/adoption.md` 跟着改。
+5. 云端的 Design System **没更新**（新规矩），还是 1.0.0：TopBar 那张图在云端照旧看不到。
 
-### 下一轮
+**Pith**
 
-- 先把 `docs/atelier-handoff-2026-11-22.md` 和 `0028` 合成 `decisions/0030`，改 `CLAUDE.md` 规则 4、`requirements.md`、`ROADMAP.md`，删掉搬来的那份。
-- 再同步 `pith-v1.0.0`，定 shadcn 变量和 `--color-*` 的对照（写回 Atelier 的 `schemes/pith/DESIGN.md`），接界面。
+1. 照你这次说的，`pith-v1.0.1` 同步进 `src/vendor/pith/`（`npm run sync -- --scheme pith --to pith --tag pith-v1.0.1`，`--check` 一致）。
+2. `src/index.css`：先引 `vendor/pith/pith.css`，shadcn 变量全指到 `--color-*`（对照在 `vendor/pith/DESIGN.md` 第 9 节）。注意 shadcn 的 `accent` 是淡底，Pith 的 `--color-accent` 是海蓝，`@theme inline` 让两边不打架。界面字号 13 → 13.5（`--text-ui`）。
+3. 字：新依赖 `@fontsource/lato`、`@fontsource-variable/newsreader`（OFL，登记在 `THIRD_PARTY.md`），`src/fonts.css` 把 Newsreader 登记成 pith.css 认的名字；中文还是系统字体。
+4. 明暗：`src/shared/theme.ts` 跟着系统写根上的 `data-theme`，Tailwind 的 `dark:` 也改成看它。
+5. App 图标换成蕨芽：`scripts/app-icon.sh`（`pnpm app:icon`）把同步来的 1024 图缩到 macOS 图标网格（主体 824/1024，四周透明）再 `tauri icon`。
+6. 版本 1.0.0 → 1.0.1（`package.json`、`Cargo.toml`、`tauri.conf.json`、`Cargo.lock`）。`.claude/launch.json` 加了 `web-mock-alt`（端口 1432）：1430 常被 Peck 的开发服务器占着。
+7. 文档：`CLAUDE.md` 规则 9「现在」、`ROADMAP.md`（现在、已完成、验收清单）、`docs/architecture.md`、`THIRD_PARTY.md`。
 
-## 上一轮（2026-11-24）：合并 Atelier、换新的开发准则
+### 测试
 
-
-### 新架构（`decisions/0028`）
-
-- **三个入口**：对话、文献库、设置。事实调查、概念研究、排版、Word 润色都做成技能，模型在对话里自己挑、自己调。
-- **Agent 循环 Pith 自己写**（Rust）：
-  - 接多家 API；
-  - 做好 Prompt Cache 前缀命中；
-  - 子任务用递归式的轻量 Subagent。
-- **花钱只看月上限**：输入框下面一个用量圈，点开看明细；不再逐次确认，也不算每段对话花了多少。
-- **组织**：研究主题只给对话分组；知识库另建。成果由模型自动存进知识库（数据）或文献库（元数据），不绑对话。
-- **1.1.0 做**（原 v0.5）：对话 + 技能运行时 + 研究主题；事实调查、概念研究、排版改成技能；摘抄与笔记进知识库；Word 润色技能。WonderLab 往后放。
-- **设计**：在 Atelier 里做完了，方案 `pith` 0.1.0 已并进 Atelier 的 `main`，还没同步进本仓库；本地照新架构开发。
-
-### 本轮（2026-11-24）：合并 Atelier、换新的开发准则
-
-1. **Atelier**：云端的 `agent/claude/pith`（19 个提交，到 `7c1350f`，Pith 的设计做完了）并进 Atelier `main`。
-   - 只有 `CHANGELOG.md` 冲突，两边的条目都留了；`schemes/pith/CLAUDE.md` 里 Pith 的旧路径顺手改成 `pith`。
-   - 删了本地三条 `agent/*/pith`（都已合并）和 GitHub 上的 `agent/claude/pith`。Atelier 现在只有 `main`。
-2. **Pith**：GitHub 上的 `cloud/v0.3`、`cloud/v0.4` 早就并进 `main` 了，删掉。现在只有 `main`。
-3. **新的开发准则**（用户给的「App & Git 开发准则」，加 ASK 里定的三点，`decisions/0029`）：
-   - Pith 版本号 0.4.1 → **1.0.0**（`package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json`，`Cargo.lock` 跟着变），功能不变；原 v0.5 / v0.6 / v0.7 改叫 1.1.0 / 1.2.0 / 1.3.0。
-   - `CLAUDE.md`：规则 2 开工前先问开发程度；新规则 7「版本与开发程度」、规则 8「Git」（只 commit，push 由用户做）。旧规则 7（云端协作）、8（v0.7 之前的开发方式）删了：真实验收的花费上限挪进规则 4，出问卷的做法和「用户验收清单」挪进规则 3；规则 9 的「现在」改成设计做完了。
-   - 删了 `HANDOFF-cloud.md`（里面没有进行中的任务）；`ROADMAP.md`、`README.md`、`docs/requirements.md`、`0026`（标成被 `0029` 取代）跟着改。
-   - Atelier：`CLAUDE.md` 加「版本与 Git」，整个仓库一个版本号、从 1.0.0 起（`package.json` 原来 0.13.0）；加了 `.claude/settings.json` 关掉默认署名；`docs/sessions.md`、`ROADMAP.md`「授权记录」、`CHANGELOG.md` 跟着改。
-4. **之后**：用户会删掉两个 GitHub 仓库、清掉本地历史重新 `git init`，再在 GitHub 上重建、重新连上。
-
-### 上一轮（2026-11-23）：本地目录改名 `pith`
-
-- `~/Documents/GitHub/personal-research-lab` 改名为 `~/Documents/GitHub/pith`；本仓库和 Atelier 里指向旧路径的地方都改了；`cargo clean -p` 清了五个工作区 crate（测试二进制里写死了旧路径）；Agent 记忆挪到新目录对应的位置。
+- Pith：`pnpm check` 全过：`pith` 281 通过、25 项默认忽略，其余 crate 全过，前端 17 + 29 通过。
+- 浏览器 `?mock`（1440 宽，亮、暗都看了）：变量、Lato、明暗跟系统切换都对；文献库、详情、调查页的颜色正常。
+- Atelier：`node tooling/pith/build.mjs --check`（37 个资产）；`npm run qa -- --scheme pith` 163 项全过；`check:ds` 12 个预览明暗都过，封面看过截图；`dw check pith-explore` 6 张全过；`check:canvases` 一致；`npm test` 37/37。没跑 `npm run all`、`build:motion`（动效没改）。
 
 ## 等你
 
-1. **重建 Git**：删掉两个 GitHub 仓库、清本地历史、重新 `git init`、连上新仓库、推送（命令在对话里给了）。
-2. **下一步怎么走**：出新一轮问卷（按 `0028`「还没定的」列题），还是直接写 1.1.0 的开发计划。开工前我会先问是哪种程度。
-3. **同步 `pith` 方案**：要先在 Atelier 给 `pith` 发版（打 tag `pith-v0.1.0`），再照 Atelier 的 `docs/adoption.md` 同步进 `src/vendor/pith/`；同步要你说一声。
-4. **摘抄、笔记的导出文件夹**（1.1.0 做导入时要）：Flomo、Obsidian 导出的 Markdown，放到 `local/` 下，我只读副本。
-5. 之前留下的：打开一次正式版 0.4.1：先备份、升到 v9；Word 模板点「更新」；两本《国富论》各「重新解析」一次。
+1. **推送**：Pith `main`；Atelier `main` 和 tag（`pith-v1.0.1` 是新的，之前的几个也还没推）：
+   `git -C ~/Documents/GitHub/visual-atelier push && git -C ~/Documents/GitHub/visual-atelier push --tags`
+2. **看新样子**：`ROADMAP.md`「用户验收清单」1.0.1 的两条（正式版的配色、字、图标；bench 里的 Design System 封面和 TopBar）。
+3. 云端的 Design System 要不要按 1.0.1 重发（新规矩下没让就不动）；Peck 的 Design System 要不要按 1.0.0 重发（共享给了组织外的人）。
+4. **正式版**：第一次打开会先备份、把数据升到 v9（以前 0.4.1 就该做的）；之后 Word 模板点「更新」，两本《国富论》各「重新解析」一次。
+5. **摘抄、笔记的导出文件夹**（1.1.0 做导入时要）：Flomo、Obsidian 导出的 Markdown，放到 `local/` 下，我只读副本。
 
 ## 已知的、没做的
 
-- **改名以后，旧目录下的会话打不开文件夹了**：Claude 桌面版里开在旧路径的几个会话（「Pith v0.5」和几个 btw 讨论）工作目录不在了，要接着用就在新目录 `~/Documents/GitHub/pith` 开新会话。
-  - `~/.claude.json` 里旧路径那一条没改（是 Claude Code 自己的配置），新目录第一次打开时可能要再点一次信任。
-- **清掉 Git 历史以后**：
-  - 文档里引用的旧提交号（`0028`「问卷」、各个决策文件里的提交号，Atelier 里的 `546725d` 等）都找不到了，只在你留的旧 `.git` 备份里。
-  - Atelier 的 tag（`pomelo-v*`、`peck-v0.1.0`、`vermilion-v*`）也会没了，Pomelo、Peck 以后同步要按 tag 走，得在新仓库里重新打。
-  - Atelier 的 `canvases/pomelo-fold/` 是 Pomelo 那个会话还没提交的东西，我没动；重新 `git init` 时 `git add -A` 会把它一起提交进去。
-- **Atelier 的 `canvases/v1-phase56-questionnaire/` 没删**：第 4 页是 Atelier Phase 6 的冷启动验收，那边还要用。
-- 第五轮问卷里填过、和新架构有关的偏好（摘抄是纯文本 Markdown、回答句后带编号、找不到时用模型自己的知识……）只在旧的 Git 历史里了（清历史以后在旧 `.git` 备份里）：删之前的 `docs/questionnaire/round-5-answers-partial.md`。出新问卷时会重新问。
-- 正式版 0.4.1 还没打开过。
+- **文献库表格窄了标题列会塌**：窗口宽度在 1100 以下（最小 960）时标题列被挤没，作者压在图标上。以前就这样（换回旧字体量过，列宽一样），不是这轮改的。
+- 琥珀、翠绿这些提示、完成的颜色还是 Tailwind 的色板（约 90 处），等 1.1.0 照 Pith 重做界面时一起换。
+- `destructive` 借了 `color-second`（纸与海是绯红）；要不要一个危险色，记在方案 `DESIGN.md` 第 8 节。
+- 中文字体先用系统的（宋体、苹方）；要不要随 App 带 Noto Serif SC、Noto Sans SC 待定（`DESIGN.md` 第 8 节）。
+- 首页叶子打开时的生长动画还没做成方案的动效零件（现在只在画布 R1 里），做 1.1.0 首页时再做。
+- 文档里引用的旧提交号、第五轮问卷的偏好只在旧 `.git` 备份里（11-24 重建 Git）。
 - 11-15 那四个修复留下的没做的照旧（`decisions/0025`）。
 
 ## 下一轮
 
 - **先问开发程度**（`CLAUDE.md` 规则 7）。
-- **定了怎么走以后**：写 1.1.0 的计划（新的决策文件、`ROADMAP.md` 分 Phase），版本号改 1.1.0，加 migration 0010 前先冻结 v9 样本库。
-- **1.1.0 大致的顺序**（待计划确认）：
-  1. 模型接口抽象（多家 API、缓存断点、账本记缓存命中）；
-  2. Agent 循环和子任务；
-  3. 技能运行时：按需加载 `SKILL.md`，工具注册，问题卡和交付卡的协议；
-  4. 对话页和研究主题；
-  5. 知识库：摘抄、笔记导入，检索接本机向量；
-  6. 旧功能一个个改成技能，改好就删旧页面；
-  7. Word 润色。
-- 界面：`pith` 方案发版、同步进来以后接上；组件只用变量。
-
-## 本轮改动
-
-- Pith：`CLAUDE.md`、`HANDOFF.md`、`ROADMAP.md`、`README.md`、`docs/requirements.md`、`docs/decisions/0026`、`docs/decisions/0029`（新）、`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`Cargo.lock`；删了 `HANDOFF-cloud.md`。代码没改。
-- Atelier：合并 `agent/claude/pith`；`CLAUDE.md`、`ROADMAP.md`、`docs/sessions.md`、`CHANGELOG.md`、`package.json`、`package-lock.json`、`.claude/settings.json`（新）、`schemes/pith/CLAUDE.md`。
-
-## 测试
-
-- Pith：`pnpm check` 全过：`pith` 281 通过、25 项默认忽略，其余 crate 全过，前端测试 17 + 29 通过。
-- Atelier：合并以后和改完准则以后各跑一次 `npm test`，都是 37 项全过；`node tooling/pith/build.mjs --check` 一致（36 个资产）。
+- 先把 `docs/atelier-handoff-2026-11-22.md` 和 `0028` 合成 `decisions/0030`，改 `CLAUDE.md` 规则 4、`requirements.md`、`ROADMAP.md`，删掉搬来的那份。
+- 再写 1.1.0 的计划（新的决策文件、`ROADMAP.md` 分 Phase），版本号改 1.1.0，加 migration 0010 前先冻结 v9 样本库。大致顺序（待计划确认）：模型接口抽象 → Agent 循环和子任务 → 技能运行时 → 对话页和研究主题（首页的叶子、顶栏三个图标用 `vendor/pith/marks/`）→ 知识库 → 旧功能改成技能 → Word 润色。
+- 界面只用 shadcn 变量和 `vendor/pith/bundle.css` 的 `pith-` 类；方案要改回 Atelier 改、发版、再同步。

@@ -90,4 +90,4 @@
 - **反过来改 Atelier**：Pith 开发、使用中发现 Atelier 的工具、Skill、流程不顺，就在 Atelier 里改，并记进它的 `CHANGELOG.md`。
 - **同步只单向**：已发版本（tag `pith-v<版本>`）照 Atelier 的 `docs/adoption.md` 复制进本仓库 `src/vendor/pith/`，带 `VERSION`、`SHA256SUMS`，不手改。要改回 Atelier 改、再发版。每次同步要用户在对话里说一声。
 - **计划分开**：Pith 的视觉写在本仓库 `ROADMAP.md`，Atelier 自己的计划写在它的 `ROADMAP.md`。
-- **现在**（2026-11-24）：Pith 的设计在 Atelier 里做完了，方案 `pith` 0.1.0（`schemes/pith/`：两套配色、36 个资产、7 个动效零件、Design System）已并进 Atelier 的 `main`。以后 `schemes/pith/`、`canvases/pith-*/` 归本仓库的会话（pith 环境）；方案发版以后照上一条同步进来，再接到界面上。
+- **现在**（2026-11-25）：方案 `pith` 1.0.1（Atelier 的 `schemes/pith/`：两套配色、37 个资产、7 个动效零件、Design System）同步进了 `src/vendor/pith/`，变量、字、明暗、App 图标接上了（对照在它的 `DESIGN.md` 第 9 节）。`schemes/pith/`、`canvases/pith-*/`、`tooling/pith/` 归本仓库的会话（pith 环境）；方案再发版照上一条同步进来。

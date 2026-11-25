@@ -1,43 +1,37 @@
 @import "tailwindcss";
+/* Pith 的视觉方案：从 visual-atelier 同步来的已发版本，不手改（vendor/pith/README.md）。两套配色、明暗看根上的 data-palette、data-theme */
+@import "./vendor/pith/pith.css";
+@import "./fonts.css";
 
-/* 颜色用 shadcn 命名的 CSS 变量；v0.1 只求简约，跟随系统浅色 / 深色。 */
+/* Tailwind 的 dark: 跟着根上的 data-theme 走（现在 data-theme 跟着系统，src/shared/theme.ts） */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * 组件只用 shadcn 命名的变量，值全从 pith 的 --color-* 来（对照和理由在 vendor/pith/DESIGN.md 第 9 节）。
+ * 注意 shadcn 的 accent 是悬停、选中的淡底，不是 pith 的强调色 --color-accent（海蓝）；手写 CSS 要强调色写 var(--color-accent)。
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #1f2328;
-  --sidebar: #f6f7f9;
-  --card: #ffffff;
-  --border: #e3e6ea;
-  --muted: #f1f3f5;
-  --muted-foreground: #6b7280;
-  --primary: #2f4f6f;
-  --primary-foreground: #ffffff;
-  --accent: #e8eef5;
-  --accent-foreground: #1f3a56;
-  --destructive: #c2410c;
-  --ring: #7aa2c8;
+  --background: var(--color-page);
+  --foreground: var(--color-text);
+  --sidebar: var(--color-page);
+  --card: var(--color-surface);
+  --border: var(--color-line);
+  --muted: var(--color-tint);
+  --muted-foreground: var(--color-text-3);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --accent: var(--color-tint);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-second);
+  --ring: var(--color-accent);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1b1d21;
-    --foreground: #e6e8eb;
-    --sidebar: #22252a;
-    --card: #1f2226;
-    --border: #33373d;
-    --muted: #2a2e34;
-    --muted-foreground: #9aa1ab;
-    --primary: #8fb3d9;
-    --primary-foreground: #10161d;
-    --accent: #2c3946;
-    --accent-foreground: #dbe7f3;
-    --destructive: #f59e6b;
-    --ring: #5f88b0;
-  }
-}
-
+/*
+ * inline：bg-accent 这类直接取 var(--accent)，不经过 --color-accent，所以和 pith.css 里同名的 --color-accent 不打架。
+ * 字体不在这里写：pith.css 的 --font-sans、--font-serif、--font-mono 不在 layer 里，压过 Tailwind 默认主题的同名变量，
+ * font-sans 就是 Lato 那一栈、font-serif 是 Newsreader 那一栈。
+ */
 @theme inline {
-  --font-sans: "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-sidebar: var(--sidebar);
@@ -61,7 +55,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-size: 13px;
+    font-size: var(--text-ui);
     line-height: 1.6;
     overscroll-behavior: none;
     cursor: default;

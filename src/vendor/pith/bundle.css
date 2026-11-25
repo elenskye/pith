@@ -1,0 +1,428 @@
+/* Pith 的组件样式（花园笔记 × 铅字）。类名以 pith- 开头，数值都用 tokens 的变量；组件的标准写法在 components/<组件>/preview.html。
+   动效零件的 CSS（schemes/pith/motion/ 下每个零件一份）在最后由构建插进来，同一份，不另写。
+   基础：.pith 是一屏的根（纸色底、正文色、无衬线）；读的东西用衬线（.pith-serif、回答、标题）。 */
+.pith { font-family: var(--font-sans); font-size: var(--text-ui); line-height: var(--leading-ui); color: var(--color-text); background: var(--color-page); -webkit-font-smoothing: antialiased; }
+.pith *, .pith *::before, .pith *::after { box-sizing: border-box; }
+.pith :where(h1, h2, h3, h4, p, figure, blockquote, q) { margin: 0; }
+.pith :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+.pith-serif { font-family: var(--font-serif); }
+
+/* ---------- 图形：铅字（.so 实心、.st 细线、.co 珊瑚色，一个图标一处珊瑚） ---------- */
+.pith-glyph { overflow: visible; flex: none; }
+.pith-glyph .so { fill: currentColor; }
+.pith-glyph .st { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.pith-glyph .co { fill: var(--color-coral); }
+.pith-type { width: 16px; height: 16px; color: var(--color-second); }
+.pith-stage { width: 28px; height: 28px; color: var(--color-accent); }
+.pith-appicon .ap-bg { fill: var(--color-app-ink); }
+.pith-appicon .ap .so { fill: var(--color-app-paper); }
+.pith-appicon .ap .co { fill: var(--color-app-coral); }
+.pith-wordmark { font: 500 23px/1 var(--font-serif); letter-spacing: .005em; white-space: nowrap; color: var(--color-text); }
+
+/* ---------- 顶栏：左边 Logo（点它回对话），三个图标居中、不写字（悬停出名字） ---------- */
+.pith-topbar { position: relative; display: flex; align-items: center; height: 68px; padding: 0 24px; border-bottom: 1px solid var(--color-line); background: var(--color-page); }
+.pith-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--color-text); }
+.pith-brand .pith-logo { width: 30px; height: 30px; }
+.pith-topbar-nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.pith-iconbtn { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--color-text-3); transition: color .25s; }
+.pith-iconbtn:hover, .pith-iconbtn.is-hover, .pith-iconbtn.is-current { color: var(--color-text); }
+.pith-iconbtn > .pith-glyph { width: 24px; height: 24px; }
+.pith-tip { position: absolute; top: 46px; left: 50%; padding: 3px 8px; border-radius: 6px; background: var(--color-text); color: var(--color-page); font: 500 12px/1.4 var(--font-sans); white-space: nowrap; opacity: 0; transform: translate(-50%, -4px); pointer-events: none; transition: opacity .2s, transform .25s var(--ease-out, cubic-bezier(.23,1,.32,1)); }
+.pith-iconbtn:hover .pith-tip { opacity: 1; transform: translate(-50%, 0); transition-delay: .35s; }
+.pith-badge { position: absolute; left: 28px; top: -4px; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--color-coral); color: var(--color-app-ink); font: 700 10.5px/1.4 var(--font-sans); }
+
+/* ---------- 输入框：居中，衬线的提示；/ @ # 三个记号；发送是强调色的圆 ---------- */
+.pith-composer { display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--width-composer); height: 56px; padding: 0 10px 0 18px; border: 1px solid var(--color-line-2); border-radius: var(--radius-m); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.pith-composer-field { flex: 1; min-width: 0; font: 400 17px/1.3 var(--font-serif); color: var(--color-text); }
+.pith-composer-field:empty::before, .pith-composer-field .ph { color: var(--color-text-4); }
+.pith-chip { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: var(--radius-pill); background: var(--color-tint); font: 700 12px/1.6 var(--font-sans); color: var(--color-accent-text); }
+.pith-sig { display: flex; gap: 2px; }
+.pith-sig > button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; font: 400 15px/1 var(--font-sans); color: var(--color-text-3); }
+.pith-send { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); }
+.pith-send > .pith-glyph { width: 19px; height: 19px; }
+
+/* ---------- 状态行：在跑的那一步，前面是会动的 Agent 图标，字上扫过一道光；做完停住、变淡 ---------- */
+.pith-status { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 15px/1.4 var(--font-serif); color: var(--color-text-3); }
+.pith-status-step { display: inline-flex; align-items: center; gap: 7px; }
+.pith-status-step > .pith-agent { width: 17px; height: 17px; color: var(--color-text-3); }
+.pith-status-step:not(.is-run) .pith-agent, .pith-status-step:not(.is-run) .pith-agent * { animation-play-state: paused !important; }
+.pith-status-step.is-done { color: var(--color-text-4); }
+.pith-status-step.is-done .pith-agent { color: var(--color-text-4); }
+.pith-thinking { display: inline-flex; align-items: center; gap: 9px; font: 400 16.5px/1 var(--font-serif); }
+.pith-thinking > .pith-agent { width: 22px; height: 22px; color: var(--color-accent); }
+
+/* ---------- 回答：衬线正文、编号 [n]、页边注 ---------- */
+.pith-answer { width: 100%; max-width: var(--width-content); }
+.pith-answer-title { font: 600 var(--text-title)/var(--leading-title) var(--font-serif); letter-spacing: -.01em; }
+.pith-p { position: relative; margin-top: 16px; font: 400 var(--text-body)/var(--leading-body) var(--font-serif); color: var(--color-text); }
+.pith-p.is-quiet { color: var(--color-text-2); }
+.pith-ref { display: inline-block; margin-left: 2px; padding: 0 3px; border-radius: 3px; font: 700 11px/1.3 var(--font-sans); color: var(--color-accent-text); vertical-align: .55em; cursor: pointer; transition: background .2s, color .2s, box-shadow .2s; }
+.pith-ref:hover, .pith-ref.is-hover { box-shadow: 0 0 0 1.5px var(--color-coral); }
+.pith-ref.is-on { background: var(--color-accent); color: var(--color-on-accent); }
+.pith-mark { background: linear-gradient(color-mix(in srgb, var(--color-accent) 40%, transparent), color-mix(in srgb, var(--color-accent) 40%, transparent)) 0 92% / 100% 3px no-repeat; }
+.pith-sidenote { width: var(--width-sidenote); padding-left: 14px; border-left: 1.5px solid var(--color-accent); }
+.pith-sidenote-head { display: flex; align-items: center; gap: 7px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; color: var(--color-second); }
+.pith-sidenote-head i { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; background: var(--color-accent); color: var(--color-on-accent); font-style: normal; }
+.pith-sidenote q { display: block; margin-top: 8px; font: italic 400 14.5px/1.6 var(--font-serif); color: var(--color-text-2); quotes: none; }
+.pith-sidenote-go { display: flex; gap: 14px; margin-top: 8px; }
+
+/* ---------- 交付卡：生长阶段、标题（字重跟着长）、「存进……」 ---------- */
+.pith-deliver { display: grid; grid-template-columns: 36px 1fr auto; column-gap: 12px; align-items: center; padding: 20px 22px; border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.pith-deliver > .pith-stage { width: 30px; height: 30px; }
+.pith-deliver-title { font: 430 19px/1.25 var(--font-serif); }
+.pith-deliver-desc { margin-top: 6px; font: 400 14px/1.6 var(--font-serif); color: var(--color-text-2); }
+.pith-deliver-meta { margin-top: 6px; font-size: 12px; color: var(--color-text-4); }
+.pith-deliver-ok { display: flex; align-items: center; gap: 8px; font-size: 13.5px; line-height: 1.5; color: var(--color-text-2); text-align: right; }
+.pith-deliver-ok > .pith-agent { width: 24px; height: 24px; color: var(--color-text); }
+
+/* ---------- 知识库卡片：类型标签（第二色）、标题、一句、日期 ---------- */
+.pith-kcard { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-surface); }
+.pith-kcard-label { display: flex; align-items: center; gap: 6px; font: 700 10.5px/1 var(--font-sans); letter-spacing: .08em; color: var(--color-second); }
+.pith-kcard-title { font: 430 18px/1.25 var(--font-serif); color: var(--color-text); }
+.pith-kcard-line { font: 400 14px/1.55 var(--font-serif); color: var(--color-text-2); }
+.pith-kcard-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-4); }
+.pith-kcard-meta > .pith-stage { width: 15px; height: 15px; }
+
+/* ---------- 文献库：表格的一行（书脊色块、题名、作者、年份），选中是淡底 ---------- */
+.pith-libtable { border-top: 1px solid var(--color-line); }
+.pith-librow { display: grid; grid-template-columns: 12px 1fr 160px 56px; column-gap: 14px; align-items: center; height: 48px; padding: 0 14px; border-bottom: 1px solid var(--color-line); }
+.pith-librow > i { width: 12px; height: 20px; border-radius: 1px 3px 3px 1px; background: var(--color-accent); }
+.pith-librow > b { font: 400 15px/1.3 var(--font-serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pith-librow > span { font-size: 12.5px; color: var(--color-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pith-librow > em { font-style: normal; font-size: 12.5px; color: var(--color-text-4); text-align: right; }
+.pith-librow.is-current { background: var(--color-tint); }
+
+/* ---------- 枝桠：对话历史和设置的导航（没有底色，一根茎、节点、标签） ---------- */
+.pith-branch { position: relative; padding-left: 26px; }
+.pith-branch::before { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; width: 1.4px; background: var(--color-accent); opacity: .7; }
+.pith-branch-item { position: relative; display: flex; align-items: center; min-height: 32px; font: 400 15.5px/1.35 var(--font-serif); color: var(--color-text-2); --dot-x: -12px; --dot-y: 50%; }
+.pith-branch-item::after { content: ""; position: absolute; left: -23px; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; border: 1.4px solid var(--color-accent); background: var(--color-page); }
+.pith-branch-item.is-current { color: var(--color-text); }
+.pith-branch-item.is-current::after { background: var(--color-coral); border-color: var(--color-coral); }
+
+/* ---------- 按钮和链接 ---------- */
+.pith-button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-on-accent); font: 700 14px/1 var(--font-sans); }
+.pith-button--quiet { background: transparent; color: var(--color-text-2); box-shadow: inset 0 0 0 1px var(--color-line-2); font-weight: 400; }
+.pith-link { font: 700 13.5px/1.3 var(--font-sans); color: var(--color-accent-text); text-decoration: none; }
+
+/* ---------- 外观：配色的色板（设置 › 外观） ---------- */
+.pith-swatch { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-line); border-radius: var(--radius-l); background: var(--color-surface); transition: box-shadow .3s; }
+.pith-swatch > i { width: 34px; height: 34px; border-radius: 50%; background: conic-gradient(var(--color-accent) 0 25%, var(--color-coral) 0 40%, var(--color-page) 0 100%); box-shadow: inset 0 0 0 1px var(--color-line-2); }
+.pith-swatch > b { font: 600 15px/1.2 var(--font-serif); color: var(--color-text); }
+.pith-swatch > span { margin-left: auto; font-size: 12px; color: var(--color-text-4); }
+.pith-swatch.is-on { box-shadow: 0 0 0 2px var(--color-accent); }
+
+/* ---------- 两套配色（非默认的那套，构建插进来） ---------- */
+[data-palette="mist-ochre"][data-theme="dark"],
+[data-theme="dark"] [data-palette="mist-ochre"],
+[data-palette="mist-ochre"] [data-theme="dark"] {
+  --color-page: #191c21;
+  --color-surface: #20242a;
+  --color-raised: #262b32;
+  --color-tint: #2a2f36;
+  --color-line: #2d3239;
+  --color-line-2: #414851;
+  --color-text: #e9ecf0;
+  --color-text-2: #d2d7de;
+  --color-text-3: #b6bdc7;
+  --color-text-4: #b4bbc5;
+  --color-accent: #e8a265;
+  --color-accent-text: #f0b57e;
+  --color-on-accent: #1a1006;
+  --color-second: #a3bce8;
+  --color-coral: #f59a85;
+  --color-gold: #6a5230;
+  --color-app-ink: #22272e;
+  --color-app-paper: #f7f8fa;
+  --color-app-coral: #f08a74;
+}
+
+[data-palette="mist-ochre"],
+[data-palette="mist-ochre"][data-theme="light"],
+[data-palette="mist-ochre"] [data-theme="light"] {
+  --color-page: #eef0f2;
+  --color-surface: #f7f8fa;
+  --color-raised: #ffffff;
+  --color-tint: #e2e6eb;
+  --color-line: #dde1e6;
+  --color-line-2: #c8cdd4;
+  --color-text: #22272e;
+  --color-text-2: #3a414b;
+  --color-text-3: #58606b;
+  --color-text-4: #656e77;
+  --color-accent: #c26a26;
+  --color-accent-text: #9a4f14;
+  --color-on-accent: #ffffff;
+  --color-second: #34558c;
+  --color-coral: #de6a55;
+  --color-gold: #f0d3a4;
+  --color-app-ink: #22272e;
+  --color-app-paper: #f7f8fa;
+  --color-app-coral: #f08a74;
+}
+
+/* ---------- 动效零件（schemes/pith/motion/，构建插进来） ---------- */
+/* ---------- 动效 · Pith 在想 · Agent 图标（agents，expressive） ---------- */
+/* Pith 在想：Agent 行为的动态图标（expressive，登记的表面 agent-status，循环，一圈 1.2–2.6 秒，登记最长的 2.6 秒）。
+   像 Claude Code：Agent 调一个工具，状态行那一步前面就是对应的图标在动，字上扫过一道光（.pith-shimmer）；那一步做完，图标停住、字变淡（Design System 的 .pith-status-step）。
+   十四个：在想、检索知识库、读原文、引用、查文献库、联网、计算、加载技能、写回答、问你、存进知识库、后台任务、改 Word、完成。图形在 marks/agents/。
+   「存进知识库」（站主 2026-11-24）：珊瑚色的种子落下、顿一下、埋进土里，土鼓一下，长出一根小枝丫，顶上的芽还是珊瑚色；.once 只演一遍、停在长好的样子（交付卡的「已种下」）。
+   .is-frame 加 --at 定在某一刻（只「存进知识库」用，它的时间都在关键帧里）。减弱动态效果：停在一帧看得懂的样子。
+   开发：图标跟着工具调用的事件换，不要按时间假装。 */
+:is(.pith-agent--think g,.pith-agent--search .s1,.pith-agent--search .s2,.pith-agent--search .s3,.pith-agent--cite .nb,.pith-agent--lib .pull,.pith-agent--lib .tilt,.pith-agent--skill .tip,.pith-agent--ask .bob,.pith-agent--save .sd,.pith-agent--save .bd,.pith-agent--save .soil,.pith-agent--done .bloom,.pith-agent--done .core,.pith-agent--read .hi,.pith-agent--bg .arc){transform-box:fill-box;transform-origin:center}
+/* 在想：一点 → 四瓣 → 八瓣，像 Claude Code 的星号，慢慢转 */
+.pith-agent--think{animation:pith-ag-spin 7.2s linear infinite}
+.pith-agent--think g{opacity:0;animation:pith-ag-ph 1.8s infinite}
+.pith-agent--think .f1{animation-delay:.6s}.pith-agent--think .f2{animation-delay:1.2s}
+@keyframes pith-ag-ph{0%{opacity:0;transform:scale(.7)}8%,30%{opacity:1;transform:none}40%,100%{opacity:0;transform:scale(1.1)}}
+@keyframes pith-ag-spin{to{transform:rotate(360deg)}}
+/* 检索：放大镜从左扫到右，扫过的种子变珊瑚色 */
+.pith-agent--search .lp{animation:pith-ag-sweep 1.6s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes pith-ag-sweep{0%{transform:translateX(-4px)}50%{transform:translateX(24px)}100%{transform:translateX(-4px)}}
+.pith-agent--search .s1{animation:pith-ag-lit 1.6s infinite}.pith-agent--search .s2{animation:pith-ag-lit 1.6s .2s infinite}.pith-agent--search .s3{animation:pith-ag-lit 1.6s .4s infinite}
+@keyframes pith-ag-lit{0%,10%,60%,100%{fill:currentColor;transform:none}25%,40%{fill:var(--color-coral);transform:scale(1.3)}}
+/* 读原文：一行一行被读到，珊瑚色的一道扫过 */
+.pith-agent--read .hi{fill:var(--color-coral);opacity:.55;transform-origin:0 50%;transform:scaleX(0);animation:pith-ag-hl 2s infinite}
+.pith-agent--read .l1 .hi{animation-delay:.5s}.pith-agent--read .l2 .hi{animation-delay:1s}.pith-agent--read .l3 .hi{animation-delay:1.5s}
+@keyframes pith-ag-hl{0%{transform:scaleX(0);opacity:.55}20%{transform:scaleX(1);opacity:.55}30%,100%{transform:scaleX(1);opacity:0}}
+/* 引用：编号蹦出来，一根细线连到页边 */
+.pith-agent--cite .nb{animation:pith-ag-pop 1.6s cubic-bezier(.34,1.56,.64,1) infinite}
+.pith-agent--cite .pp{fill:none;stroke:var(--color-page);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@keyframes pith-ag-pop{0%,8%{transform:scale(0)}24%,80%{transform:none}92%,100%{transform:scale(0)}}
+.pith-agent--cite .cl{stroke-dasharray:1 2;animation:pith-ag-draw 1.6s infinite}
+@keyframes pith-ag-draw{0%,24%{stroke-dashoffset:1}50%,82%{stroke-dashoffset:0}94%,100%{stroke-dashoffset:-1}}
+.pith-agent--cite .edge{opacity:.45}
+/* 查文献库：中间那本被抽出来又放回去，右边那本晃一下 */
+.pith-agent--lib .pull{animation:pith-ag-pull 1.8s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes pith-ag-pull{0%,15%,85%,100%{transform:none}40%,60%{transform:translateY(-6px)}}
+.pith-agent--lib .tilt{transform-origin:100% 100%;animation:pith-ag-tilt 1.8s infinite}
+@keyframes pith-ag-tilt{0%,55%,100%{transform:rotate(0)}68%{transform:rotate(12deg)}80%{transform:rotate(6deg)}}
+/* 联网：经线转动，一颗珊瑚点沿赤道绕 */
+.pith-agent--web .mer{fill:none;stroke:currentColor;animation:pith-ag-mer 2s ease-in-out infinite}
+@keyframes pith-ag-mer{0%,100%{rx:12}50%{rx:1.5}}
+.pith-agent--web .orb{transform-box:view-box;transform-origin:24px 24px;animation:pith-ag-orb 2s linear infinite}
+@keyframes pith-ag-orb{0%{transform:scaleX(1) translateX(0)}25%{transform:translateX(-13.6px)}50%{transform:translateX(-27.2px)}75%{transform:translateX(-13.6px)}100%{transform:translateX(0)}}
+/* 计算：算盘珠依次拨过去 */
+.pith-agent--compute .b1{animation:pith-ag-b 1.6s infinite}.pith-agent--compute .b2{animation:pith-ag-b 1.6s .25s infinite}.pith-agent--compute .b3{animation:pith-ag-b 1.6s .5s infinite}
+@keyframes pith-ag-b{0%,10%{transform:none}35%,70%{transform:translateX(16px)}95%,100%{transform:none}}
+/* 加载技能：一卷蕨芽从书脊旁边展开 */
+.pith-agent--skill .uf{stroke-dasharray:1 2;animation:pith-ag-unf 1.8s cubic-bezier(.3,.6,.3,1) infinite}
+@keyframes pith-ag-unf{0%{stroke-dashoffset:1}55%,85%{stroke-dashoffset:0}100%{stroke-dashoffset:0;opacity:0}}
+.pith-agent--skill .tip{animation:pith-ag-tipa 1.8s infinite}
+@keyframes pith-ag-tipa{0%,50%{transform:scale(0)}62%{transform:scale(1.35)}70%,85%{transform:none}100%{transform:none;opacity:0}}
+/* 写：笔尖往右走，后面拖出一行字（波浪线） */
+.pith-agent--write .wv{stroke-dasharray:1 2;animation:pith-ag-wv 1.8s linear infinite}
+@keyframes pith-ag-wv{0%{stroke-dashoffset:1}80%,90%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.pith-agent--write .nib{transform-box:view-box;animation:pith-ag-nib 1.8s linear infinite}
+@keyframes pith-ag-nib{0%{transform:translate(-22px,0)}20%{transform:translate(-16px,-3px)}40%{transform:translate(-10px,1px)}60%{transform:translate(-4px,-3px)}80%,90%{transform:translate(2px,0)}100%{transform:translate(2px,0);opacity:0}}
+/* 问你：问号下面那颗点一直轻轻跳 */
+.pith-agent--ask .bob{animation:pith-ag-bob 1.2s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes pith-ag-bob{0%,100%{transform:none}45%{transform:translateY(-4px) scale(1.1)}60%{transform:translateY(0) scaleX(1.15) scaleY(.85)}}
+/* 存进知识库（站主 11-24）：一颗珊瑚色的种子落下来、在土上顿一下、埋进土里；土鼓一下；一根小枝丫从土里长出来，先茎、再左右两根枝和叶，顶上的芽是珊瑚色。
+   时间都在关键帧里（没有 delay），--at 能把它定在某一刻；.once 只演一遍、停在长好的样子（App 里交付卡的「已种下」用）。 */
+.pith-agent--save .sd{animation:pith-sv-seed 2.6s infinite}
+@keyframes pith-sv-seed{0%{transform:translateY(0) scale(.5);opacity:0;animation-timing-function:ease-out}5%{transform:translateY(0);opacity:1;animation-timing-function:cubic-bezier(.55,0,.9,.45)}20%{transform:translateY(23px);opacity:1}23%{transform:translateY(23.6px) scale(1.18,.78)}27%{transform:translateY(23px);animation-timing-function:cubic-bezier(.5,0,.4,1)}40%,100%{transform:translateY(31.5px);opacity:1}}
+.pith-agent--save .soil{transform-origin:50% 100%;animation:pith-sv-soil 2.6s infinite}
+@keyframes pith-sv-soil{0%,38%{transform:none}44%{transform:scale(1.04,1.14)}52%,100%{transform:none}}
+.pith-agent--save .ss{stroke-dasharray:1 2;animation:pith-sv-ss 2.6s infinite}
+@keyframes pith-sv-ss{0%,42%{stroke-dashoffset:1;animation-timing-function:cubic-bezier(.3,.6,.3,1)}62%,100%{stroke-dashoffset:0}}
+.pith-agent--save .sb1{stroke-dasharray:1 2;animation:pith-sv-b1 2.6s infinite}.pith-agent--save .sb2{stroke-dasharray:1 2;animation:pith-sv-b2 2.6s infinite}
+@keyframes pith-sv-b1{0%,52%{stroke-dashoffset:1}61%,100%{stroke-dashoffset:0}}
+@keyframes pith-sv-b2{0%,57%{stroke-dashoffset:1}66%,100%{stroke-dashoffset:0}}
+.pith-agent--save :is(.lf1,.lf2){transform-box:view-box}
+.pith-agent--save .lf1{transform-origin:18.6px 27px;animation:pith-sv-l1 2.6s infinite}.pith-agent--save .lf2{transform-origin:29.2px 21px;animation:pith-sv-l2 2.6s infinite}
+@keyframes pith-sv-l1{0%,59%{transform:rotate(30deg) scale(0);animation-timing-function:cubic-bezier(.34,1.56,.64,1)}72%,100%{transform:none}}
+@keyframes pith-sv-l2{0%,64%{transform:rotate(-30deg) scale(0);animation-timing-function:cubic-bezier(.34,1.56,.64,1)}77%,100%{transform:none}}
+.pith-agent--save .bd{animation:pith-sv-bud 2.6s infinite}
+@keyframes pith-sv-bud{0%,72%{transform:scale(0)}78%{transform:scale(1.45)}83%,100%{transform:none}}
+.pith-agent--save .spr{animation:pith-sv-out 2.6s infinite}
+@keyframes pith-sv-out{0%,90%{opacity:1}97%,100%{opacity:0}}
+.pith-agent--save.pith-agent--save :is(.sd,.soil,.ss,.sb1,.sb2,.lf1,.lf2,.bd,.spr){animation-delay:calc(-1 * var(--at, 0s))}
+.pith-agent--save.once :is(.sd,.soil,.ss,.sb1,.sb2,.lf1,.lf2,.bd){animation-iteration-count:1;animation-fill-mode:both}.pith-agent--save.once .spr{animation:none}
+.pith-agent.is-frame,.pith-agent.is-frame *{animation-play-state:paused!important}
+/* 后台任务：一圈慢慢画满，头上一颗珊瑚点跟着走 */
+.pith-agent--bg .trk{opacity:.22}
+.pith-agent--bg .arc{stroke-dasharray:1 2;transform:rotate(-90deg);animation:pith-ag-arc 2.4s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes pith-ag-arc{0%{stroke-dashoffset:1}90%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.pith-agent--bg .head{transform-box:view-box;transform-origin:24px 24px;animation:pith-ag-head 2.4s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes pith-ag-head{0%{transform:rotate(0)}90%{transform:rotate(360deg);opacity:1}100%{transform:rotate(360deg);opacity:0}}
+/* 改 Word：一行被划掉，珊瑚色的插入点在闪 */
+.pith-agent--word .strike{stroke-dasharray:1 2;animation:pith-ag-strike 1.6s infinite}
+@keyframes pith-ag-strike{0%,10%{stroke-dashoffset:1}40%,100%{stroke-dashoffset:0}}
+.pith-agent--word .caret{animation:pith-ag-blink 1.6s steps(1) infinite}
+@keyframes pith-ag-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+/* 完成：开成一朵八瓣，芯是珊瑚色 */
+.pith-agent--done .bloom{animation:pith-ag-bloom 2.4s cubic-bezier(.34,1.56,.64,1) infinite}
+@keyframes pith-ag-bloom{0%{transform:scale(0) rotate(-45deg)}30%,85%{transform:none}100%{transform:none;opacity:0}}
+.pith-agent--done .core{animation:pith-ag-core 2.4s infinite}
+@keyframes pith-ag-core{0%{transform:scale(1)}15%{transform:scale(1.5)}30%,100%{transform:none}}
+/* 状态行的字：一道光从左往右扫过（Claude Code 那种） */
+.pith-shimmer{background:linear-gradient(90deg,var(--color-text-3) 0 38%,var(--color-text) 50%,var(--color-text-3) 62% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:pith-ag-shim 1.8s linear infinite}
+@keyframes pith-ag-shim{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion: reduce){.pith-agent:not(.is-frame),.pith-agent:not(.is-frame) *,.pith-shimmer{animation:none!important}.pith-agent--think .f2{opacity:1}.pith-agent--skill .uf,.pith-agent--cite .cl{stroke-dashoffset:0}.pith-agent--save:not(.is-frame) .sd{opacity:0}.pith-agent--bg .arc{stroke-dashoffset:.3}.pith-agent--read .hi{transform:none;opacity:.4}}
+
+/* ---------- 动效 · 悬停 · 上墨（hover，calm） ---------- */
+/* 悬停「上墨」（calm，≤ 520 毫秒）：借 Vermilion 的做法（纸片滑入、笔画写出、点抵达；链接下划线从两端收拢），数值和颜色是 Pith 自己的。
+   触发：:hover、:focus-visible，或 .is-hover（演示、导出用）。顶栏的知识库、文献库、设置和 Logo 有自己的生长（topbar-grow、logo-grow），这里让开。 */
+/* 图标按钮：一片淡底从左下滑进来，细线重写一遍，实心的铅字像印上纸一样压一下，珊瑚色最后抵达 */
+.pith-ink { position: relative; isolation: isolate; }
+.pith-ink::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--color-tint); opacity: 0; transform: translate(-3px, 3px); transition: opacity .2s, transform .2s cubic-bezier(.3,.6,.2,1); }
+.pith-ink:is(:hover, :focus-visible, .is-hover)::before { opacity: 1; transform: none; }
+:is(.pith-ink, .pith-lift, .pith-row):is(:hover, :focus-visible, .is-hover) .pith-glyph:not(.pith-icon--kb, .pith-icon--lib, .pith-icon--set, .pith-agent) > .t .st { stroke-dasharray: 1 2; animation: pith-write .3s cubic-bezier(.5,0,.2,1) both; }
+:is(.pith-ink, .pith-lift, .pith-row):is(:hover, :focus-visible, .is-hover) .pith-glyph:not(.pith-icon--kb, .pith-icon--lib, .pith-icon--set, .pith-agent) > .t .so { transform-box: fill-box; transform-origin: center; animation: pith-press .32s cubic-bezier(.34,1.56,.64,1) both; }
+:is(.pith-ink, .pith-lift, .pith-row):is(:hover, :focus-visible, .is-hover) .pith-glyph:not(.pith-icon--kb, .pith-icon--lib, .pith-icon--set, .pith-agent) > .t .co { transform-box: fill-box; transform-origin: center; animation: pith-arrive .52s linear both; }
+@keyframes pith-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes pith-press { 0% { transform: scale(.86); opacity: .55; } 100% { transform: none; opacity: 1; } }
+@keyframes pith-arrive { 0%, 68% { transform: scale(.2); opacity: 0; } 84% { transform: scale(1.35); opacity: 1; } 100% { transform: none; opacity: 1; } }
+/* 链接：上浮 1px，珊瑚色的下划线从两端收拢 */
+.pith-link { position: relative; top: 0; background-image: linear-gradient(var(--color-coral), var(--color-coral)), linear-gradient(var(--color-coral), var(--color-coral)); background-repeat: no-repeat; background-position: left 100%, right 100%; background-size: 0% 1.5px, 0% 1.5px; transition: background-size .22s ease, top .16s ease; }
+.pith-link:is(:hover, :focus-visible, .is-hover) { top: -1px; background-size: 50.5% 1.5px, 50.5% 1.5px; }
+/* 列表行（枝桠、表格）：节点上落一颗珊瑚点，字往右让 3px。点的位置用 --dot-x、--dot-y 给 */
+.pith-row { position: relative; }
+.pith-row > :is(b, span:first-child) { transition: transform .22s cubic-bezier(.3,.6,.2,1); }
+.pith-row::before { content: ""; position: absolute; left: var(--dot-x, -12px); top: var(--dot-y, 50%); z-index: 1; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--color-coral); opacity: 0; transform: scale(.2); pointer-events: none; }
+.pith-row:is(:hover, :focus-visible, .is-hover)::before { animation: pith-arrive .4s linear both; }
+.pith-row:is(:hover, :focus-visible, .is-hover) > :is(b, span:first-child) { transform: translateX(3px); }
+/* 卡片：上浮 3px、影子加深，卡上的图标也上一次墨 */
+.pith-lift { transition: transform .3s cubic-bezier(.23,1,.32,1), box-shadow .3s; }
+.pith-lift:is(:hover, :focus-visible, .is-hover) { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+/* 按钮：一道亮光从左扫过，箭头往前挪 2px */
+.pith-sweep { position: relative; overflow: hidden; isolation: isolate; }
+.pith-sweep::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, white 34%, transparent) 50%, transparent 70%) 0 0 / 250% 100% no-repeat; background-position: 120% 0; pointer-events: none; }
+.pith-sweep:is(:hover, :focus-visible, .is-hover)::after { animation: pith-sweep .6s ease-out both; }
+@keyframes pith-sweep { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+.pith-sweep :is(.pith-glyph, .ar) { display: inline-block; transition: transform .22s cubic-bezier(.34,1.56,.64,1); }
+.pith-sweep:is(:hover, :focus-visible, .is-hover) :is(.pith-glyph, .ar) { transform: translateX(2px); }
+@media (prefers-reduced-motion: reduce) {
+  :is(.pith-ink, .pith-lift, .pith-row, .pith-sweep, .pith-link):not(.is-frame) *, :is(.pith-ink, .pith-row, .pith-sweep, .pith-link)::before, :is(.pith-ink, .pith-row, .pith-sweep, .pith-link)::after { animation: none !important; transition: none !important; }
+  .pith-row:is(:hover, :focus-visible, .is-hover)::before { opacity: 1; transform: none; }
+}
+
+/* ---------- 动效 · Logo · 从底下长出来，结一颗果（logo-grow，expressive） ---------- */
+/* Logo 的生长（expressive，登记的表面 logo-grow，1.74 秒）：脚（地面）先铺开，茎从底下长上去、一口气绕一圈成 P 的碗（不停、不留缝），
+   再往里卷，卷心结出珊瑚色的果（站主 2026-11-24）。App 打开时一次（.is-in，放完拿掉），鼠标放上去再一次。
+   用 marks/logo/pith-grow.svg（茎和碗的前段一个遮罩、碗的后段一个窄遮罩、卷一个遮罩，遮罩里是中心线）。.is-frame 加 --at 定在某一刻。 */
+.is-frame, .is-frame * { animation-play-state: paused !important; }
+.pith-brand:is(:hover, :focus-visible, .is-hover, .is-in, .is-frame) .lgw .ft{transform-box:view-box;transform-origin:15.2px 40.4px;animation:pith-lg-ft .24s cubic-bezier(.3,.7,.3,1) calc(0s - var(--at, 0s)) both}
+.pith-brand:is(:hover, :focus-visible, .is-hover, .is-in, .is-frame) .lgw .m1{stroke-dasharray:1 2;animation:pith-lg-draw .98s cubic-bezier(.42,.08,.4,1) calc(0.1s - var(--at, 0s)) both}
+.pith-brand:is(:hover, :focus-visible, .is-hover, .is-in, .is-frame) .lgw .m2{stroke-dasharray:1 2;animation:pith-lg-draw .32s cubic-bezier(.2,.6,.35,1) calc(1.06s - var(--at, 0s)) both}
+.pith-brand:is(:hover, :focus-visible, .is-hover, .is-in, .is-frame) .lgw .fr{transform-box:fill-box;transform-origin:center;animation:pith-lg-fruit .4s cubic-bezier(.34,1.56,.64,1) calc(1.34s - var(--at, 0s)) both}
+@keyframes pith-lg-ft{from{transform:scaleX(0)}to{transform:none}}
+@keyframes pith-lg-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes pith-lg-fruit{0%{transform:scale(0)}55%{transform:scale(1.4)}100%{transform:none}}
+@media (prefers-reduced-motion: reduce) { .pith-brand:not(.is-frame) .lgw * { animation: none !important; } }
+
+/* ---------- 动效 · 换配色 · 湖面波纹（palette-lake，expressive） ---------- */
+/* 换配色 · 湖面波纹（expressive，登记的表面 palette-lake，2.3 秒；站主 2026-11-23：要像几层真实的湖面波纹，不是一个圈）。
+   从点的地方漾开五圈：暗的波谷（强调色压暗）和亮的波峰（纸色提亮）一对一对，第二、四圈是珊瑚色，一圈比一圈晚、一圈比一圈细；
+   同时整页像水面一样轻轻晃一下（SVG 滤镜 #pith-lake-f，1.4 秒），颜色 token 慢慢过渡（0.9 秒，@property 注册成 <color>）。
+   用法：.pith-lake 放在点的位置（left/top），里面五对圆 .rg1–5、.rh1–5，加 .is-in 才漾开；页面的根加 .pith-smooth（颜色过渡）；换的那一刻根加 .is-lake（1.45 秒后拿掉），
+   并调滤镜里 <animate id="pith-lake-anim"> 的 beginElement()。滤镜在大页面上可能吃性能，开发时要量，必要时只扭曲一张截图层。 */
+@property --color-page { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-surface { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-raised { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-tint { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-line { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-line-2 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-text { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-text-2 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-text-3 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-text-4 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-accent { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-accent-text { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-second { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --color-coral { syntax: '<color>'; inherits: true; initial-value: transparent; }
+.pith-smooth { transition: --color-page .9s cubic-bezier(.4,0,.2,1), --color-surface .9s cubic-bezier(.4,0,.2,1), --color-raised .9s cubic-bezier(.4,0,.2,1), --color-tint .9s cubic-bezier(.4,0,.2,1), --color-line .9s cubic-bezier(.4,0,.2,1), --color-line-2 .9s cubic-bezier(.4,0,.2,1), --color-text .9s cubic-bezier(.4,0,.2,1), --color-text-2 .9s cubic-bezier(.4,0,.2,1), --color-text-3 .9s cubic-bezier(.4,0,.2,1), --color-text-4 .9s cubic-bezier(.4,0,.2,1), --color-accent .9s cubic-bezier(.4,0,.2,1), --color-accent-text .9s cubic-bezier(.4,0,.2,1), --color-second .9s cubic-bezier(.4,0,.2,1), --color-coral .9s cubic-bezier(.4,0,.2,1); }
+.pith-smooth.is-lake { filter: url(#pith-lake-f); }
+.pith-lake { position: absolute; z-index: 65; width: 40px; height: 40px; margin: -20px 0 0 -20px; overflow: visible; pointer-events: none; }
+.pith-lake circle { fill: none; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; opacity: 0; }
+.pith-lake.is-in circle { animation: pith-lake 2.1s cubic-bezier(.15,.65,.3,1) var(--d) forwards; }
+.pith-lake .rg { stroke: color-mix(in srgb, var(--color-accent) 70%, var(--color-text)); }
+.pith-lake .rh { stroke: color-mix(in srgb, var(--color-page) 60%, white); stroke-width: 1.2 !important; }
+.pith-lake :is(.rg2, .rg4) { stroke: var(--color-coral); }
+.pith-lake :is(.rg1, .rh1) { --d: 0s; --k: 62; --o: .7; stroke-width: 3; }
+.pith-lake :is(.rg2, .rh2) { --d: .16s; --k: 52; --o: .6; stroke-width: 2.4; }
+.pith-lake :is(.rg3, .rh3) { --d: .34s; --k: 42; --o: .5; stroke-width: 1.8; }
+.pith-lake :is(.rg4, .rh4) { --d: .54s; --k: 32; --o: .42; stroke-width: 1.4; }
+.pith-lake :is(.rg5, .rh5) { --d: .76s; --k: 22; --o: .34; stroke-width: 1; }
+@keyframes pith-lake { 0% { transform: scale(.15); opacity: 0; } 8% { opacity: var(--o); } 100% { transform: scale(var(--k)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pith-lake { display: none; }
+  .pith-smooth.is-lake { filter: none; }
+  .pith-smooth { transition: none; }
+}
+
+/* ---------- 动效 · 生长 · 存进知识库（save-grow，expressive） ---------- */
+/* 生长 · 存进知识库（expressive，登记的表面 save-grow，1.9 秒；站主 2026-11-23）：点交付卡的「存进……」，一颗珊瑚色的种子从按钮出发，沿一条弧线落到顶栏知识库图标的正中；
+   落下的那一刻图标晃一下、芽弹一下、漾开一圈珊瑚色、+1。交付卡上的「已种下」前面，「存进知识库」的 Agent 图标演一遍（agents 零件的 .once）。
+   种子：<i class="pith-seed is-in" style="offset-path: path('M x0 y0 Q cx cy x1 y1')">（加 .is-in 才飞），起点、落点每次按真实位置量（窗口大小、顶栏布局会变），不要写死；
+   原型：控制点 cx = (x0 + x1) / 2 + 120、cy = min(y0, y1) - 40。0.82 秒后给知识库图标加 .is-fed、+1 加 .is-in，1.9 秒后都拿掉。 */
+.pith-seed { position: absolute; left: 0; top: 0; z-index: 70; width: 12px; height: 12px; border-radius: 50%; background: var(--color-coral); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-coral) 22%, transparent); offset-anchor: center; offset-rotate: 0deg; pointer-events: none; opacity: 0; }
+.pith-seed.is-in { animation: pith-seed .82s cubic-bezier(.55,0,.35,1) forwards; }
+@keyframes pith-seed { 0% { offset-distance: 0%; transform: scale(0); } 12% { offset-distance: 2%; transform: scale(1.25); } 88% { offset-distance: 100%; transform: scale(.9); opacity: 1; } 100% { offset-distance: 100%; transform: scale(.2); opacity: 0; } }
+.pith-ink.is-fed { color: var(--color-text); }
+.pith-ink.is-fed > .pith-glyph { transform-origin: 50% 100%; animation: pith-fed-sway .7s cubic-bezier(.34,1.56,.64,1); }
+.pith-ink.is-fed .t .co { transform-box: fill-box; transform-origin: center; animation: pith-fed-bud .7s cubic-bezier(.34,1.56,.64,1); }
+.pith-ink.is-fed::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1.5px solid var(--color-coral); animation: pith-fed-ring .7s ease-out forwards; pointer-events: none; }
+@keyframes pith-fed-sway { 25% { transform: rotate(-10deg) scale(1.06); } 55% { transform: rotate(7deg); } 100% { transform: none; } }
+@keyframes pith-fed-bud { 0% { transform: scale(1); } 30% { transform: scale(1.9); } 100% { transform: none; } }
+@keyframes pith-fed-ring { from { transform: scale(.6); opacity: 1; } to { transform: scale(4.2); opacity: 0; } }
+.pith-badge { opacity: 0; }
+.pith-badge.is-in { animation: pith-plus 1.8s cubic-bezier(.23,1,.32,1) both; }
+@keyframes pith-plus { 0% { opacity: 0; transform: translateY(4px) scale(.6); } 20%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pith-seed { display: none; }
+  .pith-ink.is-fed > .pith-glyph, .pith-ink.is-fed .t .co { animation: none; }
+  .pith-ink.is-fed::after { display: none; }
+  .pith-badge.is-in { animation: none; opacity: 1; }
+}
+
+/* ---------- 动效 · 顶栏图标 · 各自长出来（topbar-grow，expressive） ---------- */
+/* 顶栏三个图标的悬停（expressive，登记的表面 topbar-grow，≤ 1.32 秒）：各按自己是什么长出来，珊瑚色都在最后出现（站主 2026-11-24）。
+   知识库：茎从底下画上去，三片叶跟着茎依次展开，顶上的芽最后弹出来（0.9 秒）。
+   文献库：书一本本落下来摆好，第三本先立着、再斜靠过去；叶书签最后从中间那本里冒出来（1.05 秒）。
+   设置：一圈叶边转边一片片长出来（转得匀，每片都在同一个位置冒出来，像被转出来的），转慢、停住，轻轻「咔」一下，环心的珊瑚色最后出现（1.32 秒）。
+   触发：图标按钮 .pith-ink 悬停、键盘聚焦、.is-hover；.is-frame 加 --at（秒）定在某一刻（分解图用）。叶的 --o 是叶柄那一点（图标 SVG 里写好了）。
+   开发：这三个比一般的悬停长，每次鼠标进来都重演；刚演过的那个一两秒内别再重演（界面记一下时间，不加 .is-hover 的替身就行）。 */
+.is-frame, .is-frame * { animation-play-state: paused !important; }
+/* 知识库 */
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb .stem{stroke-dasharray:1 2;animation:pith-kb-stem .5s cubic-bezier(.3,.6,.3,1) calc(0s - var(--at, 0s)) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb :is(.l1,.l2,.l3){transform-box:view-box;transform-origin:var(--o);animation:pith-kb-leaf .36s cubic-bezier(.34,1.56,.64,1) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb .l1{--r:32deg;animation-delay:calc(0.12s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb .l2{--r:-32deg;animation-delay:calc(0.24s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb .l3{--r:32deg;animation-delay:calc(0.36s - var(--at, 0s))}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--kb .co{transform-box:fill-box;transform-origin:center;animation:pith-gr-pop .34s cubic-bezier(.34,1.56,.64,1) calc(0.56s - var(--at, 0s)) both}
+@keyframes pith-kb-stem{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes pith-kb-leaf{from{transform:rotate(var(--r)) scale(0)}to{transform:none}}
+@keyframes pith-gr-pop{0%{transform:scale(0)}60%{transform:scale(1.35)}100%{transform:none}}
+/* 文献库 */
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--lib :is(.b1,.b2){animation:pith-lib-drop .4s cubic-bezier(.3,.7,.4,1) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--lib .b1{animation-delay:calc(0s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--lib .b2{animation-delay:calc(0.13s - var(--at, 0s))}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--lib .b3{transform-box:view-box;transform-origin:36.4px 41.5px;animation:pith-lib-lean .62s cubic-bezier(.4,.2,.3,1) calc(0.26s - var(--at, 0s)) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--lib .bm{transform-box:view-box;transform-origin:var(--o);animation:pith-lib-mark .36s cubic-bezier(.34,1.56,.64,1) calc(0.7s - var(--at, 0s)) both}
+@keyframes pith-lib-drop{0%{transform:translateY(-11px);opacity:0}55%{transform:translateY(.8px);opacity:1}78%{transform:translateY(-.6px)}100%{transform:none;opacity:1}}
+@keyframes pith-lib-lean{0%{transform:translateY(-11px) rotate(-13deg);opacity:0}38%{transform:rotate(-13deg);opacity:1}48%{transform:rotate(-13deg)}82%{transform:rotate(1.6deg)}100%{transform:none;opacity:1}}
+@keyframes pith-lib-mark{from{transform:rotate(-24deg) scale(0)}to{transform:none}}
+/* 设置 */
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .wh{transform-box:view-box;transform-origin:24px 24px;animation:pith-set-spin 1s calc(0s - var(--at, 0s)) both,pith-set-lock .22s ease-out calc(1s - var(--at, 0s)) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .rg{transform-box:view-box;transform-origin:24px 24px;animation:pith-set-ring .2s ease-out calc(0s - var(--at, 0s)) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set :is(.w0,.w1,.w2,.w3,.w4,.w5){transform-box:view-box;transform-origin:var(--o);animation:pith-set-leaf .26s cubic-bezier(.34,1.56,.64,1) both}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w5{animation-delay:calc(0.0s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w4{animation-delay:calc(0.1s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w3{animation-delay:calc(0.2s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w2{animation-delay:calc(0.3s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w1{animation-delay:calc(0.4s - var(--at, 0s))}.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .w0{animation-delay:calc(0.5s - var(--at, 0s))}
+.pith-ink:is(:hover, :focus-visible, .is-hover, .is-frame) .pith-icon--set .co{transform-box:fill-box;transform-origin:center;animation:pith-gr-pop .32s cubic-bezier(.34,1.56,.64,1) calc(1.02s - var(--at, 0s)) both}
+@keyframes pith-set-spin{0%{transform:rotate(-480deg);animation-timing-function:linear}60%{transform:rotate(-120deg);animation-timing-function:cubic-bezier(.33,.67,.5,1)}100%{transform:none}}
+@keyframes pith-set-lock{0%{scale:1}40%{scale:1.07}100%{scale:1}}
+@keyframes pith-set-ring{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+@keyframes pith-set-leaf{from{transform:scale(0)}to{transform:none}}
+@media (prefers-reduced-motion: reduce) { .pith-ink:not(.is-frame) :is(.pith-icon--kb, .pith-icon--lib, .pith-icon--set) * { animation: none !important; } }
+
+/* ---------- 动效 · 舒展 · 回答和页边注（unfold，expressive） ---------- */
+/* 舒展（expressive，登记的表面 answer-unfold，≤ 1.4 秒）：回答一段段从折痕里往下展开，落定前轻轻过一点；点编号 [n] 时，那几个字下面扫过一道，页边注从上往下展开，带一点回弹（站主 2026-11-23）。
+   回答：每段 .pith-unfold，写出来那一刻加 .is-in，--d 给每段错开（0.4 秒一段）。页边注：.pith-sidenote 加 .is-open 展开（0.55 秒），去掉收起。编号 .pith-ref.is-on 填上强调色。 */
+.pith-unfold.is-in { animation: pith-unfold .9s cubic-bezier(.23,1,.32,1) var(--d, 0s) backwards; }
+@keyframes pith-unfold { from { clip-path: inset(0 0 100% 0); transform: translateY(-6px); } 70% { clip-path: inset(0 0 -20% 0); transform: translateY(1px); } to { clip-path: inset(0 0 -20% 0); transform: none; } }
+.pith-sidenote.pith-unfold-note { transform: scaleY(0); transform-origin: 0 0; opacity: 0; transition: transform .5s cubic-bezier(.34,1.45,.64,1), opacity .18s; }
+.pith-sidenote.pith-unfold-note.is-open { transform: none; opacity: 1; }
+.pith-ref.is-on + .pith-mark, .pith-mark.is-in { animation: pith-mark .5s .1s cubic-bezier(.23,1,.32,1) backwards; }
+@keyframes pith-mark { from { background-size: 0 3px; } }
+@media (prefers-reduced-motion: reduce) {
+  .pith-unfold.is-in, .pith-mark.is-in, .pith-ref.is-on + .pith-mark { animation: none; }
+  .pith-sidenote.pith-unfold-note { transition: none; }
+}

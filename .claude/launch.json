@@ -8,6 +8,16 @@
         "dev"
       ],
       "port": 1430
+    },
+    {
+      "name": "web-mock-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "1432"
+      ],
+      "port": 1432
     }
   ]
 }
