@@ -2,33 +2,33 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, TriangleAlert } from "lucide-react";
 
-/** 占中右两栏的一页：顶栏是面包屑（最后一项是当前页）和右侧按钮 */
-export function Page({ crumbs, actions, children, wide }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
+/** 技能的一页（放在对话里）：一行小字的路径（最后一项是当前页）和右侧按钮，下面是内容。不自己滚动，跟着对话滚 */
+export function Page({ crumbs, actions, children }: { crumbs: { label: string; onClick?: () => void }[]; actions?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
   return (
-    <section className="min-w-0 flex-1 overflow-y-auto">
-      <header className="sticky top-0 z-10 flex h-12 items-center gap-3 border-b bg-background px-6">
-        <h1 className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+    <section className="skill-page">
+      <header className="skill-page-head">
+        <h2 className="crumbs">
           {crumbs.map((c, i) => {
             const last = i === crumbs.length - 1;
             return (
               <span key={i} className={`flex items-center gap-1 ${last ? "min-w-0" : "shrink-0"}`}>
-                {i > 0 && <ChevronRight size={13} className="shrink-0 text-muted-foreground" />}
+                {i > 0 && <ChevronRight size={12} className="shrink-0" />}
                 {c.onClick && !last ? (
-                  <button onClick={c.onClick} className="max-w-40 truncate rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <button onClick={c.onClick} className="max-w-48 truncate hover:text-foreground">
                     {c.label}
                   </button>
                 ) : (
-                  <span className="truncate px-1 font-semibold" title={c.label}>
+                  <span className={`truncate ${last ? "is-last" : ""}`} title={c.label}>
                     {c.label}
                   </span>
                 )}
               </span>
             );
           })}
-        </h1>
+        </h2>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </header>
-      <div className={`${wide ? "max-w-6xl" : "max-w-3xl"} space-y-6 px-6 py-6`}>{children}</div>
+      <div className="space-y-6">{children}</div>
     </section>
   );
 }
@@ -38,9 +38,9 @@ type Tone = "plain" | "accent" | "warn" | "danger" | "ok";
 const TONES: Record<Tone, string> = {
   plain: "bg-muted text-muted-foreground",
   accent: "bg-accent text-accent-foreground",
-  warn: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+  warn: "bg-warn text-warn",
   danger: "bg-destructive/10 text-destructive",
-  ok: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+  ok: "bg-ok text-ok",
 };
 
 export function Badge({ tone = "plain", title, children }: { tone?: Tone; title?: string; children: React.ReactNode }) {
@@ -54,7 +54,7 @@ export function Badge({ tone = "plain", title, children }: { tone?: Tone; title?
 /** 醒目的提示框：一句标题，下面可以列几条 */
 export function Notice({ tone = "warn", title, items, children }: { tone?: "warn" | "danger" | "info"; title?: React.ReactNode; items?: string[]; children?: React.ReactNode }) {
   const box =
-    tone === "danger" ? "border-destructive/40 bg-destructive/10" : tone === "warn" ? "border-amber-300/70 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30" : "bg-muted/60";
+    tone === "danger" ? "border-destructive/40 bg-destructive/10" : tone === "warn" ? "border-warn bg-warn" : "bg-muted/60";
   return (
     <div className={`selectable rounded-md border px-3 py-2 text-xs ${box}`}>
       {title && (

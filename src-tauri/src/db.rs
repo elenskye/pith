@@ -22,6 +22,7 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration { version: 7, name: "research_fetch", sql: include_str!("../migrations/0007_research_fetch.sql") },
     Migration { version: 8, name: "concept", sql: include_str!("../migrations/0008_concept.sql") },
     Migration { version: 9, name: "alignment", sql: include_str!("../migrations/0009_alignment.sql") },
+    Migration { version: 10, name: "chat", sql: include_str!("../migrations/0010_chat.sql") },
 ];
 
 pub fn latest() -> i64 {
@@ -151,10 +152,12 @@ pub mod tests {
             "concept_sentences", "concept_anchors", "concept_relations", "concept_sources", "concept_rejected",
             // v0.5 全书对齐（0009）
             "concept_aligned_pairs",
+            // 1.0.2 对话、角色、知识库（0010）
+            "conversations", "messages", "roles", "knowledge_bases", "kb_materials",
         ] {
             assert!(names.contains(&t), "缺表 {t}");
         }
-        assert_eq!(names.len(), 45);
+        assert_eq!(names.len(), 50);
         assert!(tables.iter().all(|(_, sql)| sql.trim_end().ends_with("STRICT")), "全部是 STRICT 表");
         // 外键生效：不存在的条目不能挂作者
         let bad = c.execute("INSERT INTO creators (item_id, role, position) VALUES (999, 'author', 0)", []);

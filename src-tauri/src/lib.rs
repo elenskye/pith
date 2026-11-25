@@ -5,6 +5,7 @@
 
 mod agent;
 mod backup;
+mod chat;
 mod common;
 mod concept;
 mod db;
@@ -792,6 +793,26 @@ pub fn run() {
             agent::format_plan_update,
             agent::format_apply,
             agent::format_cancel,
+            chat::commands::chat_list,
+            chat::commands::chat_get,
+            chat::commands::chat_start,
+            chat::commands::chat_send,
+            chat::commands::chat_open_ref,
+            chat::commands::chat_link,
+            chat::commands::chat_rename,
+            chat::commands::chat_delete,
+            chat::commands::role_list,
+            chat::commands::role_save,
+            chat::commands::role_delete,
+            chat::commands::kb_list,
+            chat::commands::kb_create,
+            chat::commands::kb_update,
+            chat::commands::kb_delete,
+            chat::commands::kb_materials,
+            chat::commands::kb_material_add,
+            chat::commands::kb_material_update,
+            chat::commands::kb_material_delete,
+            chat::commands::kb_candidates,
             research::commands::research_status,
             research::commands::research_settings_set,
             research::commands::research_key_set,

@@ -257,7 +257,8 @@ export default function Reader({ attachmentId, onClose, onShowItem }: Props) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {/* 工具栏 */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b bg-sidebar px-2">
+      {/* 标题栏藏在这条下面（tauri.conf.json 的 titleBarStyle: Overlay）：左边让出红绿灯，整条能拖动窗口 */}
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b bg-sidebar pr-2 pl-[84px]" data-tauri-drag-region>
         <ToolButton onClick={onClose} title="返回文献库">
           <ArrowLeft size={15} />
           <span>文献库</span>

@@ -18,6 +18,17 @@
         "1432"
       ],
       "port": 1432
+    },
+    {
+      "name": "atelier-bench",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "/Users/elenskye/Documents/GitHub/visual-atelier/bench/bin/dw.js",
+        "serve",
+        "--port",
+        "4321"
+      ],
+      "port": 4321
     }
   ]
 }

@@ -63,6 +63,8 @@ pub(crate) fn rich_library(name: &str) -> Lib {
     crate::research::store::source_set_item(&c, &first.uid, "S1", id).unwrap();
     // v0.4：两份文本（英文连到这本书、中文对齐）、一次整章分析、一次反方（有来源）
     crate::concept::tests::sample(&c, &paths.backups, id);
+    // 1.0.2：对话、角色、知识库
+    crate::chat::tests::sample(&c);
     crate::search::rebuild(&c).unwrap();
     Lib { _dir: dir, paths, c }
 }
@@ -123,6 +125,16 @@ fn exercise(c: &Connection) {
             assert_eq!(crate::concept::store::alignment_load(c, &t.uid, &other).unwrap(), Some(al));
         }
     }
+    crate::chat::store::roles_list(c).unwrap();
+    for s in crate::chat::store::list(c).unwrap() {
+        if let Some(uid) = s.uid {
+            crate::chat::store::get(c, &uid).unwrap();
+        }
+    }
+    for k in crate::chat::store::kbs_list(c).unwrap() {
+        crate::chat::store::materials(c, Some(&k.uid)).unwrap();
+    }
+    crate::chat::store::candidates(c).unwrap();
     for q in crate::research::store::questions_list(c).unwrap() {
         for r in &q.runs {
             let run = crate::research::store::run_load(c, &r.uid).unwrap();

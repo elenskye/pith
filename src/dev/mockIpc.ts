@@ -5,6 +5,7 @@ import { emit } from "@tauri-apps/api/event";
 import { agentHandlers } from "./mockAgent";
 import { researchHandlers } from "./mockResearch";
 import { conceptHandlers } from "./mockConcept";
+import { chatHandlers } from "./mockChat";
 import type {
   Annotation,
   AnnotationPatch,
@@ -768,6 +769,8 @@ const handlers: Record<string, (a: Args) => unknown> = {
   // 事实调查（模拟实现和示例数据在 mockResearch.ts）
   ...researchHandlers,
   ...conceptHandlers,
+  // 对话、角色、知识库（mockChat.ts）
+  ...chatHandlers,
   // 系统对话框（@tauri-apps/plugin-dialog）：返回合成路径
   "plugin:dialog|open": (a) => {
     const o = (a.options ?? {}) as { directory?: boolean; multiple?: boolean; title?: string; filters?: unknown[] };

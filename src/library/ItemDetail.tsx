@@ -43,7 +43,7 @@ export function DetailPane({ selection, onSelection, scope }: Props) {
   const one = selection.length === 1 ? selection[0] : null;
   const open = (s: Selection) => onSelection([s]);
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l bg-card">
+    <aside className="flex min-h-0 flex-col">
       {selection.length === 0 ? (
         <p className="m-auto text-muted-foreground">选择一条文献查看详情</p>
       ) : !one ? (
@@ -68,7 +68,7 @@ export function DetailPane({ selection, onSelection, scope }: Props) {
 function Load<T>({ query, render }: { query: { queryKey: unknown[]; queryFn: () => Promise<T> }; render: (d: T) => React.ReactNode }) {
   const q = useQuery(query);
   if (q.error) return <p className="selectable p-5 text-destructive">{String(q.error)}</p>;
-  return q.data ? <div className="selectable min-h-0 flex-1 overflow-y-auto p-5">{render(q.data)}</div> : null;
+  return q.data ? <div className="selectable px-4 pb-6">{render(q.data)}</div> : null;
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
@@ -390,6 +390,19 @@ function CreatorsEditor({ d, disabled }: { d: ItemDetail; disabled: boolean }) {
   );
 }
 
+/** R1：面板头上一个「阅读」（有能读的 PDF 时） */
+function ReadItem({ d }: { d: ItemDetail }) {
+  const { openItem } = useRead();
+  if (!d.attachments.some((a) => a.readable)) return null;
+  return (
+    <p className="mt-4 mb-2">
+      <button className="pith-button pith-sweep" onClick={() => void openItem(d.id)}>
+        阅读 <i className="ar not-italic">→</i>
+      </button>
+    </p>
+  );
+}
+
 function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection) => void; onGone: () => void }) {
   const ui = useUi();
   const mutate = useMutate();
@@ -407,8 +420,13 @@ function Item({ d, onSelect, onGone }: { d: ItemDetail; onSelect: (s: Selection)
   return (
     <>
       {banner}
-      <EditableText value={d.title} onSave={save("title")} placeholder="（无标题，点击填写）" disabled={locked} className="text-base leading-snug font-semibold" />
+      <p className="panel-k">
+        {itemTypeLabel(d.itemType)}
+        {d.year ? ` · ${d.year}` : ""}
+      </p>
+      <EditableText value={d.title} onSave={save("title")} placeholder="（无标题，点击填写）" disabled={locked} className="panel-title" />
       <CreatorsEditor d={d} disabled={locked} />
+      <ReadItem d={d} />
       <Grid>
         <F label="类型">
           <select

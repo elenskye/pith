@@ -12,52 +12,12 @@ import { AgentSettingsSection } from "@/settings/AgentSettings";
 import { ResearchSettingsSection } from "@/settings/ResearchSettings";
 import { ConceptSettingsSection } from "@/settings/ConceptSettings";
 import { KeysSettingsSection } from "@/settings/KeysSettings";
-import { NavItem, NavLabel, SideNav } from "@/app/SideNav";
-import { Page } from "@/format/parts";
 
-/** 设置分两组、七页（decisions/0023）：常规的东西和要联网、花钱的模型分开 */
+/** 原来的八页（decisions/0023）。1.0.2 起设置照 R1 分七页（SettingsScreen），这几页是其中的内容块 */
 export type SettingsSection = "general" | "backup" | "library" | "word" | "keys" | "format" | "research" | "concept";
 
-const GROUPS: { title: string; items: [SettingsSection, string, string][] }[] = [
-  {
-    title: "常规",
-    items: [
-      ["general", "通用", "数据目录、版本、搜索索引"],
-      ["backup", "备份与导出", "自动备份、恢复、整库导出"],
-      ["library", "文献库", "联网补全"],
-      ["word", "Word 与引文", "Word 模板、引文样式、Zotero 转换"],
-    ],
-  },
-  {
-    title: "模型与联网",
-    items: [
-      ["keys", "密钥与费用", "五把密钥、月度上限"],
-      ["format", "排版 Agent", "模型、论文发送方式"],
-      ["research", "事实调查", "模型、搜索、可信度、单价"],
-      ["concept", "概念研究", "模型、推理深浅、搜索、PDF、技能"],
-    ],
-  },
-];
-
-const TITLE = Object.fromEntries(GROUPS.flatMap((g) => g.items.map(([k, label]) => [k, label]))) as Record<SettingsSection, string>;
-
-export function SettingsNav({ section, onSection }: { section: SettingsSection; onSection: (s: SettingsSection) => void }) {
-  return (
-    <SideNav title="设置">
-      {GROUPS.map((g, i) => (
-        <div key={g.title} className={i > 0 ? "mt-1" : ""}>
-          <NavLabel>{g.title}</NavLabel>
-          {g.items.map(([k, label, sub]) => (
-            <NavItem key={k} label={label} sub={sub} active={section === k} onClick={() => onSection(k)} />
-          ))}
-        </div>
-      ))}
-    </SideNav>
-  );
-}
-
 /** onRestored：库被整个换掉（恢复）之后，让外框回到初始状态 */
-export function SettingsPage({ section, onSection, onRestored }: { section: SettingsSection; onSection: (s: SettingsSection) => void; onRestored: () => void }) {
+export function SettingsPage({ section, onKeys, onRestored }: { section: SettingsSection; onKeys: () => void; onRestored: () => void }) {
   const qc = useQueryClient();
   const { confirm, notify } = useUi();
   const info = useQuery({ queryKey: ["appInfo"], queryFn: api.appInfo });
@@ -103,7 +63,7 @@ export function SettingsPage({ section, onSection, onRestored }: { section: Sett
   };
 
   return (
-    <Page crumbs={[{ label: "设置" }, { label: TITLE[section] }]}>
+    <div className="space-y-6">
       {section === "general" && (
         <>
         <div>
@@ -222,9 +182,9 @@ export function SettingsPage({ section, onSection, onRestored }: { section: Sett
       )}
 
       {section === "keys" && <KeysSettingsSection />}
-      {section === "format" && <AgentSettingsSection onKeys={() => onSection("keys")} />}
-      {section === "research" && <ResearchSettingsSection onKeys={() => onSection("keys")} />}
-      {section === "concept" && <ConceptSettingsSection onKeys={() => onSection("keys")} />}
-    </Page>
+      {section === "format" && <AgentSettingsSection onKeys={onKeys} />}
+      {section === "research" && <ResearchSettingsSection onKeys={onKeys} />}
+      {section === "concept" && <ConceptSettingsSection onKeys={onKeys} />}
+    </div>
   );
 }

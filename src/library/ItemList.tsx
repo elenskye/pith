@@ -16,6 +16,8 @@ type Props = {
   selection: Selection[];
   onSelection: (s: Selection[]) => void;
   onImport: () => void;
+  /** 页头下面那排：范围、集合与标签、导入（LibraryScreen 给） */
+  tabs?: React.ReactNode;
 };
 
 const same = (a: Selection, b: Selection) => a.kind === b.kind && a.id === b.id;
@@ -26,7 +28,7 @@ function toQueryScope(s: Scope, includeChildren: boolean): ListQuery["scope"] {
 }
 
 /** 中间的列表。切换范围时由外层用 key 重建，搜索词、筛选、排序随之清空。 */
-export function ItemList({ scope, tags, selection, onSelection, onImport }: Props) {
+export function ItemList({ scope, tags, selection, onSelection, onImport, tabs }: Props) {
   const ui = useUi();
   const mutate = useMutate();
   const { openItem, openAttachment } = useRead();
@@ -231,7 +233,7 @@ export function ItemList({ scope, tags, selection, onSelection, onImport }: Prop
     const activeKey = sort?.key ?? (q ? "relevance" : "added");
     const on = activeKey === key;
     return (
-      <th className={`${cls} px-2 py-2 font-normal`}>
+      <th className={cls}>
         <button
           onClick={() => setSort(on && sort ? { key, desc: !sort.desc } : { key, desc: key === "added" || key === "year" })}
           className={`flex items-center gap-0.5 hover:text-foreground ${on ? "text-foreground" : ""}`}
@@ -244,72 +246,70 @@ export function ItemList({ scope, tags, selection, onSelection, onImport }: Prop
   };
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-        <h1 className="min-w-0 truncate text-sm font-semibold">{title}</h1>
-        {items.data && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{rows.length} 条</span>}
-        <div className="ml-auto flex items-center gap-2">
-          {scope.kind === "collection" && (
-            <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title="同时显示下级集合里的">
-              <input type="checkbox" checked={includeChildren} onChange={(e) => setIncludeChildren(e.target.checked)} />
-              含子集合
-            </label>
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <p className="page-count num">{items.data ? `${rows.length} 条` : " "}</p>
+      <h1 className="page-h1 truncate">{scope.kind === "all" ? "文献库" : title}</h1>
+      {tabs}
+      <div className="lib-tools">
+        <label className="lib-find">
+          <Search size={14} />
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setInput("")}
+            placeholder="搜索标题、作者、标签、摘要、笔记"
+            className="selectable"
+          />
+          {input && (
+            <button onClick={() => setInput("")} className="hover:text-foreground" aria-label="清空">
+              <X size={13} />
+            </button>
           )}
-          <div className="relative">
-            <Search size={13} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setInput("")}
-              placeholder="搜索标题、作者、标签、摘要、笔记"
-              className="selectable w-60 rounded-md border bg-background py-1 pr-6 pl-7 text-xs outline-none focus:border-ring"
-            />
-            {input && (
-              <button onClick={() => setInput("")} className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X size={12} />
-              </button>
-            )}
-          </div>
-          <select value={itemType} onChange={(e) => setItemType(e.target.value)} className="rounded-md border bg-background px-1.5 py-1 text-xs outline-none" title="按类型筛选">
-            <option value="">全部类型</option>
-            {ITEM_TYPE_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {itemTypeLabel(t)}
-              </option>
-            ))}
-            <option value="attachment">独立附件</option>
-            <option value="note">独立笔记</option>
-          </select>
+        </label>
+        <select value={itemType} onChange={(e) => setItemType(e.target.value)} className="menu-btn bg-transparent outline-none" title="按类型筛选">
+          <option value="">全部类型</option>
+          {ITEM_TYPE_OPTIONS.map((t) => (
+            <option key={t} value={t}>
+              {itemTypeLabel(t)}
+            </option>
+          ))}
+          <option value="attachment">独立附件</option>
+          <option value="note">独立笔记</option>
+        </select>
+        {scope.kind === "collection" && (
+          <label className="menu-btn" title="同时显示下级集合里的">
+            <input type="checkbox" checked={includeChildren} onChange={(e) => setIncludeChildren(e.target.checked)} />
+            含子集合
+          </label>
+        )}
+        <div className="ml-auto">
           {trash ? (
-            <button
-              onClick={emptyTrash}
-              disabled={rows.length === 0}
-              className="flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs text-destructive hover:bg-muted disabled:opacity-40"
-            >
-              <Trash2 size={13} />
-              清空
+            <button onClick={emptyTrash} disabled={rows.length === 0} className="pith-button pith-button--quiet text-destructive disabled:opacity-40">
+              <Trash2 size={14} />
+              清空回收站
             </button>
           ) : (
-            <button onClick={newMenu} title="新建文献 / 添加附件" className="shrink-0 rounded-md border p-1 hover:bg-muted">
+            <button onClick={newMenu} className="pith-button pith-button--quiet">
               <Plus size={14} />
+              新建
             </button>
           )}
         </div>
-      </header>
+      </div>
 
-      <div ref={tableRef} tabIndex={0} onKeyDown={onKey} className="min-h-0 flex-1 overflow-y-auto outline-none">
+      <div ref={tableRef} tabIndex={0} onKeyDown={onKey} className="lib-table min-h-0 flex-1 overflow-y-auto outline-none">
         {items.error ? (
           <p className="selectable p-6 text-destructive">{String(items.error)}</p>
         ) : items.data && rows.length === 0 ? (
           <Empty scope={scope} filtered={filtered} onImport={onImport} inSubcollections={includeChildren ? 0 : inSubcollections} onShowSubcollections={() => setIncludeChildren(true)} />
         ) : (
           <table className="w-full table-fixed border-collapse">
-            <thead className="sticky top-0 z-10 bg-background text-left text-xs text-muted-foreground">
+            <thead>
               <tr className="border-b">
-                {header("title", "标题", "pl-4")}
-                {header("creator", "作者", "w-44")}
+                {header("title", "题名", "pl-4")}
+                {header("creator", "作者", "w-48")}
                 {trash ? header("added", "删除于", "w-32") : header("year", "年份", "w-16")}
-                {header("type", "类型", "w-24")}
+                {header("type", "类型", "w-28")}
               </tr>
             </thead>
             <tbody>
@@ -319,8 +319,8 @@ export function ItemList({ scope, tags, selection, onSelection, onImport }: Prop
                 return (
                   <Fragment key={`${it.kind}-${it.id}`}>
                     {groupStart && (
-                      <tr className="bg-muted/60">
-                        <td colSpan={4} className="px-4 py-1 text-[11px] text-muted-foreground">
+                      <tr className="grp">
+                        <td colSpan={4}>
                           第 {(it.group ?? 0) + 1} 组 · {it.groupReason}
                         </td>
                       </tr>
@@ -334,18 +334,19 @@ export function ItemList({ scope, tags, selection, onSelection, onImport }: Prop
                         else if (it.kind === "attachment") void openAttachment(it.id);
                       }}
                       onContextMenu={(e) => rowMenu(e, i)}
-                      className={`border-b border-border/60 ${active ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+                      className={active ? "is-on" : ""}
                     >
-                      <td className="py-1.5 pr-2 pl-4">
-                        <div className="flex min-w-0 items-center gap-1.5">
+                      <td className="ti">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <i className="sp" style={{ background: spine(it) }} />
                           <KindIcon row={it} />
-                          <span className="truncate">{it.title || <span className="text-muted-foreground">（无标题）</span>}</span>
+                          <b className="truncate">{it.title || <span className="text-muted-foreground">（无标题）</span>}</b>
                           <Badges row={it} />
                         </div>
                       </td>
-                      <td className="truncate px-2 py-1.5 text-muted-foreground">{creatorsSummary(it.firstCreator, it.creatorCount)}</td>
-                      <td className="truncate px-2 py-1.5 tabular-nums text-muted-foreground">{trash ? formatTime(it.deletedAt) : (it.year ?? "")}</td>
-                      <td className="truncate px-2 py-1.5 text-muted-foreground">{typeLabel(it)}</td>
+                      <td className="c truncate">{creatorsSummary(it.firstCreator, it.creatorCount)}</td>
+                      <td className="c truncate tabular-nums">{trash ? formatTime(it.deletedAt) : (it.year ?? "")}</td>
+                      <td className="c f truncate">{typeLabel(it)}</td>
                     </tr>
                   </Fragment>
                 );
@@ -356,6 +357,16 @@ export function ItemList({ scope, tags, selection, onSelection, onImport }: Prop
       </div>
     </section>
   );
+}
+
+/** 书脊的颜色：按类型从方案的几种颜色里取 */
+function spine(r: ListRow): string {
+  if (r.kind !== "item") return "var(--color-line-2)";
+  const t = r.itemType ?? "";
+  if (t === "book" || t === "bookSection") return "var(--color-accent-text)";
+  if (t === "journalArticle" || t === "magazineArticle" || t === "newspaperArticle") return "var(--color-second)";
+  if (t === "thesis" || t === "report") return "color-mix(in srgb, var(--color-gold) 70%, var(--color-text-3))";
+  return "var(--color-text-3)";
 }
 
 function typeLabel(r: ListRow): string {

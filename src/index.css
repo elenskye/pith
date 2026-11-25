@@ -2,8 +2,10 @@
 /* Pith 的视觉方案：从 visual-atelier 同步来的已发版本，不手改（vendor/pith/README.md）。两套配色、明暗看根上的 data-palette、data-theme */
 @import "./vendor/pith/pith.css";
 @import "./fonts.css";
+@import "./vendor/pith/bundle.css";
+@import "./styles/app.css";
 
-/* Tailwind 的 dark: 跟着根上的 data-theme 走（现在 data-theme 跟着系统，src/shared/theme.ts） */
+/* Tailwind 的 dark: 跟着根上的 data-theme 走（src/shared/theme.ts：设置 › 外观选的，或跟着系统） */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*

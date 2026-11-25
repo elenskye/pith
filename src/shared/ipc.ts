@@ -1382,7 +1382,103 @@ export type ConceptQuote = {
   zhParagraph: string | null;
 };
 
+
+// ---------- 对话、角色、知识库（1.0.2，decisions/0030；回答这一版是模拟的，src-tauri/src/chat/mock.rs） ----------
+
+/** 技能：对话里点名用（/），跑的还是原来的那套流程 */
+export type SkillId = "research" | "concept" | "format";
+
+export type ChatSummary = {
+  /** 以前的调查、研究还没有对话时是 null（点开接着问时再建） */
+  uid: string | null;
+  title: string;
+  role: string;
+  skill: SkillId | null;
+  refUid: string | null;
+  /** 生长阶段：0 刚种下、1 长着、2 常青 */
+  stage: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatStep = { agent: string; text: string };
+export type ChatCite = { n: number; kind: string; src: string; loc: string; text: string; material?: string | null; kb?: string | null };
+export type ChatDelivery = { kind: string; title: string; desc: string; meta: string; kb: { uid: string; name: string } | null };
+/** 一条消息的内容：你说的只有 text；Pith 的是状态行、段落（[n] 是编号）、出处、反问、交付卡 */
+export type ChatBody = {
+  text?: string;
+  role?: string;
+  mock?: boolean;
+  steps?: ChatStep[];
+  paragraphs?: string[];
+  cites?: ChatCite[];
+  ask?: string | null;
+  delivery?: ChatDelivery | null;
+};
+export type ChatMessage = { position: number; author: string; body: ChatBody; createdAt: string };
+export type Chat = Omit<ChatSummary, "uid"> & { uid: string; kbs: string[]; messages: ChatMessage[] };
+
+export type Role = {
+  uid: string;
+  name: string;
+  /** 头像上的一个字 */
+  mark: string;
+  line: string;
+  prompt: string;
+  kb: string;
+  model: string;
+  skills: string[];
+  builtin: boolean;
+  edited: boolean;
+};
+
+export type KnowledgeBase = { uid: string; name: string; note: string; count: number; createdAt: string };
+
+/** 十种记录 */
+export type MaterialKind = "full" | "excerpt" | "note" | "web" | "file" | "scan" | "concept" | "report" | "wonder" | "answer";
+
+export type Material = {
+  uid: string;
+  kb: string;
+  kind: MaterialKind;
+  title: string;
+  sub: string;
+  body: string;
+  stage: number;
+  /** concept_text / research_run / concept_card（研究 uid#卡片 key）/ item */
+  sourceKind: string | null;
+  sourceRef: string | null;
+  conversation: string | null;
+  createdAt: string;
+  tendedAt: string;
+};
+
 export const api = {
+  // 对话、角色、知识库
+  chatList: () => invoke<ChatSummary[]>("chat_list"),
+  chatGet: (uid: string) => invoke<Chat>("chat_get", { uid }),
+  /** skill 是 null：Pith 直接回答（模拟）；点名了技能：先建对话，技能跑起来以后 chatLink */
+  chatStart: (text: string, role: string, kbs: string[], skill: SkillId | null) => invoke<Chat>("chat_start", { text, role, kbs, skill }),
+  chatSend: (uid: string, text: string, role: string | null) => invoke<Chat>("chat_send", { uid, text, role }),
+  chatOpenRef: (skill: SkillId, refUid: string, title: string) => invoke<string>("chat_open_ref", { skill, refUid, title }),
+  chatLink: (uid: string, skill: SkillId, refUid: string) => invoke<void>("chat_link", { uid, skill, refUid }),
+  chatRename: (uid: string, title: string) => invoke<void>("chat_rename", { uid, title }),
+  chatDelete: (uid: string) => invoke<void>("chat_delete", { uid }),
+  roleList: () => invoke<Role[]>("role_list"),
+  roleSave: (role: Role) => invoke<Role>("role_save", { role }),
+  /** 内置的是改回默认 */
+  roleDelete: (uid: string) => invoke<void>("role_delete", { uid }),
+  kbList: () => invoke<KnowledgeBase[]>("kb_list"),
+  kbCreate: (name: string, note: string) => invoke<string>("kb_create", { name, note }),
+  kbUpdate: (uid: string, name: string, note: string) => invoke<void>("kb_update", { uid, name, note }),
+  kbDelete: (uid: string) => invoke<void>("kb_delete", { uid }),
+  kbMaterials: (kb: string | null) => invoke<Material[]>("kb_materials", { kb }),
+  /** kb 是空串：种进第一个知识库，没有就建「随手存」 */
+  kbMaterialAdd: (material: Partial<Material> & { kind: MaterialKind; title: string }) => invoke<Material>("kb_material_add", { material: { kb: "", sub: "", body: "", stage: 0, sourceKind: null, sourceRef: null, conversation: null, ...material } }),
+  kbMaterialUpdate: (uid: string, title: string, body: string, stage: number) => invoke<Material>("kb_material_update", { uid, title, body, stage }),
+  kbMaterialDelete: (uid: string) => invoke<void>("kb_material_delete", { uid }),
+  /** 能种进知识库的：解析好的书、做完的调查、概念研究的卡片 */
+  kbCandidates: () => invoke<Material[]>("kb_candidates"),
   appInfo: () => invoke<AppInfo>("app_info"),
   revealDataDir: () => invoke<void>("app_reveal_data_dir"),
   overview: () => invoke<Overview>("library_overview"),

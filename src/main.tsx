@@ -5,11 +5,11 @@ import { App } from "@/app/App";
 import { installPlainInputs } from "@/shared/plainInputs";
 import { startRenderer } from "@/cite/renderer";
 import { PickerApp } from "@/picker/Picker";
-import { followSystemTheme } from "@/shared/theme";
+import { startLook } from "@/shared/theme";
 import "./index.css";
 
-// 明暗跟着系统（vendor/pith 的 data-theme），主窗口和搜索窗都要
-followSystemTheme();
+// 配色和明暗（vendor/pith 的 data-palette、data-theme），主窗口和搜索窗都要
+startLook();
 
 const params = new URLSearchParams(location.search);
 // 置顶搜索窗（Word 里插入 / 编辑引文）与主窗口共用这一份前端，按 ?window=picker 区分
