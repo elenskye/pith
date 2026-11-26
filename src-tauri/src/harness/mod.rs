@@ -176,6 +176,8 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
     step(&mut out, Step::new("think", "想了想"));
     let mut seen: HashMap<String, (String, u32)> = HashMap::new();
     let mut wrap_up = false;
+    // 界面上已经写出来、下一轮接着写时要另起一段的
+    let mut carry = false;
     let u = Use { purpose, conversation: ctx.conversation };
     let mut round = 0;
     loop {
@@ -202,6 +204,10 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
             &req,
             &mut |d| {
                 if let Delta::Text(t) = d {
+                    // 上一轮写的留着（跟着交付卡写的回答）：这一轮另起一段
+                    if !streamed && carry {
+                        (ctx.sink)(Event::Text("\n\n".into()));
+                    }
                     streamed = true;
                     (ctx.sink)(Event::Text(t));
                 }
@@ -219,6 +225,8 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
                 out.note = Some(match (e.kind, &e.spent) {
                     (ErrorKind::Cancelled, Some(_)) => format!("{STOPPED}停之前生成的部分照样计费，按估计记进了用量。"),
                     (ErrorKind::Cancelled, None) => STOPPED.into(),
+                    // 写到一半断了：已经生成的照样计费（1.1.0 真实验收里 Gemini 中途 503，提示却说没有产生费用）
+                    (_, Some(_)) => format!("{}中途断了，已经生成的部分按估计记进了用量。", e.message.replace("这次没有产生费用。", "")),
                     _ => e.message,
                 });
                 break;
@@ -252,9 +260,13 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
             }
             break;
         }
-        if streamed {
+        // 跟着查、读、算写的是「我查一下」这类过程话：清掉重来；跟着交付卡、问题卡写的是回答本身，留着
+        // （1.1.0 真实验收：DeepSeek 把整篇回答和交付卡写在同一轮，以前被当成过程话丢了）
+        let gathering = calls.iter().any(|(_, n, _)| toolbox.gathers(n));
+        if streamed && gathering {
             (ctx.sink)(Event::Reset);
         }
+        carry = (streamed && !gathering) || (carry && !streamed && !gathering);
         // 工具调用一定配上结果（不然下一回的对话不成立）；被截断、拒答、最后一轮的调用回一句不执行
         let refuse = if out.ending != Ending::Done {
             Some("这一回已经结束，这个调用没有执行。")
@@ -311,7 +323,7 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
             break;
         }
     }
-    out.text = out.turns.iter().rev().filter(|m| m.role == Role::Assistant).map(Message::text).find(|t| !t.trim().is_empty()).unwrap_or_default();
+    out.text = answer_text(&out.turns, toolbox);
     if matches!(out.ending, Ending::Done | Ending::Limit | Ending::Looping | Ending::Asked) && !out.text.trim().is_empty() {
         step(&mut out, Step::new("write", "写好了"));
     }
@@ -321,6 +333,26 @@ pub fn run(ctx: &Ctx, system: &[SystemBlock], toolbox: &Toolbox, history: Vec<Me
         out.note = Some("同样的查法反复了几次，先停下写了回答。".into());
     }
     out
+}
+
+/// 给站主看的回答：最后一次查、读、算以后模型写的文字（跟着交付卡、问题卡写的也算），按顺序连起来；
+/// 一段都没有（比如停在查的中途）就是最后一条有字的
+pub fn answer_text(turns: &[Message], toolbox: &Toolbox) -> String {
+    let mut answer: Vec<String> = Vec::new();
+    for m in turns.iter().filter(|m| m.role == Role::Assistant) {
+        if m.tool_calls().iter().any(|(_, n, _)| toolbox.gathers(n)) {
+            answer.clear();
+            continue;
+        }
+        let t = m.text();
+        if !t.trim().is_empty() {
+            answer.push(t.trim().to_string());
+        }
+    }
+    if answer.is_empty() {
+        return turns.iter().rev().filter(|m| m.role == Role::Assistant).map(Message::text).find(|t| !t.trim().is_empty()).unwrap_or_default();
+    }
+    answer.join("\n\n")
 }
 
 #[cfg(test)]

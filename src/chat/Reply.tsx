@@ -9,13 +9,24 @@ import { api, type ChatAsk, type ChatBody, type ChatCite, type ChatLive, type Ch
 import { Agent, Stage } from "@/shared/marks";
 import { useNav, roleTone } from "@/app/nav";
 import { money } from "@/research/labels";
+import { segments, type Seg } from "@/chat/markdown";
 
-/** 一行里的 **加粗** 和 [n] 编号 */
+/** 一行里的 **加粗**、*斜体*、[n] 编号、[文字](网址)（网址在系统浏览器里打开） */
 function Inline({ text, open, onRef }: { text: string; open: number | null; onRef: (n: number) => void }) {
-  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
+  const nav = useNav();
+  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|(?<![*\w])\*[^*\s][^*]*\*(?![*\w]))/g);
   return (
     <>
       {parts.map((p, i) => {
+        const link = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(p);
+        if (link)
+          return (
+            <a key={i} className="pith-inline-link" href={link[2]} onClick={(e) => (e.preventDefault(), void api.openUrl(link[2]).catch((err) => nav.say(String(err))))}>
+              {link[1]}
+            </a>
+          );
+        const em = /^\*([^*]+)\*$/.exec(p);
+        if (em) return <em key={i}>{em[1]}</em>;
         const ref = /^\[(\d+)\]$/.exec(p);
         if (ref) {
           const n = Number(ref[1]);
@@ -33,42 +44,55 @@ function Inline({ text, open, onRef }: { text: string; open: number | null; onRe
   );
 }
 
-/** 一段：列表（- 或 1.）、小标题（#），其余是段落 */
+/** 一段：小标题、列表、段落按原来的顺序排 */
 function Block({ text, open, onRef, className, style }: { text: string; open: number | null; onRef: (n: number) => void; className: string; style?: React.CSSProperties }) {
-  const lines = text.split("\n").filter((l) => l.trim());
-  const list = lines.length > 0 && lines.every((l) => /^\s*([-*•]|\d+[.、)])\s+/.test(l));
-  if (list) {
-    const ordered = /^\s*\d/.test(lines[0]);
-    const items = lines.map((l) => l.replace(/^\s*([-*•]|\d+[.、)])\s+/, ""));
-    const Tag = ordered ? "ol" : "ul";
+  const segs = segments(text);
+  // 首字下沉只给第一截
+  const cls = (key: number) => (key === 0 ? className : className.replace(/\bcap\b/, ""));
+  const one = (seg: Seg, key: number) => {
+    const className = cls(key);
+    if (seg.kind === "head")
+      return (
+        <p key={key} className={`${className} pith-h`} style={style}>
+          <Inline text={seg.text} open={open} onRef={onRef} />
+        </p>
+      );
+    if (seg.kind === "quote")
+      return (
+        <blockquote key={key} className={`${className} pith-quote`} style={style}>
+          {seg.lines.map((l, i) => (
+            <Fragment key={i}>
+              {i > 0 && <br />}
+              <Inline text={l} open={open} onRef={onRef} />
+            </Fragment>
+          ))}
+        </blockquote>
+      );
+    if (seg.kind === "list") {
+      const Tag = seg.ordered ? "ol" : "ul";
+      return (
+        <Tag key={key} className={`${className} pith-list`} style={style}>
+          {seg.items.map((t, i) => (
+            <li key={i}>
+              <Inline text={t} open={open} onRef={onRef} />
+            </li>
+          ))}
+        </Tag>
+      );
+    }
     return (
-      <Tag className={`${className} pith-list`} style={style}>
-        {items.map((t, i) => (
-          <li key={i}>
-            <Inline text={t} open={open} onRef={onRef} />
-          </li>
+      <p key={key} className={className} style={style}>
+        {seg.lines.map((l, i) => (
+          <Fragment key={i}>
+            {i > 0 && <br />}
+            <Inline text={l} open={open} onRef={onRef} />
+          </Fragment>
         ))}
-      </Tag>
-    );
-  }
-  const head = /^#{1,4}\s+(.*)$/.exec(lines[0] ?? "");
-  if (head && lines.length === 1) {
-    return (
-      <p className={`${className} pith-h`} style={style}>
-        <Inline text={head[1]} open={open} onRef={onRef} />
       </p>
     );
-  }
-  return (
-    <p className={className} style={style}>
-      {lines.map((l, i) => (
-        <Fragment key={i}>
-          {i > 0 && <br />}
-          <Inline text={l.replace(/^#{1,4}\s+/, "")} open={open} onRef={onRef} />
-        </Fragment>
-      ))}
-    </p>
-  );
+  };
+  if (segs.length === 1) return one(segs[0], 0);
+  return <>{segs.map(one)}</>;
 }
 
 /** 页边注里的网页：存进知识库（存过了就是「知识库里」，点了去看） */

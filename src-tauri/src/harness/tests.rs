@@ -330,3 +330,21 @@ fn web_tools_search_fetch_and_continue() {
     let names: Vec<String> = Toolbox::subagent().specs().into_iter().map(|t| t.name).collect();
     assert!(names.contains(&"web_search".to_string()) && names.contains(&"web_fetch".to_string()));
 }
+
+#[test]
+fn an_answer_written_alongside_the_delivery_card_is_kept() {
+    // DeepSeek 的样子：查完，整篇回答和交付卡写在同一轮，最后一轮只说一句「上面放了交付卡」
+    let main = MockModel::scripted(
+        spec(),
+        vec![
+            Turn { text: "我先查一下。".into(), calls: vec![("library_search".into(), json!({ "query": "Smith" }))], ..Default::default() },
+            Turn { text: "「看不见的手」只出现在 IV.ii.9。\n\n上下文在讲对外贸易。".into(), calls: vec![("deliver".into(), json!({ "kind": "answer", "title": "看不见的手", "summary": "出处" }))], ..Default::default() },
+            Turn::text("上面放了一张交付卡。"),
+        ],
+    );
+    let r = go(&main, None, &meter("harness-answer-with-card"), Limits::default(), false, "看不见的手在哪");
+    assert_eq!(r.out.text, "「看不见的手」只出现在 IV.ii.9。\n\n上下文在讲对外贸易。\n\n上面放了一张交付卡。");
+    // 过程话（跟着查的）清掉了，跟着交付卡写的没清
+    let resets = r.events.iter().filter(|e| matches!(e, Event::Reset)).count();
+    assert_eq!(resets, 1);
+}

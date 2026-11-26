@@ -135,3 +135,46 @@ fn chinese_and_english_align_where_counts_match() {
 fn not_an_epub_is_refused_with_a_reason() {
     assert!(text::from_epub(b"not a zip", None).unwrap_err().contains("EPUB"));
 }
+
+/// 页码不能一直往下带（1.1.0 真实验收：Penguin 第二卷的 EPUB 没有页码标记，以前全成了第一卷最后的「570」）：
+/// 离上一个页码标记太远（`STALE_PAGE`）的段落当作没有页码；近的照旧接着上一页；又出现标记就又有页码
+#[test]
+fn pages_are_not_carried_into_long_unpaged_chapters() {
+    use concept_engine::epub::{Block, Book, Doc, TocEntry};
+    let p = |text: String, pages: Vec<(usize, String)>| Block { tag: "p".into(), text, pages, ..Default::default() };
+    let h = |text: &str| Block { tag: "h2".into(), text: text.into(), ..Default::default() };
+    let long = "Of the various kinds of taxes, and of the reasons why some of them fall upon rent while others fall upon wages. ".repeat(12);
+    let mut ch1 = vec![h("CHAPTER I"), p("The first chapter opens on page ten and runs on.".into(), vec![(0, "10".into())])];
+    ch1.push(p(format!("{long} and turns the page here."), vec![(long.chars().count(), "11".into())]));
+    ch1.push(p("A short paragraph that is still on page eleven.".into(), vec![]));
+    let mut ch2 = vec![h("CHAPTER II")];
+    for _ in 0..12 {
+        ch2.push(p(long.clone(), vec![]));
+    }
+    ch2.push(p("Here a page marker turns up again.".into(), vec![(0, "40".into())]));
+    let toc = |label: &str, file: &str, depth| TocEntry { label: label.into(), file: file.into(), fragment: None, depth };
+    let book = Book {
+        title: "Synthetic".into(),
+        language: "en".into(),
+        toc: vec![toc("Book One", "b.xhtml", 1), toc("CHAPTER I", "c1.xhtml", 2), toc("CHAPTER II", "c2.xhtml", 2)],
+        docs: vec![
+            Doc { file: "b.xhtml".into(), blocks: vec![h("BOOK I")], loose_ids: vec![] },
+            Doc { file: "c1.xhtml".into(), blocks: ch1, loose_ids: vec![] },
+            Doc { file: "c2.xhtml".into(), blocks: ch2, loose_ids: vec![] },
+        ],
+        page_source: "page-list".into(),
+        ..Default::default()
+    };
+    let t = concept_engine::text::from_book(&book, None);
+    let bodies: Vec<&concept_engine::text::Paragraph> = t.paragraphs.iter().filter(|p| p.role == concept_engine::text::Role::Body).collect();
+    let pages: Vec<Option<String>> = bodies.iter().map(|p| t.paragraph_pages(p.seq)).collect();
+    // 第一章：10、10–11、11（短的接着上一页）
+    assert_eq!(pages[..3], [Some("10".into()), Some("10–11".into()), Some("11".into())]);
+    // 第二章：头一两段还算第 11 页，离标记远了就没有页码，最后又有标记
+    assert_eq!(pages[3], Some("11".into()));
+    let gone = pages.iter().position(Option::is_none).expect("远了就没有页码");
+    assert!((5..=8).contains(&gone), "大约两页以后不再往下带：{pages:?}");
+    assert!(pages[gone..pages.len() - 1].iter().all(Option::is_none), "{pages:?}");
+    assert_eq!(pages.last().unwrap(), &Some("40".into()));
+    assert_eq!(concept_engine::text::PARSER_VERSION, "concept-text-3");
+}

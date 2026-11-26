@@ -231,6 +231,17 @@ PITH_LOCAL_MODELS=real PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.e
 - **`harness/tests.rs`**：`web_search`、`web_fetch`、接着读、取不到回出错；子代理也有联网工具。
 - 真的联网在第 5 期的真实验收里（`0040`）。
 
+## 1.1.0 真实验收（第 5 期，`decisions/0040`）
+
+默认忽略；联网、花钱（上限 $20，这一次 $0.63）。和 App 走同一条路（网关的真模型、`ChatEnv`、本机检索、真联网），回答存进 `PITH_ACCEPT_DIR` 的对话，打包版设 `PITH_DATA_DIR` 指过去能看。第一次跑会解析两本书、迁进书架、补向量（约 6 分钟）；书的解析器版本变了会先「重新解析」。密钥文件每行 `名字=密钥`（`anthropic=…`、`openai=…`、`deepseek=…`、`google=…`）。轮次：`anthropic`、`followup`（接着 anthropic 那段对话问）、`openai`、`deepseek`、`google`、`google_lite`、`chapter`、`longchapter`（长章交给子代理）、`web`、`web_openai`、`web_deepseek`、`web_google`、`web_google_lite`。每一轮打印状态行、怎么结束的、花费和缓存、引用编号对上几个、回答。
+
+```bash
+PITH_LOCAL_MODELS=real PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=local/acceptance-1.1.0/data PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub PITH_ROUNDS=anthropic,openai,deepseek cargo test -p pith real_chat_acceptance -- --ignored --nocapture
+```
+
+- 前端的轻量 Markdown（`src/chat/markdown.test.ts`）：单个换行隔开的小标题、列表、段落按顺序拆开；整行加粗算小标题、行内的不算；`>` 引文连成一段。
+- 页码不能一直往下带（`concept-engine/tests/text.rs` 的 `pages_are_not_carried_into_long_unpaged_chapters`）。
+
 ## 换配色的帧（1.0.3，`decisions/0032`）
 
 动效卡不卡要在 WebKit 里量（Tauri 用的就是它）；无头 Chrome 用 GPU 画 SVG 滤镜，量不出来。看不见的窗口 WebKit 会停掉动画帧，所以这个小窗口会浮在最前面一两分钟。

@@ -22,7 +22,16 @@ use serde::{Deserialize, Serialize};
 use crate::epub::{self, Block};
 
 /// 解析器版本：规则变了就改，存下的文本记着它（`decisions/0024`「存进主库」）
-pub const PARSER_VERSION: &str = "concept-text-2";
+pub const PARSER_VERSION: &str = "concept-text-3";
+
+/// 离上一个页码标记超过这么多字（中日韩一个字算 3 个），接着往下带的页码就不可信了，当作没有页码。
+/// 1.1.0 真实验收时发现：Penguin 版第一卷（第一至三篇）有页码，第二卷（第四、五篇）的 EPUB 里一个页码标记都没有，
+/// 以前一直把第一卷最后的「570」往下带，两篇书都成了第 570 页（`decisions/0040`）
+pub const STALE_PAGE: usize = 5_000;
+
+fn page_weight(text: &str) -> usize {
+    text.chars().map(|c| if is_cjk(c) { 3 } else { 1 }).sum()
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -604,6 +613,8 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
 
     let mut paragraphs: Vec<Paragraph> = Vec::new();
     let mut page: Option<String> = None;
+    // 离上一个页码标记多远了（见 STALE_PAGE）
+    let mut since_mark: usize = 0;
     // 每个编号单元（章）里的状态：正文数到几、上一段正文、见过的注释标记
     #[derive(Default)]
     struct Numbered {
@@ -630,13 +641,20 @@ pub fn from_book(book: &epub::Book, numbering: Option<Numbering>) -> Text {
         if block.text.trim().is_empty() {
             if let Some((_, p)) = marks.last() {
                 page = Some(p.clone());
+                since_mark = 0;
             }
             continue;
         }
+        if since_mark > STALE_PAGE {
+            page = None;
+        }
         let start_page = marks.iter().rfind(|(at, _)| *at == 0).map(|(_, p)| p.clone()).or_else(|| page.clone());
         let breaks: Vec<PageBreak> = marks.iter().filter(|(at, _)| *at > 0 && *at < text_len).map(|(at, p)| PageBreak { at: *at, page: p.clone() }).collect();
-        if let Some((_, p)) = marks.last() {
+        if let Some((at, p)) = marks.last() {
             page = Some(p.clone());
+            since_mark = page_weight(&block.text.chars().skip(*at).collect::<String>());
+        } else {
+            since_mark += page_weight(&block.text);
         }
         let nu = numbering_unit(owner);
         let kind = units[owner].kind;

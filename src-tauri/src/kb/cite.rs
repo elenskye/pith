@@ -2,7 +2,7 @@
 //!
 //! - `[P123]`：知识库里的一块（检索、读原文给的）：段落号、页码、对照译文、一步到知识库和文献库；
 //! - `[W45]`：对话里取回的网页的一块（`web_fetch` 给的，1.1.0 第 4 期）：网站、取回的日子、打开网页、存进知识库。
-//! - 编号按第一次出现的顺序；一处写几个（`[P12, W34]`、`[P12][P34]`）就是几个编号。
+//! - 编号按第一次出现的顺序；一处写几个（`[P12, W34]`、`[P12][P34]`）就是几个编号；一段范围（`[P12–P15]`）换成 `[a]–[b]`。
 //! - 库里没有的编号原样留着（程序不改模型的话，`0030`）。
 //! - 存进知识库的回答：编号后面附上「出处」一节（换了地方 [1] 还看得懂）。
 
@@ -28,8 +28,19 @@ impl std::fmt::Display for Handle {
     }
 }
 
-/// 一处 `[P12, W34]`：在文字里的位置（字节）和里面的编号
+/// 一处 `[P12, W34]`：在文字里的位置（字节）和里面的编号；`ranges` 是写成范围的那几对（前一个的下标）
+struct Group {
+    start: usize,
+    end: usize,
+    ids: Vec<Handle>,
+    ranges: Vec<usize>,
+}
+
 fn groups(text: &str) -> Vec<(usize, usize, Vec<Handle>)> {
+    groups_full(text).into_iter().map(|g| (g.start, g.end, g.ids)).collect()
+}
+
+fn groups_full(text: &str) -> Vec<Group> {
     let mut out = Vec::new();
     let b = text.as_bytes();
     let mut i = 0;
@@ -45,6 +56,7 @@ fn groups(text: &str) -> Vec<(usize, usize, Vec<Handle>)> {
         let start = i;
         let mut j = i + olen;
         let mut ids = Vec::new();
+        let mut ranges: Vec<usize> = Vec::new();
         let mut ok = false;
         loop {
             while j < text.len() && b[j] == b' ' {
@@ -72,6 +84,46 @@ fn groups(text: &str) -> Vec<(usize, usize, Vec<Handle>)> {
                 j += s.len();
                 continue;
             }
+            // 范围：P12–P15、P12-P15、P12~P15（后一个可以不写字母）
+            if let Some(s) = ["–", "—", "-", "~", "～"].iter().find(|s| text[j..].starts_with(**s)) {
+                let mut k = j + s.len();
+                while k < text.len() && b[k] == b' ' {
+                    k += 1;
+                }
+                if k < text.len() && b[k].is_ascii_digit() {
+                    // 「P12–15」：补上同样的字母，接着读数字
+                    let prefix = match ids.last() {
+                        Some(Handle::W(_)) => "W",
+                        _ => "P",
+                    };
+                    let mut e = k;
+                    while e < text.len() && b[e].is_ascii_digit() {
+                        e += 1;
+                    }
+                    let n: i64 = text[k..e].parse().unwrap_or(0);
+                    ranges.push(ids.len() - 1);
+                    ids.push(if prefix == "W" { Handle::W(n) } else { Handle::P(n) });
+                    j = e;
+                    while j < text.len() && b[j] == b' ' {
+                        j += 1;
+                    }
+                    if let Some(s) = [",", "，", ";", "；", "、"].iter().find(|s| text[j..].starts_with(**s)) {
+                        j += s.len();
+                        continue;
+                    }
+                    if text[j..].starts_with(']') {
+                        j += 1;
+                        ok = true;
+                    } else if text[j..].starts_with('】') {
+                        j += '】'.len_utf8();
+                        ok = true;
+                    }
+                    break;
+                }
+                ranges.push(ids.len() - 1);
+                j = k;
+                continue;
+            }
             if text[j..].starts_with(']') {
                 j += 1;
                 ok = true;
@@ -82,7 +134,7 @@ fn groups(text: &str) -> Vec<(usize, usize, Vec<Handle>)> {
             break;
         }
         if ok && !ids.is_empty() {
-            out.push((start, j, ids));
+            out.push(Group { start, end: j, ids, ranges });
             i = j;
         } else {
             i += olen;
@@ -108,18 +160,22 @@ pub fn handles(text: &str) -> Vec<Handle> {
 pub fn number(text: &str, order: &[Handle]) -> String {
     let mut out = String::with_capacity(text.len());
     let mut last = 0;
-    for (s, e, ids) in groups(text) {
-        let ns: Option<Vec<usize>> = ids.iter().map(|id| order.iter().position(|x| x == id).map(|i| i + 1)).collect();
+    for g in groups_full(text) {
+        let ns: Option<Vec<usize>> = g.ids.iter().map(|id| order.iter().position(|x| x == id).map(|i| i + 1)).collect();
         if let Some(ns) = ns {
-            out.push_str(&text[last..s]);
+            out.push_str(&text[last..g.start]);
             let mut seen = Vec::new();
-            for n in ns {
-                if !seen.contains(&n) {
-                    out.push_str(&format!("[{n}]"));
-                    seen.push(n);
+            for (k, n) in ns.iter().enumerate() {
+                if seen.contains(n) {
+                    continue;
+                }
+                out.push_str(&format!("[{n}]"));
+                seen.push(*n);
+                if g.ranges.contains(&k) {
+                    out.push('–');
                 }
             }
-            last = e;
+            last = g.end;
         }
     }
     out.push_str(&text[last..]);
@@ -160,11 +216,12 @@ pub struct Cite {
     pub key: Option<Handle>,
 }
 
-fn kind_of(source_kind: &str, role: &str) -> String {
-    match (source_kind, role) {
+fn kind_of(src: &retrieve::Source, role: &str) -> String {
+    match (src.kind.as_str(), role) {
         ("full", "sidenote") => "旁注".into(),
         ("full", "note") => "注释".into(),
         ("full", "guide") => "导读".into(),
+        ("full", _) if src.translation => "译文".into(),
         ("full", _) => "原文".into(),
         (k, _) => retrieve::kind_name(k).into(),
     }
@@ -184,7 +241,7 @@ pub fn cites(c: &Connection, ids: &[Handle]) -> Result<Vec<Cite>, String> {
                 let by = if src.sub.is_empty() { String::new() } else { format!(" {}", src.sub) };
                 out.push(Cite {
                     n,
-                    kind: kind_of(&src.kind, &p.role),
+                    kind: kind_of(&src, &p.role),
                     src: format!("《{}》{by}", src.title),
                     loc: retrieve::locator(&p),
                     text: p.text.clone(),
@@ -274,5 +331,9 @@ mod tests {
         assert_eq!(number_live("还在写 [P8]，接着 [w3]"), "还在写 [1]，接着 [2]");
         assert_eq!(handles("[p7]；[ P8 ]"), [P(7), P(8)]);
         assert_eq!(W(3).to_string(), "W3");
+        // 范围：两头各一个编号，中间一条线
+        let r = "航海条例 [P2685–P2690]，又见 [P10-12, W4]。";
+        assert_eq!(handles(r), [P(2685), P(2690), P(10), P(12), W(4)]);
+        assert_eq!(number(r, &[P(2685), P(2690), P(10), P(12), W(4)]), "航海条例 [1]–[2]，又见 [3]–[4][5]。");
     }
 }

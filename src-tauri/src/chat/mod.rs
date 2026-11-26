@@ -10,3 +10,6 @@ pub mod store;
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod acceptance;

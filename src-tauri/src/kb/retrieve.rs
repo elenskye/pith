@@ -37,6 +37,8 @@ pub struct Source {
     pub item: Option<i64>,
     /// 网页快照的网址
     pub url: Option<String>,
+    /// 书是译本（连着原著）
+    pub translation: bool,
 }
 
 pub fn source(c: &Connection, material: i64) -> Result<Source, String> {
@@ -56,7 +58,11 @@ pub fn source(c: &Connection, material: i64) -> Result<Source, String> {
         (Some("web_page"), Some(r)) => c.query_row("SELECT final_url FROM web_pages WHERE id = ?1", [r], |r| r.get::<_, String>(0)).optional().map_err(err)?,
         _ => None,
     };
-    Ok(Source { id: material, uid, kind, title, sub, kb, item, url })
+    let translation = match (sk.as_deref(), sr.as_deref()) {
+        (Some("concept_text"), Some(r)) => c.query_row("SELECT original_id IS NOT NULL FROM concept_texts WHERE uid = ?1", [r], |r| r.get::<_, bool>(0)).optional().map_err(err)?.unwrap_or(false),
+        _ => false,
+    };
+    Ok(Source { id: material, uid, kind, title, sub, kb, item, url, translation })
 }
 
 /// 书的对面（原著 ↔ 译本）：对面的材料、对齐、这一边是不是原著

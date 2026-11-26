@@ -204,6 +204,11 @@ impl Toolbox {
         self.tools().map(|t| ToolSpec { name: t.name.into(), description: t.description.into(), input_schema: (t.schema)() }).collect()
     }
 
+    /// 查、读、算这类（只读的）工具：跟着它写的文字是过程话
+    pub fn gathers(&self, name: &str) -> bool {
+        TOOLS.iter().any(|t| t.name == name && t.read_only)
+    }
+
     fn get(&self, name: &str) -> Option<&'static Tool> {
         self.tools().find(|t| t.name == name)
     }

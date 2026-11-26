@@ -80,16 +80,21 @@ impl ApiKey {
             let ok = |s: &str, min: usize, max: usize| (min..=max).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
             return ok(id, 3, 120) && ok(key, 16, 200);
         }
-        let chars_ok = k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
         let len = k.len();
+        if self == ApiKey::Google {
+            // Google 的 API Key 两种样子：旧的 AIza 开头、39 个字符；2026 年起新建的 AQ. 开头、50 多个字符（1.1.0 验收时发现，
+            // 两种在 generativelanguage.googleapis.com 上都能用）
+            let ok = |s: &str| s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
+            return (k.starts_with("AIza") && (35..=60).contains(&len) && ok(k)) || (k.starts_with("AQ.") && (40..=200).contains(&len) && ok(&k[3..]));
+        }
+        let chars_ok = k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
         chars_ok
             && match self {
                 ApiKey::Anthropic => k.starts_with("sk-ant-") && (40..=300).contains(&len),
                 ApiKey::Deepseek => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=200).contains(&len),
                 ApiKey::Tavily => k.starts_with("tvly-") && (20..=200).contains(&len),
                 ApiKey::Openai => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=400).contains(&len),
-                // Google 的 API Key：AIza 开头、39 个字符
-                ApiKey::Google => k.starts_with("AIza") && (35..=60).contains(&len),
+                ApiKey::Google => false,
                 ApiKey::Mathpix => false,
             }
     }
@@ -106,7 +111,7 @@ impl ApiKey {
             ApiKey::Tavily => "这看起来不是 Tavily 的 API 密钥（应以 tvly- 开头）。到 app.tavily.com 复制完整的一串。",
             ApiKey::Openai => "这看起来不是 OpenAI 的 API 密钥（应以 sk- 开头）。到 platform.openai.com 的 API keys 里复制完整的一串。",
             ApiKey::Mathpix => "这看起来不是 Mathpix 的 app_id 和 app_key。到 console.mathpix.com 复制两项，分别填进两个框。",
-            ApiKey::Google => "这看起来不是 Google 的 API Key（应以 AIza 开头）。到 aistudio.google.com 的 API keys 里复制完整的一串。",
+            ApiKey::Google => "这看起来不是 Google 的 API Key（应以 AIza 或 AQ. 开头）。到 aistudio.google.com 的 API keys 里复制完整的一串。",
         }
         .into())
     }
@@ -385,6 +390,11 @@ mod tests {
         assert!(ApiKey::Deepseek.check(GOOGLE).is_err());
         assert_eq!(ApiKey::Google.find_in(&format!("GEMINI_API_KEY={GOOGLE}\nopenai={OPENAI}\n")).as_deref(), Some(GOOGLE));
         assert_eq!(ApiKey::Google.find_in(&format!("{GOOGLE}\n")).as_deref(), Some(GOOGLE));
+        // 2026 年起新建的 Key 是 AQ. 开头
+        const NEW: &str = "AQ.Ab8RN6Kq0123456789abcdefABCDEF0123456789abcdefgh";
+        assert_eq!(ApiKey::Google.check(NEW).unwrap(), NEW);
+        assert_eq!(ApiKey::Google.find_in(&format!("google={NEW}\n")).as_deref(), Some(NEW));
+        assert!(ApiKey::Google.check("AQ.short").is_err() && ApiKey::Google.check("AQ.Ab8RN6Kq0123456789abcdef ABCDEF0123456789abcdefgh").is_err());
     }
 
     #[test]

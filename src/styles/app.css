@@ -685,6 +685,9 @@ ol.pith-list { list-style: decimal; }
 .pith-list li::marker { color: var(--color-text-4); }
 .pith-p strong, .pith-list strong { font-weight: 600; }
 .pith-p.pith-h { margin-top: 24px; font-weight: 600; }
+/* 回答里的「>」引文、[文字](网址) */
+.pith-quote { margin-top: 14px; padding: 2px 0 2px 18px; border-left: 2px solid var(--color-line-2); font-style: italic; color: var(--color-text-2); }
+.pith-inline-link { color: var(--color-accent-text); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
 .pith-status-step.is-sub { font-size: 13px; }
 .pith-status-step.is-sub > .pith-agent { width: 14px; height: 14px; }
 .pith-status-step.is-sub::before { content: "└"; margin-right: -2px; color: var(--color-line-2); }
