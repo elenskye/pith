@@ -1438,7 +1438,22 @@ export type ChatSummary = {
 /** 状态行的一格：Agent 图标 + 一句话；sub 是子代理的 id（收在派它的那一格下面） */
 export type ChatStep = { agent: string; text: string; sub?: string | null };
 /** 页边注（1.1.0 第 3 期起是真的：回答里的 [P123] 换成 [n]，这是那一段原文） */
-export type ChatCite = { n: number; kind: string; src: string; loc: string; text: string; translation?: string | null; translationLoc?: string | null; material?: string | null; kb?: string | null; passage?: number | null; item?: number | null };
+export type ChatCite = {
+  n: number;
+  kind: string;
+  src: string;
+  loc: string;
+  text: string;
+  translation?: string | null;
+  translationLoc?: string | null;
+  material?: string | null;
+  kb?: string | null;
+  passage?: number | null;
+  item?: number | null;
+  /** 网页（1.1.0 第 4 期，回答里的 [W12]）：网址、取回的那一页（存进知识库用） */
+  url?: string | null;
+  webPage?: number | null;
+};
 export type ChatDelivery = { kind: string; title: string; desc: string; meta: string; kb: { uid: string; name: string } | null; body?: string };
 /** 问题卡（1.1.0）：一句问话、几个选项；1.0.x 的演示回答是一句话 */
 export type ChatAsk = string | { question: string; options: string[] };
@@ -1545,6 +1560,8 @@ export const api = {
   /** 读一份材料的原文：给了段落读它那一章，给了章（目录下标）读那一章 */
   kbRead: (material: string, unit: number | null, passage: number | null) => invoke<KbView>("kb_read", { material, unit, passage }),
   kbIndexStatus: () => invoke<KbIndexStatus>("kb_index_status"),
+  /** 对话里取回的一页存进知识库（网页快照）；kb 空着：第一个知识库 */
+  kbSaveWeb: (page: number, kb: string | null, conversation: string | null) => invoke<Material>("kb_save_web", { page, kb, conversation }),
   /** 在后台补齐向量 */
   kbIndexStart: () => invoke<KbIndexStatus>("kb_index_start"),
   /** 能种进知识库的：解析好的书、做完的调查、概念研究的卡片 */

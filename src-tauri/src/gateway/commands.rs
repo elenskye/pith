@@ -245,6 +245,7 @@ pub fn purpose_label(p: &str) -> &'static str {
     match p {
         "chat" => "对话",
         "chat_subagent" => "子代理",
+        "chat_web" => "联网",
         "extract" | "plan" => "排版",
         p if p.starts_with("research") => "事实调查",
         p if p.starts_with("concept") || p.starts_with("mathpix") => "概念研究",

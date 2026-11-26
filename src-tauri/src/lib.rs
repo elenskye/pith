@@ -28,6 +28,7 @@ mod snapshot;
 mod store;
 mod text;
 mod transfer;
+mod web;
 mod word;
 
 use paths::DataPaths;
@@ -831,6 +832,7 @@ pub fn run() {
             kb::commands::kb_material_delete,
             kb::commands::kb_material_link,
             kb::commands::kb_candidates,
+            kb::commands::kb_save_web,
             kb::commands::kb_read,
             kb::commands::kb_index_status,
             kb::commands::kb_index_start,

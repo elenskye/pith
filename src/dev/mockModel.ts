@@ -74,7 +74,7 @@ function summary(conversation: string | null): UsageSummary {
     return [...m.entries()].map(([k, v]) => ({ key: k, label: label(k), ...v })).sort((a, b) => b.usd - a.usd);
   };
   const PL: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", openai_compatible: "DeepSeek", deepseek: "DeepSeek" };
-  const PU = (p: string) => (p === "chat" ? "对话" : p === "chat_subagent" ? "子代理" : p.startsWith("research") ? "事实调查" : p.startsWith("concept") ? "概念研究" : "其他");
+  const PU = (p: string) => (p === "chat" ? "对话" : p === "chat_subagent" ? "子代理" : p === "chat_web" ? "联网" : p.startsWith("research") ? "事实调查" : p.startsWith("concept") ? "概念研究" : "其他");
   const input = real.reduce((a, c) => a + c.tokens.input, 0);
   const read = real.reduce((a, c) => a + c.tokens.cacheRead, 0);
   return {

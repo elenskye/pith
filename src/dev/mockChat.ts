@@ -79,6 +79,9 @@ const book: Para[] = [
 wnFull.passages = book.length;
 wnFull.kbs.push("kb-thesis");
 const byKey = (k: string) => book.find((p) => p.key === k)!;
+// 对话里取回的一页（合成的）
+const webPage = { id: 701, site: "stats.example.gov", title: "示例市 2024 年国民经济和社会发展统计公报", url: "https://stats.example.gov/2024/bulletin.html", text: "全年城镇调查失业率平均为 5.1%，其中 16–24 岁青年为 15.7%（不含在校生），比上年下降 1.3 个百分点。" };
+const webCite = (n: number): ChatCite => ({ n, kind: "网页", src: webPage.title, loc: `${webPage.site} · 取于 ${now().slice(0, 10)}`, text: webPage.text, url: webPage.url, webPage: webPage.id, material: materials.find((x) => x.sourceKind === "web_page" && x.sourceRef === String(webPage.id))?.uid ?? null });
 const bookCite = (n: number, p: Para): ChatCite => ({ n, kind: "原文", src: "《The Wealth of Nations》 Smith 1776", loc: `${p.key} · 第 ${p.page} 页`, text: p.text, translation: p.zh, translationLoc: `${p.key} · 杨敬年译本`, material: wnFull.uid, kb: "kb-wn", passage: p.id, item: 1 });
 const firstReply: ChatBody = {
   steps: [
@@ -126,8 +129,15 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
   const query = q.replace(/[？?。，,！!]/g, "").slice(0, 16);
   // 知识库里找：《国富论》在范围里就挑两段讲分工和市场的
   const found = picked.length === 0 || wnFull.kbs.some((k) => picked.includes(k)) ? [byKey("I.iii.1"), byKey("I.i.3")] : [];
+  const online = /网上|最新|联网|查一下|新闻/.test(q);
   const steps: ChatStep[] = [
     { agent: "think", text: "想了想" },
+    ...(online
+      ? [
+          { agent: "web", text: `在网上搜「${query}」：3 条` },
+          { agent: "web", text: `取回了 ${webPage.site} 的网页` },
+        ]
+      : []),
     { agent: "search", text: `在知识库里找「${query}」：${found.length} 段` },
     { agent: "lib", text: `在文献库里找「${query}」：${hits.length} 条` },
   ];
@@ -140,6 +150,7 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
     ? ["这个问题两头都能讲，先问你一句：你更想先看哪一边？选一个，我接着往下查。"]
     : [
         "这是 ?mock 里的模拟回答：照 Agent 循环的样子走一遍——想、查、做交付卡、写——问题本身没有被回答。",
+        ...(online ? [`网上取回了 ${webPage.site} 的一页：${webPage.text.slice(0, 26)}……[${found.length + 1}]。页边注能打开网页、存进知识库。`] : []),
         found.length ? "知识库里最相关的是斯密讲市场范围的那一段[1]，和别针厂的例子[2]，点编号看原文和中译。" : "知识库里没有找到相关的段落。",
         hits.length ? `文献库里沾边的有：${hits.map((h) => `**${h.title}**`).join("、")}。` : "文献库里没有找到沾边的条目。",
         "- 真的回答在正式版里（或开发版设 PITH_REAL_MODEL=1）\n- 下面的交付卡点「存进」，种子会飞进知识库",
@@ -147,7 +158,7 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
   const body: ChatBody = {
     steps,
     paragraphs,
-    cites: ask ? [] : found.map((p, i) => bookCite(i + 1, p)),
+    cites: ask ? [] : [...found.map((p, i) => bookCite(i + 1, p)), ...(online ? [webCite(found.length + 1)] : [])],
     ask,
     delivery: ask ? null : { kind: "answer", title: q.slice(0, 40), desc: "模拟回答：查了什么、找到了什么。", meta: "存下的回答 • Claude Sonnet 5.5", kb: name ? { uid: picked[0], name } : null, body: "" },
     model: "Claude Sonnet 5.5",
@@ -155,8 +166,10 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
     ending: ask ? "asked" : "done",
     note: null,
   };
-  const beats: Beat[] = [{ at: 0, step: steps[0] }, { at: 250, text: "我先在知识库里找找。" }, { at: 900, reset: true }, { at: 950, step: steps[1] }, { at: 1350, step: steps[2] }, { at: 1700, step: steps[3] }];
-  let at = 2000;
+  // 一格格出来（最后的「写好了」不在这里：写的时候界面自己补「在写」）
+  const beats: Beat[] = [{ at: 0, step: steps[0] }, { at: 250, text: "我先找找。" }, { at: 900, reset: true }];
+  let at = 950;
+  for (const st of steps.slice(1, -1)) beats.push({ at: (at += 380), step: st });
   const full = paragraphs.join("\n\n");
   for (let i = 0; i < full.length; i += 3) beats.push({ at: (at += 40), text: full.slice(i, i + 3) });
   return { beats, body };
@@ -322,6 +335,17 @@ export const chatHandlers: Record<string, (a: Args) => unknown> = {
     const at = focus ? keys.indexOf(focus.unitKey) : Math.min(Number(unit ?? 0), keys.length - 1);
     const ps = book.filter((p) => p.unitKey === keys[at]);
     return { units, unit: at, passages: ps.map(({ zh: _zh, ...p }) => p), focus: focus?.id ?? null, pairs: Object.fromEntries(ps.filter((p) => p.zh).map((p) => [String(p.id), p.zh])), pairTitle: "国富论（杨敬年译）" };
+  },
+  kb_save_web: ({ page, kb }) => {
+    const k = String(kb ?? "") || kbs[0]?.uid;
+    const had = materials.find((x) => x.sourceKind === "web_page" && x.sourceRef === String(page));
+    if (had) {
+      if (!had.kbs.includes(k)) had.kbs.push(k);
+      return had;
+    }
+    const made = { ...m(k, "web", webPage.title, `${webPage.site} · 取于 ${now().slice(0, 10)}`, webPage.text, 0, 0), sourceKind: "web_page", sourceRef: String(page) };
+    materials.push(made);
+    return made;
   },
   kb_index_status: () => ({ total: 11_420, done: 11_420, running: false, error: null, model: "模拟向量模型", issue: null, materials: materials.length }),
   kb_index_start: () => ({ total: 11_420, done: 11_420, running: false, error: null, model: "模拟向量模型", issue: null, materials: materials.length }),

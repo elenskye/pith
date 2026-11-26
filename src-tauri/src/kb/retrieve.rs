@@ -35,6 +35,8 @@ pub struct Source {
     pub kb: String,
     /// 书在文献库里的条目（一步到文献库）
     pub item: Option<i64>,
+    /// 网页快照的网址
+    pub url: Option<String>,
 }
 
 pub fn source(c: &Connection, material: i64) -> Result<Source, String> {
@@ -50,7 +52,11 @@ pub fn source(c: &Connection, material: i64) -> Result<Source, String> {
         (Some("item"), Some(r)) => r.parse().ok(),
         _ => None,
     };
-    Ok(Source { id: material, uid, kind, title, sub, kb, item })
+    let url = match (sk.as_deref(), sr.as_deref()) {
+        (Some("web_page"), Some(r)) => c.query_row("SELECT final_url FROM web_pages WHERE id = ?1", [r], |r| r.get::<_, String>(0)).optional().map_err(err)?,
+        _ => None,
+    };
+    Ok(Source { id: material, uid, kind, title, sub, kb, item, url })
 }
 
 /// 书的对面（原著 ↔ 译本）：对面的材料、对齐、这一边是不是原著

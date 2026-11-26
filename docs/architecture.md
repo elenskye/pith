@@ -44,7 +44,7 @@ pith/
 │   └── reader/                 阅读器（单独打包，第一次阅读时加载）：Reader（工具栏、浮动工具条、查找）、
 │                               controller（pdf.js 的 PDFViewer、标注层、选区 → PDF 坐标）、AnnotationList、useRead
 ├── src-tauri/                  Rust 后端（唯一读写 SQLite 的地方）
-│   ├── migrations/             0001_library … 0011_passages；顺序编号，用过永不改
+│   ├── migrations/             0001_library … 0012_web；顺序编号，用过永不改
 │   ├── word/                   Word 一侧的源文件：Pith.bas（宏，ASCII）、customUI.xml（选项卡）、images/（选项卡图标 PNG）、Pith.applescript、pith-bridge.sh
 │   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）；
 │   │                           research/（虚构「示例市」的网页、统计表原件，录制的 Anthropic / DeepSeek / Tavily 回复）
@@ -65,8 +65,10 @@ pith/
 │       │                       passages（段落块：书一段一块、别的按空行切；读一章、上下文、目录）、index（search.db 的按词索引和本机向量，后台补）、
 │       │                       retrieve（按意思 + 按词 → 重排，带对照译文）、read（kb_read、面板、子代理读整章）、cite（[P123] → [n]、页边注）、
 │       │                       align（向量齐了用相似度重新对齐）、commands（`kb_*`）
+│       ├── web/                联网（1.1.0 第 4 期，`0039`）：mod（选哪家的搜索、取回、写成给模型看的文字）、store（web_pages、web_blocks）、
+│       │                       gemini（Gemini 的 Google 搜索）；搜索和下载复用 research 的 ClaudeSearch、Tavily、Downloader、ClaudeFetch 和 concept 的 OpenAiSearch
 │       ├── harness/            Agent 循环（1.1.0，`decisions/0037`）：mod（一轮一轮、停的条件、防打转、事件）、prompt（提示分层）、
-│       │                       tools（按插件分组的工具：基础、知识库、文献库；子代理）、calc（精确计算）、brain（开发版的模拟模型）
+│       │                       tools（按插件分组的工具：基础、知识库、文献库、联网；子代理）、calc（精确计算）、brain（开发版的模拟模型）
 │       ├── library.rs          文献库只读查询（概览、列表的范围 / 搜索 / 筛选 / 排序、四种详情、集合树、标签、附件打开位置）
 │       ├── edit.rs             写操作：编辑、新建、标签、集合、批量、回收站、合并、添加附件
 │       ├── fields.rs           条目字段规则：由字段推出常用列（导入与编辑共用）
@@ -168,7 +170,7 @@ pith/
 ```
 
 - 事件攒在 `chat::run::Runs`（每段对话一份 `LiveView`），界面轮询；子代理的步骤带 `sub`；正在写的正文里的段落编号已经换成 [n]。
-- 工具接口 `harness::tools::Env`：App 里查数据库和本机模型（文献库 `library::items_list`、`item_get`；知识库 `kb::retrieve`、`kb::read`，范围是这段对话勾的库），测试里是假的。
+- 工具接口 `harness::tools::Env`：App 里是 `chat::run::ChatEnv`（不碰 Tauri，真实验收也用它）：文献库 `library::items_list`、`item_get`；知识库 `kb::retrieve`、`kb::read`（范围是这段对话勾的库）；联网 `web`（第一次用到才造、才读密钥）。测试里是假的。
 - 跑完：回答里的 `[P123]` 查库换成 `[1]`、页边注存进 body 的 `cites`（`kb::cite`）；交付卡的正文换好编号、附出处。
 
 ## 知识库检索（1.1.0 第 3 期，`decisions/0038`）
@@ -184,6 +186,16 @@ kb_read（工具）─▶ kb::read：上下文 / 整章（主对话约 9000 toke
 - 范围：这段对话勾的知识库，没勾是全部。本机模型用不了或者还没有向量时只按词，重排用不了按向量排，都给模型一句说明。
 - 启动时（和整库恢复后）`kb::on_startup`：家补进 `kb_members`、第一次（`kb.v11`）并重复、书迁进「书架」、没切块的切一遍，按词索引对上主库。
 - 面板读原文：`kb_read` 命令给一章的块、读到的那一段、对照（块 id → 对面的文字）。设置 › 知识库与检索：`kb_index_status` / `kb_index_start`。
+
+## 联网（1.1.0 第 4 期，`decisions/0039`）
+
+```
+web_search（工具）─▶ web::kit：这一回模型那家自带的搜索（另一次便宜的调用）/ Tavily / 借别家的 ─▶ 标题、网站、网址、摘要
+web_fetch（工具）─▶ 本机下载（失败：Claude 网页抓取）─▶ 快照（数据目录/web/）─▶ web_pages + web_blocks（切块同知识库）─▶ 带 [W12] 的正文，约 6000 token 一次
+回答 ─▶ kb::cite：[W12] 和 [P123] 一起编号；页边注「打开网页」「存进知识库」（kb_save_web：web 材料，块就是那一页的块）
+```
+
+- 账本用途 `chat_web`（research 的 `Meter::for_chat`），带对话 uid；发之前按最坏情况查月上限。开发版、`?mock` 用模拟搜索和合成网页。
 
 ## 恢复的流程（`decisions/0013`）
 
@@ -292,7 +304,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - v0.3 事实调查（见上）：连 `api.anthropic.com`、`api.deepseek.com`（地址可改）、`api.tavily.com`，以及检索到的网页（本机下载，只取单页）。每次发送模型和搜索前界面确认、查月度上限。
 - v0.4 概念研究（见上）：连 `api.openai.com`（或选 Opus 时的 `api.anthropic.com`）、`api.mathpix.com`（上传前确认页数和费用，用完删除），网页检索同 v0.3。
 - 本机模型（见上）：只连 `127.0.0.1:8081` / `8082`，不出这台电脑。
-- 1.0.2 的对话不联网（回答是模拟的）；1.1.0 起对话调模型（网关，`0036`），知识库检索只连本机的向量和重排服务。
+- 1.0.2 的对话不联网（回答是模拟的）；1.1.0 起对话调模型（网关，`0036`），知识库检索只连本机的向量和重排服务；第 4 期起模型能用 `web_search`、`web_fetch`（`0039`）：搜索跟着这一回的模型用它自带的（Claude 网页搜索、OpenAI 网页搜索、Gemini 的 Google 搜索），DeepSeek 用 Tavily，都没有就借别家的；取回用 v0.3 的本机下载器（不下本机和内网），失败了用 Claude 网页抓取。快照在 `数据目录/web/`。
 - 导入完成、改了 DOI / ISBN 后，命令层把文献放进 `AppState.lookups` 队列，后台线程一次一条地查：读库（拿锁）→ 联网（不拿锁）→ 写库（拿锁）并更新搜索索引。
 
 ## 资源约束

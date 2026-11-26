@@ -80,6 +80,8 @@ const LABELS: &[(&str, &str)] = &[
     ("kb_materials", "知识库的材料"),
     ("kb_members", "材料在哪些知识库"),
     ("passages", "材料的段落块"),
+    ("web_pages", "对话里取回的网页"),
+    ("web_blocks", "网页的块"),
 ];
 
 fn label(table: &str) -> String {

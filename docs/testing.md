@@ -225,6 +225,12 @@ PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM=
 PITH_LOCAL_MODELS=real PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p pith real_alignment -- --ignored --nocapture
 ```
 
+## 联网（1.1.0 第 4 期，`decisions/0039`）
+
+- **`web/tests.rs`**（模拟的搜索、合成的「示例市」网页，不联网）：搜、取回存快照（在 `数据目录/web/`，不在事实调查的目录）、切块带 [W12]、同样的内容只存一份、从某一块接着读、不是 http(s) 的拒绝；[W12] 的页边注（网页、网站、日子、网址）、出处带网址；存进知识库（块就是那一页的块、再存只是照料、存过的页边注知道在哪、按词找得到、页边注带网址）；每家用自己的搜索、DeepSeek 用 Tavily、没有 Tavily 借别家的并说明、什么都没有说去哪填；账本记成 `chat_web` 带对话。`web/gemini.rs`：Google 搜索的回复 → 结果、摘要、用量。
+- **`harness/tests.rs`**：`web_search`、`web_fetch`、接着读、取不到回出错；子代理也有联网工具。
+- 真的联网在第 5 期的真实验收里（`0040`）。
+
 ## 换配色的帧（1.0.3，`decisions/0032`）
 
 动效卡不卡要在 WebKit 里量（Tauri 用的就是它）；无头 Chrome 用 GPU 画 SVG 滤镜，量不出来。看不见的窗口 WebKit 会停掉动画帧，所以这个小窗口会浮在最前面一两分钟。

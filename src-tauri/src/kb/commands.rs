@@ -89,6 +89,29 @@ pub fn kb_material_link(state: State<AppState>, uid: String, kb: String) -> Resu
     state.with_db(|c| store::material_link(c, &uid, &kb, &now_iso()))
 }
 
+/// 对话里取回的一页存进知识库（页边注的「存进知识库」）。kb 是空的：种进第一个知识库，没有就建「随手存」
+#[tauri::command(async)]
+pub fn kb_save_web(app: AppHandle, state: State<AppState>, page: i64, kb: Option<String>, conversation: Option<String>) -> Result<Material, String> {
+    let saved = state.with_db(|c| {
+        let tx = Tx::begin(c)?;
+        let now = now_iso();
+        // 没给库：这段对话勾的第一个库；也没勾就第一个库，没有就建「随手存」
+        let picked = conversation.as_deref().and_then(|u| crate::chat::store::get(c, u).ok()).and_then(|conv| conv.kbs.into_iter().find(|k| store::kb_id(c, k).is_ok()));
+        let kb = match kb.filter(|k| !k.is_empty()).or(picked) {
+            Some(k) => k,
+            None => match store::kbs_list(c)?.first() {
+                Some(k) => k.uid.clone(),
+                None => store::kb_create(c, "随手存", "对话里存下的回答和随手种进来的东西", &now)?,
+            },
+        };
+        let m = store::save_web(c, page, &kb, conversation.as_deref(), &now)?;
+        tx.commit()?;
+        Ok(m)
+    })?;
+    index::start(&app);
+    Ok(saved)
+}
+
 #[tauri::command]
 pub fn kb_candidates(state: State<AppState>) -> Result<Vec<Material>, String> {
     state.with_db(|c| store::candidates(c))

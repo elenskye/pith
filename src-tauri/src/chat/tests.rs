@@ -102,6 +102,12 @@ impl crate::harness::tools::Env for DbEnv {
     fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
         crate::kb::read::chapter_for_subagent(&self.0.lock().unwrap(), passage, false)
     }
+    fn web_search(&self, _query: &str, _limit: usize) -> Result<(String, usize), String> {
+        Err("测试里不联网".into())
+    }
+    fn web_fetch(&self, _url: &str, _from: Option<i64>) -> Result<(String, String), String> {
+        Err("测试里不联网".into())
+    }
 }
 
 #[test]

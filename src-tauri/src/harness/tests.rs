@@ -43,6 +43,18 @@ impl Env for FakeEnv {
     fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
         if passage == 7 { Ok(("第三章".into(), "《国富论》「第三章」：\n\n[P7] I.iii.1\nAs it is the power of exchanging…".into())) } else { Err("没有这一段。".into()) }
     }
+
+    fn web_search(&self, query: &str, _limit: usize) -> Result<(String, usize), String> {
+        Ok((format!("网上搜「{query}」的 1 条（模拟搜索）：\n\n1. 示例市统计局 — stats.example.gov\n   https://stats.example.gov/2024\n"), 1))
+    }
+
+    fn web_fetch(&self, url: &str, from: Option<i64>) -> Result<(String, String), String> {
+        match (url, from) {
+            (_, Some(9)) => Ok(("[W9] 后半页".into(), "stats.example.gov".into())),
+            ("https://stats.example.gov/2024", None) => Ok(("「2024 年公报」：\n[W8] 16-24 岁失业率 15.7%。\n（后面还有 1 段没给出：from 写 W9 接着读。）".into(), "stats.example.gov".into())),
+            _ => Err("连不上".into()),
+        }
+    }
 }
 
 fn spec() -> &'static catalog::ModelSpec {
@@ -242,7 +254,7 @@ fn a_subagent_reads_with_the_stronger_model_and_reports_back() {
     assert_eq!(sub_reqs.len(), 4);
     assert!(sub_reqs[0].system[0].text.contains("规矩") || sub_reqs[0].system[0].text.contains("子代理"));
     let names: Vec<&str> = sub_reqs[0].tools.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["calculate", "kb_search", "kb_read", "library_search", "library_item"]);
+    assert_eq!(names, ["calculate", "kb_search", "kb_read", "library_search", "library_item", "web_search", "web_fetch"]);
     assert_eq!(sub_reqs[0].effort.as_deref(), Some("high"));
     assert!(sub_reqs[0].messages[0].text().starts_with("任务："));
     // 状态行：派的那一格，下面是它的步骤（带它的 id）
@@ -293,4 +305,28 @@ fn knowledge_base_tools_and_a_whole_chapter_for_a_subagent() {
     // 没有的段落：出错的结果，模型接着做
     assert!(matches!(&results[2], Part::ToolResult { is_error: true, .. }));
     assert_eq!(o.text, "分工受市场范围限制 [P7]。");
+}
+
+#[test]
+fn web_tools_search_fetch_and_continue() {
+    let main = MockModel::scripted(
+        spec(),
+        vec![
+            Turn::call("web_search", json!({ "query": "2024 青年失业率" })),
+            Turn::calls(vec![("web_fetch", json!({ "url": "https://stats.example.gov/2024" })), ("web_fetch", json!({ "url": "https://stats.example.gov/2024", "from": "W9" })), ("web_fetch", json!({ "url": "https://nowhere.example" }))]),
+            Turn::text("15.7% [W8]。"),
+        ],
+    );
+    let r = go(&main, None, &meter("harness-web"), Limits::default(), false, "查一下 2024 年青年失业率");
+    let o = &r.out;
+    let texts: Vec<(&str, &str)> = o.steps.iter().map(|s| (s.agent.as_str(), s.text.as_str())).collect();
+    assert!(texts.contains(&("web", "在网上搜「2024 青年失业率」：1 条")), "{texts:?}");
+    assert!(texts.contains(&("web", "取回了 stats.example.gov 的网页")) && texts.contains(&("web", "接着读 stats.example.gov 的网页")), "{texts:?}");
+    let results = &o.turns[3].parts;
+    assert!(matches!(&results[0], Part::ToolResult { output, is_error: false, .. } if output.contains("[W8]")));
+    assert!(matches!(&results[1], Part::ToolResult { output, is_error: false, .. } if output == "[W9] 后半页"));
+    assert!(matches!(&results[2], Part::ToolResult { output, is_error: true, .. } if output.contains("没取到")));
+    // 联网工具在「联网」插件里；子代理也能用
+    let names: Vec<String> = Toolbox::subagent().specs().into_iter().map(|t| t.name).collect();
+    assert!(names.contains(&"web_search".to_string()) && names.contains(&"web_fetch".to_string()));
 }

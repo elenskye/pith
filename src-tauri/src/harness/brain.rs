@@ -49,6 +49,17 @@ pub fn brain() -> Brain {
         if let Some(expr) = arithmetic(&q).filter(|_| !has("calculate")) {
             return Turn { text: "我先算一下。".into(), calls: vec![("calculate".into(), json!({ "expression": expr }))], ..Default::default() };
         }
+        // 要查网上的（「网上」「最新」「联网」「查一下」）：搜一次、取回第一条
+        let online = ["网上", "最新", "联网", "查一下", "新闻"].iter().any(|w| q.contains(w));
+        if online && !has("web_search") {
+            return Turn { text: "我上网查一下。".into(), calls: vec![("web_search".into(), json!({ "query": q, "limit": 3 }))], ..Default::default() };
+        }
+        if online && !has("web_fetch") {
+            let found = done.iter().find(|(n, _)| n == "web_search").map(|(_, r)| r.clone()).unwrap_or_default();
+            if let Some(url) = found.split_whitespace().find(|w| w.starts_with("http")) {
+                return Turn::call("web_fetch", json!({ "url": url }));
+            }
+        }
         if !has("kb_search") {
             return Turn { text: "我先在知识库里找找。".into(), reasoning: "先看看知识库里有没有相关的原文。".into(), calls: vec![("kb_search".into(), json!({ "query": q, "limit": 4 }))], ..Default::default() };
         }
@@ -65,10 +76,15 @@ pub fn brain() -> Brain {
         let found = done.iter().find(|(n, _)| n == "library_search").map(|(_, r)| r.lines().next().unwrap_or("").to_string()).unwrap_or_default();
         let calc = done.iter().find(|(n, _)| n == "calculate").map(|(_, r)| format!("算出来 {r}。")).unwrap_or_default();
         let kb = done.iter().find(|(n, _)| n == "kb_search").map(|(_, r)| r.clone()).unwrap_or_default();
-        let cited: Vec<String> = crate::kb::cite::handles(&kb).into_iter().take(2).map(|id| format!("[P{id}]")).collect();
+        let cited: Vec<String> = crate::kb::cite::handles(&kb).into_iter().take(2).map(|id| format!("[{id}]")).collect();
+        let web = done.iter().find(|(n, _)| n == "web_fetch").map(|(_, r)| r.clone()).unwrap_or_default();
+        let web_line = match crate::kb::cite::handles(&web).first() {
+            Some(h) => format!("网上取回的那一页里有一段 [{h}]。"),
+            None => String::new(),
+        };
         let kb_line = if cited.is_empty() { "知识库里没找到相关的段落。".to_string() } else { format!("知识库里最相关的是这几段{}，点编号能看原文。", cited.join("")) };
         Turn::text(format!(
-            "这是开发版的模拟回答：没有联网、不花钱，问题本身没有被回答。正式版（或设了 PITH_REAL_MODEL=1）这里是真的模型在答。\n\n刚才照真回答的样子走了一遍：{calc}{kb_line}在文献库里也查了一下——{found}\n\n下面那张交付卡点「存进」，能看种子飞进知识库。"
+            "这是开发版的模拟回答：没有联网、不花钱，问题本身没有被回答。正式版（或设了 PITH_REAL_MODEL=1）这里是真的模型在答。\n\n刚才照真回答的样子走了一遍：{calc}{web_line}{kb_line}在文献库里也查了一下——{found}\n\n下面那张交付卡点「存进」，能看种子飞进知识库。"
         ))
     })
 }

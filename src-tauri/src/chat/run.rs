@@ -133,8 +133,7 @@ fn kind_label(kind: &str) -> &'static str {
 /// `cites` 是回答里的段落编号查出来的页边注（`kb::cite::cites`）：正文里的 [P123] 换成 [1]；
 /// 交付卡存进知识库的正文也换好，后面附上出处
 pub fn reply_body(o: &Outcome, model_label: &str, kb: Option<(&str, &str)>, cites: &[Cite]) -> Value {
-    let order: Vec<i64> = cites.iter().map(|x| x.passage).collect();
-    let text = cite::number(&o.text, &order);
+    let text = cite::number(&o.text, &cite::order_of(cites));
     let paragraphs: Vec<String> = text.split("\n\n").map(str::trim).filter(|p| !p.is_empty()).map(str::to_string).collect();
     let delivery = o.delivery.as_ref().map(|d| {
         let body = if d.body.trim().is_empty() { &o.text } else { &d.body };
@@ -213,37 +212,76 @@ pub fn describe_item(c: &rusqlite::Connection, id: i64) -> Result<String, String
     Ok(lines.join("\n"))
 }
 
-struct AppEnv {
-    app: AppHandle,
+/// Agent 的工具碰到的外面：数据库、本机模型、联网（不碰 Tauri：App 和真实验收共用这一套）
+pub struct ChatEnv<'a> {
+    pub state: &'a AppState,
     /// 这段对话勾的知识库（空 = 全部）
-    kbs: Vec<String>,
+    pub kbs: Vec<String>,
+    pub conversation: Option<String>,
+    pub cancel: &'a AtomicBool,
+    /// 检索时发现缺向量：在后台补
+    pub backfill: Box<dyn Fn() + Send + Sync + 'a>,
+    /// 联网工具第一次用到时才造（才去读密钥）
+    pub make_web: Box<dyn Fn() -> crate::web::Web + Send + Sync + 'a>,
+    pub web: std::sync::OnceLock<crate::web::Web>,
 }
 
-impl Env for AppEnv {
+impl ChatEnv<'_> {
+    fn web(&self) -> &crate::web::Web {
+        self.web.get_or_init(|| (self.make_web)())
+    }
+}
+
+impl Env for ChatEnv<'_> {
     fn library_search(&self, query: &str, limit: usize) -> Result<Vec<LibHit>, String> {
-        let state: tauri::State<AppState> = self.app.state();
-        state.with_db(|c| search_library(c, query, limit))
+        self.state.with_db(|c| search_library(c, query, limit))
     }
 
     fn library_item(&self, id: i64) -> Result<String, String> {
-        let state: tauri::State<AppState> = self.app.state();
-        state.with_db(|c| describe_item(c, id))
+        self.state.with_db(|c| describe_item(c, id))
     }
 
     fn kb_search(&self, query: &str, limit: usize) -> Result<KbFound, String> {
-        let state: tauri::State<AppState> = self.app.state();
-        kb_search_in(state.inner(), &state.local, &self.kbs, query, limit, || crate::kb::index::start(&self.app))
+        kb_search_in(self.state, &self.state.local, &self.kbs, query, limit, || (self.backfill)())
     }
 
     fn kb_read(&self, req: &KbRead) -> Result<String, String> {
-        let state: tauri::State<AppState> = self.app.state();
-        state.with_db(|c| crate::kb::read::read(c, req))
+        self.state.with_db(|c| crate::kb::read::read(c, req))
     }
 
     fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
-        let state: tauri::State<AppState> = self.app.state();
-        state.with_db(|c| crate::kb::read::chapter_for_subagent(c, passage, false))
+        self.state.with_db(|c| crate::kb::read::chapter_for_subagent(c, passage, false))
     }
+
+    fn web_search(&self, query: &str, limit: usize) -> Result<(String, usize), String> {
+        let f = crate::web::search(self.web(), query, limit, self.cancel)?;
+        Ok((f.text, f.hits))
+    }
+
+    fn web_fetch(&self, url: &str, from: Option<i64>) -> Result<(String, String), String> {
+        let page = match from {
+            Some(b) => self.state.with_db(|c| crate::web::store::block(c, b))?.map(|(_, p)| p.id).ok_or_else(|| format!("没有编号 W{b} 的段落。"))?,
+            None => crate::web::fetch(self.web(), self.state, url, self.conversation.as_deref(), self.cancel)?,
+        };
+        self.state.with_db(|c| Ok((crate::web::render(c, page, from)?, crate::web::store::page(c, page)?.map(|p| p.site).unwrap_or_default())))
+    }
+}
+
+/// App 里造联网工具：密钥从钥匙串（正式版）或内存、文件来；Vertex 要项目填了、gcloud 登录过
+fn web_kit(app: &AppHandle, provider: Provider, conversation: &str) -> crate::web::Web {
+    let state: tauri::State<AppState> = app.state();
+    let vertex = crate::gateway::commands::vertex_config(&state);
+    let key = |k: crate::agent::secret::ApiKey| -> Option<String> { if keys::present(app, k) { keys::load(app, k).ok() } else { None } };
+    crate::web::kit(&crate::web::Setup {
+        root: &state.paths.root,
+        real: crate::agent::use_real_model(),
+        provider,
+        key: &key,
+        vertex: (vertex.is_set() && crate::gateway::vertex::adc_present()).then_some(vertex),
+        budget_usd: crate::agent::budget(&state),
+        prices: crate::research::commands::settings(&state).prices,
+        conversation: Some(conversation),
+    })
 }
 
 /// 在知识库里找（不碰 Tauri，测试直接调）。搜索词空着：列出有哪些材料。缺向量时 `backfill` 在后台补
@@ -333,7 +371,16 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     let model = build(app, &state, main)?;
     let strong_model = build(app, &state, strong)?;
     let meter = Meter::new(&state.paths.root, crate::agent::budget(&state), crate::research::commands::settings(&state).prices);
-    let env = AppEnv { app: app.clone(), kbs: conv.kbs.clone() };
+    let provider = main.model.provider;
+    let env = ChatEnv {
+        state: &state,
+        kbs: conv.kbs.clone(),
+        conversation: Some(conv_uid.to_string()),
+        cancel,
+        backfill: Box::new(|| crate::kb::index::start(app)),
+        make_web: Box::new(move || web_kit(app, provider, conv_uid)),
+        web: std::sync::OnceLock::new(),
+    };
     let sink = |e: Event| {
         if let Ok(mut v) = view.lock() {
             match e {
@@ -357,5 +404,6 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     let outcome = harness::run(&ctx, &prompt::system(&main_role), &Toolbox::main(), history(&conv), "chat");
     let kb = conv.kbs.first().and_then(|u| kbs.iter().find(|k| &k.uid == u)).map(|k| (k.uid.as_str(), k.name.as_str()));
     let cites = state.with_db(|c| cite::cites(c, &cite::handles(&outcome.text)))?;
+    drop(env);
     Ok(reply_body(&outcome, main.model.label, kb, &cites))
 }

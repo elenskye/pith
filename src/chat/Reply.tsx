@@ -1,6 +1,6 @@
 // 一条消息：你说的；Pith（或点名的角色）的——一行状态行（每一步一个 Agent 图标，子代理的步骤收在派它的那一格下面）、
 // 正文（轻量的 Markdown：段落、列表、加粗、小标题；[n] 是编号，点开在右边展开页边注：那一段原文、段落号和页码、对照译文，
-// 一步到知识库里那一段、文献库里那本书）、问题卡（点选项就当你这样回答）、
+// 一步到知识库里那一段、文献库里那本书；网页是那一块、网站和日子，能打开网页、存进知识库）、问题卡（点选项就当你这样回答）、
 // 交付卡（「存进……」把它种进知识库，种子落到顶栏的知识库图标），和这一回怎么结束的（停了、月上限、拒答……）。
 // 正在回答的那一回（LiveReply）：状态行一格格长出来，正文一边写一边出来。
 import { Fragment, useRef, useState } from "react";
@@ -68,6 +68,43 @@ function Block({ text, open, onRef, className, style }: { text: string; open: nu
         </Fragment>
       ))}
     </p>
+  );
+}
+
+/** 页边注里的网页：存进知识库（存过了就是「知识库里」，点了去看） */
+function WebSave({ cite, conv, kb }: { cite: ChatCite; conv: string; kb: string | null }) {
+  const nav = useNav();
+  const qc = useQueryClient();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [busy, setBusy] = useState(false);
+  const saved = useQuery({ queryKey: ["materials", null], queryFn: () => api.kbMaterials(null), select: (ms) => ms.find((m) => m.sourceKind === "web_page" && m.sourceRef === String(cite.webPage)) ?? null });
+  if (saved.data)
+    return (
+      <button className="pith-link" onClick={() => nav.openKb(saved.data!.kb, saved.data!.uid)}>
+        知识库里
+      </button>
+    );
+  return (
+    <button
+      ref={ref}
+      className="pith-link"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await api.kbSaveWeb(cite.webPage!, kb, conv);
+          nav.seed(ref.current);
+          await qc.invalidateQueries({ queryKey: ["materials"] });
+          void qc.invalidateQueries({ queryKey: ["kbs"] });
+        } catch (e) {
+          nav.say(String(e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      存进知识库
+    </button>
   );
 }
 
@@ -189,9 +226,16 @@ export function Reply({ msg, conv, roles, fresh, first, last, onAnswer }: { msg:
         </span>
       )}
       <span className="pith-sidenote-go">
-        {c.material && (
+        {c.material ? (
           <button className="pith-link" onClick={() => nav.openKb(c.kb ?? null, c.material, c.passage ?? null)}>
-            知识库里这一段
+            {c.webPage ? "知识库里" : "知识库里这一段"}
+          </button>
+        ) : (
+          typeof c.webPage === "number" && <WebSave cite={c} conv={conv} kb={b.delivery?.kb?.uid ?? null} />
+        )}
+        {c.url && (
+          <button className="pith-link" onClick={() => void api.openUrl(c.url!).catch((e) => nav.say(String(e)))}>
+            打开网页
           </button>
         )}
         {typeof c.item === "number" && (

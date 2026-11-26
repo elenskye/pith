@@ -235,6 +235,30 @@ pub fn material_add(c: &Connection, m: &Material, now: &str) -> Result<Material,
     material_get(c, &uid)
 }
 
+/// 对话里取回的一页存进知识库：一份「网页快照」材料，块就是那一页的块。已经存过就放进这个库、照料一下
+pub fn save_web(c: &Connection, page: i64, kb: &str, conversation: Option<&str>, now: &str) -> Result<Material, String> {
+    let p = crate::web::store::page(c, page)?.ok_or("这一页不在了。")?;
+    let blocks = crate::web::store::blocks(c, page)?;
+    let excerpt: String = blocks.iter().filter(|b| b.role == "body").map(|b| b.text.as_str()).collect::<Vec<_>>().join("\n\n").chars().take(240).collect();
+    let conversation = match conversation {
+        Some(uid) if crate::chat::store::conv_id(c, uid).is_ok() => Some(uid.to_string()),
+        _ => None,
+    };
+    let m = Material {
+        kb: kb.into(),
+        kind: "web".into(),
+        title: if p.title.trim().is_empty() { p.site.clone() } else { p.title.clone() },
+        sub: format!("{} · 取于 {}", p.site, p.fetched_at.get(..10).unwrap_or("")),
+        body: excerpt,
+        stage: 0,
+        source_kind: Some("web_page".into()),
+        source_ref: Some(page.to_string()),
+        conversation,
+        ..Default::default()
+    };
+    material_add(c, &m, now)
+}
+
 /// 再放进一个库（已经在就只是照料一下）
 pub fn material_link(c: &Connection, uid: &str, kb: &str, now: &str) -> Result<Material, String> {
     let (id, kb) = (material_id(c, uid)?, kb_id(c, kb)?);

@@ -2,6 +2,7 @@
 //!
 //! - **书**（来源是解析好的文本）：一段一块，段落号、页码、所在的章照文本（`concept_paragraphs` 原样抄一份，seq 一样，对齐靠它）。
 //!   书的文本删了，知识库里这份还在；重新解析了就重抄（`sync_source`）。
+//! - **网页快照**（来源是对话里取回的一页）：块就是那一页的块。
 //! - **别的材料**：正文按空行切，太短的并在一起、太长的在句末拆开；单独一行的 `#` 小标题是标题块，后面的块记在它名下。
 //!   调查报告、概念卡没有正文时用原来的东西（报告的 Markdown、卡片的句子）。
 //! - 重切时同一个位置（seq）的块留着原来的 id（编号 `[P123]` 不变），只改变了的字；多出来的删、少的补。
@@ -166,6 +167,15 @@ fn blocks_of(c: &Connection, id: i64) -> Result<Option<Vec<Block>>, String> {
     };
     if let (Some("concept_text"), Some(r)) = (source_kind.as_deref(), source_ref.as_deref()) {
         return from_text(c, r);
+    }
+    // 对话里取回的网页：块就是那一页的块（小标题记在名下）
+    if let (Some("web_page"), Some(r)) = (source_kind.as_deref(), source_ref.as_deref()) {
+        let Ok(page) = r.parse::<i64>() else { return Ok(None) };
+        let blocks = crate::web::store::blocks(c, page)?;
+        if blocks.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(blocks.into_iter().map(|b| Block { role: b.role, key: String::new(), unit_key: String::new(), unit_label: b.heading, page: None, text: b.text }).collect()));
     }
     if !body.trim().is_empty() {
         return Ok(Some(chunk(&body)));

@@ -3,9 +3,10 @@
 //! - 基础：`calculate`（精确计算）、`ask_user`（问题卡）、`deliver`（交付卡，站主点「存进」才存）、`delegate`（派子代理）；
 //! - 知识库：`kb_search`（按意思和词找段落）、`kb_read`（上下文、整章、目录、对照译文），只读；回答里写段落的编号 `[P123]`，
 //!   程序换成 [1] 和页边注（`crate::kb::cite`）；
-//! - 文献库：`library_search`、`library_item`（只读）。
+//! - 文献库：`library_search`、`library_item`（只读）；
+//! - 联网：`web_search`（搜）、`web_fetch`（取回一页、存快照，每段一个编号 `[W12]`），1.1.0 第 4 期。
 //!
-//! 只读的（计算、查知识库、查文献库、子代理）一批里并行跑，最多 `Limits::parallel` 个一起；问题卡、交付卡按顺序。
+//! 只读的（计算、查知识库、查文献库、联网、子代理）一批里并行跑，最多 `Limits::parallel` 个一起；问题卡、交付卡按顺序。
 //! 工具名用英文（各家接口都认），说明用中文。工具是 Rust 写的，只做程序该做的：给数、给条目，不规定回答怎么写（`0030`）。
 
 use serde_json::{Value, json};
@@ -22,6 +23,10 @@ pub trait Env: Send + Sync {
     fn kb_read(&self, req: &KbRead) -> Result<String, String>;
     /// 子代理读整章：（章名, 带编号的全文）
     fn kb_chapter(&self, passage: i64) -> Result<(String, String), String>;
+    /// 联网搜（写成给模型看的文字、几条）
+    fn web_search(&self, query: &str, limit: usize) -> Result<(String, usize), String>;
+    /// 取回一页（`from`：从这一块接着读）：（给模型看的文字, 网站）
+    fn web_fetch(&self, url: &str, from: Option<i64>) -> Result<(String, String), String>;
 }
 
 /// 知识库检索的结果（已经写成给模型看的文字）
@@ -159,6 +164,20 @@ pub static TOOLS: &[Tool] = &[
         name: "library_item",
         description: "看文献库里一个条目的详情（作者、日期、出处、DOI、摘要、标签、附件和笔记的数目）。id 是 library_search 给的条目号。",
         schema: || json!({ "type": "object", "properties": { "id": { "type": "integer" } }, "required": ["id"] }),
+        read_only: true,
+    },
+    Tool {
+        plugin: "联网",
+        name: "web_search",
+        description: "在网上搜（需要最新的、知识库和文献库里没有的事实时用）。返回几条结果的标题、网址和摘要；摘要不能当原文引用，要用哪一条就用 web_fetch 取回。",
+        schema: || json!({ "type": "object", "properties": { "query": { "type": "string", "description": "搜索词；查外文资料用外文" }, "limit": { "type": "integer", "minimum": 1, "maximum": 10 } }, "required": ["query"] }),
+        read_only: true,
+    },
+    Tool {
+        plugin: "联网",
+        name: "web_fetch",
+        description: "取回一个网页（或 PDF）的原文，存一份快照，每段前面是编号（如 [W12]），引用时写编号。太长的分几次读：from 写上次结尾给的编号。",
+        schema: || json!({ "type": "object", "properties": { "url": { "type": "string" }, "from": { "type": "string", "description": "接着读：从这一段起，如 W123" } }, "required": ["url"] }),
         read_only: true,
     },
 ];
@@ -303,6 +322,22 @@ impl Toolbox {
                 match ctx.env.kb_read(&req) {
                     Ok(text) => ToolOut::ok(text, Step::new("read", what)),
                     Err(e) => ToolOut::error(e),
+                }
+            }
+            "web_search" => {
+                let q = s("query");
+                let limit = input.get("limit").and_then(Value::as_u64).unwrap_or(6).clamp(1, 10) as usize;
+                match ctx.env.web_search(&q, limit) {
+                    Ok((text, n)) => ToolOut::ok(text, Step::new("web", format!("在网上搜「{}」：{n} 条", short(&q, 20)))),
+                    Err(e) => ToolOut::error(format!("搜不了：{e}")),
+                }
+            }
+            "web_fetch" => {
+                let url = s("url");
+                let from = input.get("from").and_then(Value::as_str).and_then(|h| h.trim().trim_start_matches(['W', 'w']).parse().ok());
+                match ctx.env.web_fetch(&url, from) {
+                    Ok((text, site)) => ToolOut::ok(text, Step::new("web", if from.is_some() { format!("接着读 {site} 的网页") } else { format!("取回了 {site} 的网页") })),
+                    Err(e) => ToolOut::error(format!("这个网页没取到：{e}")),
                 }
             }
             "delegate" => {

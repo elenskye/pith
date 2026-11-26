@@ -13,16 +13,27 @@ use research_engine::ports::{ErrorKind, Model, ModelReply, ModelRequest, PortErr
 
 use crate::agent::usage::{self, Call, Ledger, Prices, Tokens};
 
+/// 对话里联网的账本用途
+pub const CHAT_WEB: &str = "chat_web";
+
 pub struct Meter {
     pub ledger: Ledger,
     pub budget_usd: f64,
     pub prices: Prices,
     pub now: fn() -> String,
+    /// 对话里联网（1.1.0）：账本的用途统一记成 `chat_web`，并记着是哪段对话
+    pub chat: Option<Option<String>>,
 }
 
 impl Meter {
     pub fn new(data_dir: &std::path::Path, budget_usd: f64, prices: Prices) -> Self {
-        Meter { ledger: Ledger::new(data_dir), budget_usd, prices, now: crate::text::now_iso }
+        Meter { ledger: Ledger::new(data_dir), budget_usd, prices, now: crate::text::now_iso, chat: None }
+    }
+
+    /// 给对话用：每一行记成 `chat_web`、带上对话的 uid
+    pub fn for_chat(mut self, conversation: Option<&str>) -> Self {
+        self.chat = Some(conversation.map(str::to_string));
+        self
     }
 
     fn month(&self) -> String {
@@ -45,7 +56,11 @@ impl Meter {
         Ok(())
     }
 
-    pub fn record(&self, call: Call) -> Result<(), PortError> {
+    pub fn record(&self, mut call: Call) -> Result<(), PortError> {
+        if let Some(conv) = &self.chat {
+            call.purpose = CHAT_WEB.into();
+            call.conversation = conv.clone();
+        }
         self.ledger.append(&call).map_err(|e| PortError::new(ErrorKind::Fatal, e))
     }
 

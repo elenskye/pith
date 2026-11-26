@@ -236,6 +236,12 @@ impl Downloader {
         Downloader::new(Box::new(Http::new(limits.timeout)), data_dir, limits)
     }
 
+    /// 快照放到别的目录（对话里取回的网页在 `数据目录/web`，不被事实调查的清理删掉）
+    pub fn into_snapshots(mut self, snapshots: Snapshots) -> Self {
+        self.snapshots = snapshots;
+        self
+    }
+
     /// 模拟模式：合成来源，不联网、不等待
     pub fn mock(data_dir: &Path, round: u32) -> Self {
         Downloader::new(Box::new(FixtureTransport { round }), data_dir, Limits { host_gap: Duration::ZERO, allow_private: true, ..Default::default() })

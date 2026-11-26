@@ -2,7 +2,27 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.1.0 第 3 期做完（2026-11-26）
+## 现在：1.1.0 第 4 期做完（2026-11-26），接着做第 5 期
+
+你说第 4、5 期一起做。第 4 期一个提交；第 5 期（真实验收、装正式版）接着做，做完这里再改。
+
+### 第 4 期：联网（`decisions/0039`）
+
+- **冻结 v11 样本库**（`fixtures/library-v11.json`，带知识库的块），**migration 0012**：`web_pages`、`web_blocks`。
+- **工具**（插件「联网」）：`web_search`（搜，返回标题、网站、网址、摘要）、`web_fetch`（取回一页，存快照，每段一个编号 `[W12]`，太长的接着读）。子代理也能用。
+- **搜索跟着这一回的模型**：Anthropic → Claude 网页搜索（Haiku 搜一次）；OpenAI → Responses 网页搜索；Google、Vertex → Gemini 的 Google 搜索（新写的 `web/gemini.rs`）；DeepSeek → Tavily；用不了就用 Tavily，再不行借别家有密钥的，并说一声。密钥第一次用到联网工具时才读。
+- **取回**：v0.3 的本机下载器（不下本机和内网），失败了有 Anthropic 密钥就用 Claude 网页抓取。快照在 `数据目录/web/`。
+- **引用**：`[W12]` 和 `[P123]` 一起编号；网页的页边注：标题、网站、取回的日子、那一段；「打开网页」「存进知识库」（存成网页快照材料，块就是那一页的块，能检索、能引用；存过的变「知识库里」）。
+- **账本**：用途 `chat_web`（用量明细里叫「联网」），带着对话。
+- 开发版、`?mock`：模拟搜索和合成网页；模拟脑子遇到「网上、最新、联网、查一下、新闻」先搜、取回、引用。
+
+改的文件：新 `src-tauri/migrations/0012_web.sql`、`src-tauri/src/web/*`、`fixtures/library-v11.json`、`docs/decisions/0039-web.md`；改 `kb/{cite,passages,retrieve,store,commands}.rs`、`chat/{run,tests}.rs`（工具环境改成不碰 Tauri 的 `ChatEnv`，真实验收也用它）、`harness/{tools,prompt,brain,tests}.rs`、`research/{meter,download}.rs`、`gateway/commands.rs`、`db.rs`、`transfer.rs`、`lib.rs`；前端 `ipc.ts`、`chat/Reply.tsx`、`dev/{mockChat,mockModel}.ts`；文档。
+
+测试：`pnpm check` 全过（Rust 主库 336 个，新增联网 5 个、工具 1 个）。`?mock` 里走过：问一句要上网的 → 状态行「在网上搜」「取回了」→ 页边注 → 存进知识库 → 变「知识库里」。真联网在第 5 期。
+
+提交：`v1.1.0: add web search, page fetch, web citations`
+
+## 上一期：1.1.0 第 3 期（2026-11-26）
 
 你说开工第 3 期：知识库检索。一个提交。对话现在能在知识库里找原文、读上下文和整章，回答带编号 [n]，点开是那一段。开发版用模拟模型；真模型用这些工具的效果在第 5 期真实验收里看。
 
