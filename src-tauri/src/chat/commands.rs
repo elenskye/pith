@@ -1,10 +1,10 @@
-//! 对话、角色、知识库的 Tauri 命令。规则都在 `store`、`run` 里，这里只取连接、记时间。
+//! 对话、角色的 Tauri 命令（知识库的在 `crate::kb::commands`）。规则都在 `store`、`run` 里，这里只取连接、记时间。
 //! 1.1.0 起回答由 Agent 循环在后台给（`run`）：`chat_start` / `chat_send` 存下站主这一句就返回，界面轮询 `chat_live`。
 
 use tauri::{AppHandle, State};
 
 use super::run::{self, LiveView, Runs};
-use super::store::{self, ConvSummary, Conversation, KnowledgeBase, Material, Role};
+use super::store::{self, ConvSummary, Conversation, Role};
 use crate::AppState;
 use crate::common::Tx;
 use crate::text::now_iso;
@@ -113,63 +113,4 @@ pub fn role_save(state: State<AppState>, role: Role) -> Result<Role, String> {
 #[tauri::command]
 pub fn role_delete(state: State<AppState>, uid: String) -> Result<(), String> {
     state.with_db(|c| store::role_delete(c, &uid))
-}
-
-#[tauri::command]
-pub fn kb_list(state: State<AppState>) -> Result<Vec<KnowledgeBase>, String> {
-    state.with_db(|c| store::kbs_list(c))
-}
-
-#[tauri::command]
-pub fn kb_create(state: State<AppState>, name: String, note: String) -> Result<String, String> {
-    state.with_db(|c| store::kb_create(c, &name, &note, &now_iso()))
-}
-
-#[tauri::command]
-pub fn kb_update(state: State<AppState>, uid: String, name: String, note: String) -> Result<(), String> {
-    state.with_db(|c| store::kb_update(c, &uid, &name, &note, &now_iso()))
-}
-
-#[tauri::command]
-pub fn kb_delete(state: State<AppState>, uid: String) -> Result<(), String> {
-    state.with_db(|c| store::kb_delete(c, &uid))
-}
-
-#[tauri::command]
-pub fn kb_materials(state: State<AppState>, kb: Option<String>) -> Result<Vec<Material>, String> {
-    state.with_db(|c| store::materials(c, kb.as_deref()))
-}
-
-/// 种进知识库。kb 是空的：种进第一个知识库，没有就建一个「随手存」
-#[tauri::command]
-pub fn kb_material_add(state: State<AppState>, material: Material) -> Result<Material, String> {
-    state.with_db(|c| {
-        let tx = Tx::begin(c)?;
-        let now = now_iso();
-        let mut m = material;
-        if m.kb.is_empty() {
-            m.kb = match store::kbs_list(c)?.first() {
-                Some(k) => k.uid.clone(),
-                None => store::kb_create(c, "随手存", "对话里存下的回答和随手种进来的东西", &now)?,
-            };
-        }
-        let saved = store::material_add(c, &m, &now)?;
-        tx.commit()?;
-        Ok(saved)
-    })
-}
-
-#[tauri::command]
-pub fn kb_material_update(state: State<AppState>, uid: String, title: String, body: String, stage: i64) -> Result<Material, String> {
-    state.with_db(|c| store::material_update(c, &uid, &title, &body, stage, &now_iso()))
-}
-
-#[tauri::command]
-pub fn kb_material_delete(state: State<AppState>, uid: String) -> Result<(), String> {
-    state.with_db(|c| store::material_delete(c, &uid))
-}
-
-#[tauri::command]
-pub fn kb_candidates(state: State<AppState>) -> Result<Vec<Material>, String> {
-    state.with_db(|c| store::candidates(c))
 }

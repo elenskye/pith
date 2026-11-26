@@ -21,7 +21,8 @@ use crate::gateway::http::{Credential, HttpModel};
 use crate::gateway::meter::Meter;
 use crate::gateway::mock::MockModel;
 use crate::gateway::{Message, Model, Part, Provider, Role as Who, keys};
-use crate::harness::tools::{Env, LibHit, Toolbox};
+use crate::harness::tools::{Env, KbFound, KbRead, LibHit, Toolbox};
+use crate::kb::cite::{self, Cite};
 use crate::harness::{self, Ctx, Ending, Event, Limits, Outcome, Step, prompt};
 
 /// 正在回答的那一回（界面轮询看到的样子）
@@ -52,8 +53,11 @@ impl Runs {
         self.live.lock().map(|l| l.contains_key(conv)).unwrap_or(false)
     }
 
+    /// 正文里的段落编号（[P123]）已经换成 [1]
     pub fn view(&self, conv: &str) -> Option<LiveView> {
-        self.live.lock().ok()?.get(conv).and_then(|l| l.view.lock().ok().map(|v| v.clone()))
+        let mut v = self.live.lock().ok()?.get(conv).and_then(|l| l.view.lock().ok().map(|v| v.clone()))?;
+        v.text = cite::number_live(&v.text);
+        Some(v)
     }
 
     pub fn stop(&self, conv: &str) {
@@ -108,7 +112,7 @@ pub fn history(conv: &Conversation) -> Vec<Message> {
 
 /// 站主这一句存成什么样：`text` 给人看，`sent` 是发给模型的（带今天几号、勾了哪些知识库、`@` 请了谁）
 pub fn you_body(c: &rusqlite::Connection, conv: &Conversation, text: &str, role: &str, today: &str) -> Result<Value, String> {
-    let kbs = store::kbs_list(c)?;
+    let kbs = crate::kb::store::kbs_list(c)?;
     let names: Vec<String> = conv.kbs.iter().filter_map(|u| kbs.iter().find(|k| &k.uid == u).map(|k| k.name.clone())).collect();
     let asked = (role != conv.role).then(|| store::role_get(c, role).ok()).flatten();
     Ok(json!({ "text": text, "role": role, "sent": prompt::user_text(text, today, &names, asked.as_ref()) }))
@@ -125,23 +129,28 @@ fn kind_label(kind: &str) -> &'static str {
     }
 }
 
-/// 一回的结果 → 消息的 body（前端照它画：状态行、段落、问题卡、交付卡；`transcript` 只给下一回用）
-pub fn reply_body(o: &Outcome, model_label: &str, kb: Option<(&str, &str)>) -> Value {
-    let paragraphs: Vec<String> = o.text.split("\n\n").map(str::trim).filter(|p| !p.is_empty()).map(str::to_string).collect();
+/// 一回的结果 → 消息的 body（前端照它画：状态行、段落、页边注、问题卡、交付卡；`transcript` 只给下一回用）。
+/// `cites` 是回答里的段落编号查出来的页边注（`kb::cite::cites`）：正文里的 [P123] 换成 [1]；
+/// 交付卡存进知识库的正文也换好，后面附上出处
+pub fn reply_body(o: &Outcome, model_label: &str, kb: Option<(&str, &str)>, cites: &[Cite]) -> Value {
+    let order: Vec<i64> = cites.iter().map(|x| x.passage).collect();
+    let text = cite::number(&o.text, &order);
+    let paragraphs: Vec<String> = text.split("\n\n").map(str::trim).filter(|p| !p.is_empty()).map(str::to_string).collect();
     let delivery = o.delivery.as_ref().map(|d| {
+        let body = if d.body.trim().is_empty() { &o.text } else { &d.body };
         json!({
             "kind": d.kind,
             "title": d.title,
             "desc": d.desc,
             "meta": format!("{} • {model_label}", kind_label(&d.kind)),
             "kb": kb.map(|(uid, name)| json!({ "uid": uid, "name": name })),
-            "body": d.body,
+            "body": cite::with_sources(body, cites),
         })
     });
     json!({
         "steps": o.steps,
         "paragraphs": paragraphs,
-        "cites": [],
+        "cites": cites,
         "ask": o.ask,
         "delivery": delivery,
         "model": model_label,
@@ -206,6 +215,8 @@ pub fn describe_item(c: &rusqlite::Connection, id: i64) -> Result<String, String
 
 struct AppEnv {
     app: AppHandle,
+    /// 这段对话勾的知识库（空 = 全部）
+    kbs: Vec<String>,
 }
 
 impl Env for AppEnv {
@@ -218,6 +229,34 @@ impl Env for AppEnv {
         let state: tauri::State<AppState> = self.app.state();
         state.with_db(|c| describe_item(c, id))
     }
+
+    fn kb_search(&self, query: &str, limit: usize) -> Result<KbFound, String> {
+        let state: tauri::State<AppState> = self.app.state();
+        kb_search_in(state.inner(), &state.local, &self.kbs, query, limit, || crate::kb::index::start(&self.app))
+    }
+
+    fn kb_read(&self, req: &KbRead) -> Result<String, String> {
+        let state: tauri::State<AppState> = self.app.state();
+        state.with_db(|c| crate::kb::read::read(c, req))
+    }
+
+    fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
+        let state: tauri::State<AppState> = self.app.state();
+        state.with_db(|c| crate::kb::read::chapter_for_subagent(c, passage, false))
+    }
+}
+
+/// 在知识库里找（不碰 Tauri，测试直接调）。搜索词空着：列出有哪些材料。缺向量时 `backfill` 在后台补
+pub fn kb_search_in(db: &impl crate::kb::Db, local: &crate::local::LocalModels, kbs: &[String], query: &str, limit: usize, backfill: impl FnOnce()) -> Result<KbFound, String> {
+    if query.trim().is_empty() {
+        let text = db.with(|c| crate::kb::retrieve::list_materials(c, kbs))?;
+        return Ok(KbFound { text, hits: 0, semantic: false });
+    }
+    let f = crate::kb::retrieve::search(db, local, query, kbs, limit)?;
+    if f.note.is_some() {
+        backfill();
+    }
+    Ok(KbFound { text: crate::kb::retrieve::format(query, &f), hits: f.hits.len(), semantic: f.mode == "semantic" })
 }
 
 // ---------- 模型 ----------
@@ -282,7 +321,7 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     let (conv, main_role, kbs) = state.with_db(|c| {
         let conv = store::get(c, conv_uid)?;
         let role = store::role_get(c, &conv.role).or_else(|_| store::role_get(c, "pith"))?;
-        Ok((conv, role, store::kbs_list(c)?))
+        Ok((conv, role, crate::kb::store::kbs_list(c)?))
     })?;
     let (main, strong) = picks(&state, &main_role);
     if !ready(app, &state, main.model.provider) {
@@ -294,7 +333,7 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     let model = build(app, &state, main)?;
     let strong_model = build(app, &state, strong)?;
     let meter = Meter::new(&state.paths.root, crate::agent::budget(&state), crate::research::commands::settings(&state).prices);
-    let env = AppEnv { app: app.clone() };
+    let env = AppEnv { app: app.clone(), kbs: conv.kbs.clone() };
     let sink = |e: Event| {
         if let Ok(mut v) = view.lock() {
             match e {
@@ -317,5 +356,6 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     };
     let outcome = harness::run(&ctx, &prompt::system(&main_role), &Toolbox::main(), history(&conv), "chat");
     let kb = conv.kbs.first().and_then(|u| kbs.iter().find(|k| &k.uid == u)).map(|k| (k.uid.as_str(), k.name.as_str()));
-    Ok(reply_body(&outcome, main.model.label, kb))
+    let cites = state.with_db(|c| cite::cites(c, &cite::handles(&outcome.text)))?;
+    Ok(reply_body(&outcome, main.model.label, kb, &cites))
 }

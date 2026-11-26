@@ -145,6 +145,8 @@ pub fn apply(c: &Connection, backups: &Path, snapshots: &Snapshots, uid: &str, t
     search::remove_text(&tx, id)?;
     store::text_replace(&tx, uid, text, meta, source_sha256, &now)?;
     search::add_text(&tx, id)?;
+    // 知识库里这本书的那一份重抄（同一个位置的段落块留着原来的编号）；向量按文字的散列，变了的下次补
+    crate::kb::passages::sync_source(&tx, "concept_text", uid)?;
 
     // 3. 重新对齐（原著 → 每一份译本；译本 → 原著）
     let mut as_original: Option<Alignment> = None;

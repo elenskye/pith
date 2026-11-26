@@ -210,6 +210,21 @@ PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_QUESTIONS='问题一|问题
 PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM='division of labour' cargo test -p pith real_excerpt -- --ignored --nocapture
 ```
 
+## 知识库检索（1.1.0 第 3 期，`decisions/0038`）
+
+- **存取**（`src-tauri/src/kb/tests.rs`，fresh）：一份材料进几个库、再种进同一个库只是照料、从家里拿掉家挪过去、删库只删只在这个库里的；正文切块（小标题、并短的、拆长的），改正文时同一位置的块 id 不变、按词索引跟着改，变短了多出来的连索引一起删；索引坏了对一遍就重建。
+- **1.1.0 的升级**：0011 以前同一来源在两个库里各一份 → 并成一份、进两个库、阶段取高的；已经种过的书不再种，没种的进「书架」；书的块和文本一段对一段（段落号、页码、章）；再启动一次什么都不多。升级测试（`transfer/tests.rs`）：v10 的冻结样本库（`fixtures/library-v10.json`，这一期加 migration 之前冻的）升到 v11，`exercise` 跑一遍升级、每份材料都在家里、面板读得出。
+- **检索**（模拟的本机模型）：没向量时只按词并说明；补向量（书以前算过的直接拿来、建好的不重算）；英文问题按意思找到讲市场范围的那一段；中文问题从译本映射回原著、带着中译、同一组不重复；勾了空库找不到；本机模型关掉只按词；搜索词空着列出材料。
+- **读原文**：上下文不出这一章、整章的段数对、按章号读和按段落读一样、目录、面板读到那一段并带对照；太长的一章只给前一部分并说怎么接着读。
+- **引用编号**：`[P12]`、`【P34】`、`[P12, P56]`、`[P56][P99]` 按第一次出现编号；不认识的那一处原样留着；页边注带段落号、页码、中译、文献库条目；存进知识库的正文后面附出处。
+- **对齐用上相似度**：没向量不动；补完向量重新对齐、记下模型；同一个模型对过的不再算。
+- **Agent 工具**（`harness/tests.rs`）：`kb_search`、`kb_read`、子代理拿到整章原文（不经主对话）、没有的段落回出错的结果；子代理的工具里有 `kb_search`、`kb_read`。开发版的模拟脑子走一遍：找到知识库里的笔记、回答里的编号换成 [1]、交付卡的正文带出处（`chat/tests.rs`）。
+- **真实的两本书**（默认忽略；不联网、不花钱，会经 `llmctl.sh` 启动向量服务、跑完停掉；约 6 分钟）：解析 → 迁进知识库 → 补向量 → 只用长度 vs 加相似度对齐，只打印聚合数字。结果记在 `0038`：
+
+```bash
+PITH_LOCAL_MODELS=real PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub cargo test -p pith real_alignment -- --ignored --nocapture
+```
+
 ## 换配色的帧（1.0.3，`decisions/0032`）
 
 动效卡不卡要在 WebKit 里量（Tauri 用的就是它）；无头 Chrome 用 GPU 画 SVG 滤镜，量不出来。看不见的窗口 WebKit 会停掉动画帧，所以这个小窗口会浮在最前面一两分钟。

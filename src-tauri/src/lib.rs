@@ -15,6 +15,7 @@ mod fields;
 mod gateway;
 mod harness;
 mod import;
+mod kb;
 mod library;
 mod local;
 mod metadata;
@@ -69,6 +70,8 @@ impl AppState {
             attach_search(&conn, &paths);
             // v0.4 概念研究：进行中的标成已停止；段落检索对上主库（要在搜索索引挂上之后）
             concept::commands::on_startup(&conn);
+            // 1.1.0 知识库：家进 kb_members、解析好的书迁成全文材料、段落块和检索索引对上主库
+            kb::on_startup(&conn);
             if existed {
                 // 尽力而为：自动备份失败不挡启动，设置页能看到备份列表
                 match backup::daily(&conn, &paths.backups) {
@@ -156,6 +159,7 @@ impl AppState {
         if let Err(e) = search::rebuild(live) {
             eprintln!("重建搜索索引失败：{e}");
         }
+        kb::on_startup(live);
         Ok(report)
     }
 }
@@ -694,6 +698,7 @@ pub fn run() {
             concept::semantic::manage(app);
             // 对话：后台正在回答的几回（1.1.0 的 Agent 循环）
             chat::run::manage(app);
+            kb::index::manage(app);
             word::start_service(app.handle());
             Ok(())
         })
@@ -816,15 +821,19 @@ pub fn run() {
             chat::commands::role_list,
             chat::commands::role_save,
             chat::commands::role_delete,
-            chat::commands::kb_list,
-            chat::commands::kb_create,
-            chat::commands::kb_update,
-            chat::commands::kb_delete,
-            chat::commands::kb_materials,
-            chat::commands::kb_material_add,
-            chat::commands::kb_material_update,
-            chat::commands::kb_material_delete,
-            chat::commands::kb_candidates,
+            kb::commands::kb_list,
+            kb::commands::kb_create,
+            kb::commands::kb_update,
+            kb::commands::kb_delete,
+            kb::commands::kb_materials,
+            kb::commands::kb_material_add,
+            kb::commands::kb_material_update,
+            kb::commands::kb_material_delete,
+            kb::commands::kb_material_link,
+            kb::commands::kb_candidates,
+            kb::commands::kb_read,
+            kb::commands::kb_index_status,
+            kb::commands::kb_index_start,
             research::commands::research_status,
             research::commands::research_settings_set,
             research::commands::research_key_set,

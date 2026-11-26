@@ -154,6 +154,10 @@
 @keyframes note-in { from { opacity: 0; transform: translateY(-6px); clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 -10% 0); } }
 .side-note b { display: block; margin-top: 8px; font: 400 16px/1.3 var(--font-serif); }
 .side-note .loc { display: block; margin-top: 2px; font-size: 12.5px; color: var(--color-text-4); }
+/* 原文长的在页边注里自己滚；对照译文跟在下面，小一号 */
+.side-note > q { max-height: 15.5em; overflow-y: auto; scrollbar-width: thin; }
+.side-note-zh { display: block; margin-top: 10px; }
+.side-note-zh q { max-height: 9em; overflow-y: auto; font-size: 13.5px; font-style: normal; color: var(--color-text-3); scrollbar-width: thin; }
 .thread .pith-deliver { margin-top: 26px; }
 .pith-deliver .act { white-space: nowrap; }
 .deliver-grow { position: relative; width: 30px; height: 30px; }
@@ -300,6 +304,24 @@
 .panel .s { margin-top: 8px; font-size: 14px; color: var(--color-text-4); }
 .panel .t { margin-top: 18px; font: 400 17px/1.8 var(--font-serif); color: var(--color-text-2); white-space: pre-wrap; }
 .panel .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+/* 面板里读原文：一章一章，读到的那一段亮着（淡底慢慢退掉），对照译文小一号跟在下面 */
+.kb-read { margin-top: 18px; }
+.kb-read-bar { position: sticky; top: -30px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -34px; padding: 10px 34px; background: var(--color-raised); font-size: 13.5px; }
+.kb-read-bar > .pith-link { flex: none; white-space: nowrap; }
+.kb-read-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-3); }
+.kb-read-h { margin-top: 22px; font: 600 18px/1.4 var(--font-serif); }
+.kb-read-p { margin: 14px -12px 0; padding: 6px 12px; border-radius: var(--radius-m); transition: background 1.6s var(--out); }
+.kb-read-p p { font: 400 16px/1.75 var(--font-serif); color: var(--color-text-2); white-space: pre-wrap; }
+.kb-read-p.is-aside p { font-size: 14px; color: var(--color-text-3); }
+.kb-read-p.is-focus { background: color-mix(in srgb, var(--color-accent) 14%, transparent); animation: kb-focus 2.4s var(--out) both; }
+@keyframes kb-focus { from { background: color-mix(in srgb, var(--color-accent) 34%, transparent); } }
+.kb-read-loc { display: block; font: 700 11px/1 var(--font-sans); letter-spacing: .05em; color: var(--color-second); }
+.kb-read-p .kb-read-loc + p { margin-top: 6px; }
+.kb-read-zh { margin-top: 6px; padding-left: 12px; border-left: 1.5px solid var(--color-line); font-size: 14.5px !important; color: var(--color-text-3) !important; }
+.kb-in { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kb-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: var(--radius-pill); background: var(--color-tint); font-size: 13px; }
+.kb-chip button { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: var(--color-text-4); }
+.kb-chip button:hover { background: var(--color-line); color: var(--color-text); }
 /* 知识库的一份材料：和文献库的面板同一套字段（小字的名、衬线的值） */
 .panel > dl { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: baseline; row-gap: 8px; column-gap: 14px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-line); }
 .panel > dl dt { font: 400 12.5px/1.4 var(--font-sans); color: var(--color-text-4); }
@@ -685,3 +707,10 @@ ol.pith-list { list-style: decimal; }
 .comp-stop { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--color-tint); transition: background .2s, transform .3s var(--spring); }
 .comp-stop:hover { background: var(--color-line-2); transform: scale(1.06); }
 .comp-stop i { width: 11px; height: 11px; border-radius: 2px; background: var(--color-text); }
+/* 设置 › 知识库与检索：索引到哪了 */
+.kb-index-row { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 14px; font-size: 14px; }
+.kb-index-bar { display: block; height: 3px; margin-top: 10px; border-radius: var(--radius-pill); background: var(--color-line); overflow: hidden; }
+.kb-index-bar i { display: block; height: 100%; background: var(--color-accent); transition: width .8s var(--out); }
+.kb-index-bar i.is-run { background: linear-gradient(90deg, var(--color-accent), var(--color-second), var(--color-accent)); background-size: 200% 100%; animation: kb-index-run 1.6s linear infinite; }
+@keyframes kb-index-run { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .kb-index-bar i.is-run { animation: none; } }

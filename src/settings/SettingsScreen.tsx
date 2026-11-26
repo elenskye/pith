@@ -240,7 +240,7 @@ function KnowledgeBases() {
             <button
               className="pith-link"
               onClick={async () => {
-                const ok = await ui.confirm({ title: `删掉「${k.name}」？`, message: `里面的 ${k.count} 份材料一起拿掉；原来的书、调查、对话都还在。`, confirm: "删掉", danger: true });
+                const ok = await ui.confirm({ title: `删掉「${k.name}」？`, message: `只在这个库里的材料一起拿掉，别的库也有的留着；原来的书、调查、对话都还在。`, confirm: "删掉", danger: true });
                 if (!ok) return;
                 await api.kbDelete(k.uid);
                 void refresh();
@@ -256,9 +256,7 @@ function KnowledgeBases() {
         ＋ 新知识库
       </button>
       <p className="set-h3">检索</p>
-      <p className="text-sm text-muted-foreground">
-        对话已经接上模型，但还不会在知识库里找（1.1.0 第 3 期接上：段落块、本机向量和重排、读原文、引用编号）。本机向量模型的设置在 设置 › 技能 › 概念研究。
-      </p>
+      <SearchIndex />
     </>
   );
 }
@@ -333,5 +331,53 @@ function Appearance() {
       </div>
       <p className="mt-6 text-[13.5px] text-muted-foreground">也可以 ⌘K 里打「配色」「暗」。记在这台电脑上。</p>
     </>
+  );
+}
+
+/** 知识库的检索：材料切成块，按词随时能找；按意思找要本机向量模型把每块算一遍（只算一次，之后种进来的随手补） */
+function SearchIndex() {
+  const ui = useUi();
+  const q = useQuery({ queryKey: ["kbIndex"], queryFn: api.kbIndexStatus, refetchInterval: (x) => (x.state.data?.running ? 1000 : false) });
+  const st = q.data;
+  if (!st) return null;
+  const pct = st.total ? Math.round((st.done / st.total) * 100) : 100;
+  const start = async () => {
+    try {
+      await api.kbIndexStart();
+      void q.refetch();
+    } catch (e) {
+      ui.notify(String(e), "error");
+    }
+  };
+  return (
+    <div className="kb-index">
+      <p className="text-sm text-muted-foreground">
+        回答时 Pith 在你勾的知识库里找原文（没勾就是全部）：按意思找、按词找，再用本机的重排模型挑最相关的几段；引用的地方标上编号，点开是那一段。都在这台电脑上算，不联网、不花钱。
+      </p>
+      <div className="kb-index-row">
+        <span className="num">
+          {st.materials} 份材料 · {st.total.toLocaleString()} 块
+        </span>
+        {st.model ? (
+          <span className="num">
+            按意思：{st.done.toLocaleString()} / {st.total.toLocaleString()}（{st.model}）
+          </span>
+        ) : (
+          <span>只按词</span>
+        )}
+      </div>
+      {st.model && st.total > 0 && (
+        <span className="kb-index-bar" aria-hidden="true">
+          <i style={{ width: `${pct}%` }} className={st.running ? "is-run" : ""} />
+        </span>
+      )}
+      {st.issue && <p className="mt-2 text-xs text-muted-foreground">{st.issue}</p>}
+      {st.error && !st.running && <p className="mt-2 text-xs text-destructive">上次没建完：{st.error}</p>}
+      {st.model && st.done < st.total && (
+        <button className="pith-button pith-sweep mt-4" onClick={start} disabled={st.running}>
+          {st.running ? "在建……" : st.done === 0 ? "建索引（第一次要几分钟）" : "补齐"}
+        </button>
+      )}
+    </div>
   );
 }

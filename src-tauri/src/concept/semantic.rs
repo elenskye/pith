@@ -35,7 +35,7 @@ const TOP_TRANSLATION: usize = 24;
 const TOP_KEYWORD: usize = 24;
 const POOL: usize = 64;
 
-fn sig(body: &str) -> i64 {
+pub(crate) fn sig(body: &str) -> i64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in body.as_bytes() {
         h = (h ^ *b as u64).wrapping_mul(0x0000_0100_0000_01b3);

@@ -131,10 +131,15 @@ fn exercise(c: &Connection) {
             crate::chat::store::get(c, &uid).unwrap();
         }
     }
-    for k in crate::chat::store::kbs_list(c).unwrap() {
-        crate::chat::store::materials(c, Some(&k.uid)).unwrap();
+    for k in crate::kb::store::kbs_list(c).unwrap() {
+        crate::kb::store::materials(c, Some(&k.uid)).unwrap();
     }
-    crate::chat::store::candidates(c).unwrap();
+    crate::kb::store::candidates(c).unwrap();
+    crate::kb::store::upgrade(c, "2026-11-26T10:00:00.000Z").unwrap();
+    for m in crate::kb::store::materials(c, None).unwrap() {
+        assert!(!m.kbs.is_empty() && m.kbs.contains(&m.kb), "每份材料都在它的家里");
+        crate::kb::read::view(c, m.id, None, None).unwrap();
+    }
     for q in crate::research::store::questions_list(c).unwrap() {
         for r in &q.runs {
             let run = crate::research::store::run_load(c, &r.uid).unwrap();

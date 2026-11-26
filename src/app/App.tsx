@@ -35,7 +35,7 @@ function Shell() {
   const [screen, setScreen] = useState<Screen>("chat");
   const [chat, setChat] = useState<ChatTarget>(null);
   const [setSection, setSetSection] = useState<SetSection>("roles");
-  const [kb, setKb] = useState<{ uid: string | null; material: string | null }>({ uid: null, material: null });
+  const [kb, setKb] = useState<{ uid: string | null; material: string | null; passage: number | null }>({ uid: null, material: null, passage: null });
   const [libRequest, setLibRequest] = useState<LibRequest | null>(null);
   const [side, setSide] = useState(false);
   const [tags, setTags] = useState(false);
@@ -99,8 +99,8 @@ function Shell() {
         go("set");
       },
       kb,
-      openKb: (uid, material = null) => {
-        setKb((k) => ({ uid: uid ?? k.uid, material }));
+      openKb: (uid, material = null, passage = null) => {
+        setKb((k) => ({ uid: uid ?? k.uid, material, passage }));
         go("kb");
       },
       openLibrary: (r) => {
@@ -195,7 +195,7 @@ function Shell() {
   const afterRestore = useCallback(() => {
     setReading(null);
     setChat(null);
-    setKb({ uid: null, material: null });
+    setKb({ uid: null, material: null, passage: null });
     setLibRequest(null);
     void qc.invalidateQueries();
   }, [qc]);

@@ -1,5 +1,6 @@
-//! 开发版的模拟模型的「脑子」：不联网、不花钱，照真模型的样子走一遍循环——先查（文献库，问题里有算式就先算）、
-//! 再做一张交付卡、最后写回答，回答里说清楚这是模拟的。正式版、`PITH_REAL_MODEL=1` 用不到它。
+//! 开发版的模拟模型的「脑子」：不联网、不花钱，照真模型的样子走一遍循环——先查（问题里有算式先算，再查知识库、文献库）、
+//! 再做一张交付卡、最后写回答，回答里引用知识库找到的前两段（`[P123]`，程序换成 [1]），说清楚这是模拟的。
+//! 正式版、`PITH_REAL_MODEL=1` 用不到它。
 
 use serde_json::json;
 
@@ -48,6 +49,9 @@ pub fn brain() -> Brain {
         if let Some(expr) = arithmetic(&q).filter(|_| !has("calculate")) {
             return Turn { text: "我先算一下。".into(), calls: vec![("calculate".into(), json!({ "expression": expr }))], ..Default::default() };
         }
+        if !has("kb_search") {
+            return Turn { text: "我先在知识库里找找。".into(), reasoning: "先看看知识库里有没有相关的原文。".into(), calls: vec![("kb_search".into(), json!({ "query": q, "limit": 4 }))], ..Default::default() };
+        }
         if !has("library_search") {
             // 有英文词就拿英文词搜（文献以英文为主），没有就拿整句
             let latin: Vec<&str> = q.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| w.len() >= 3).collect();
@@ -60,8 +64,11 @@ pub fn brain() -> Brain {
         }
         let found = done.iter().find(|(n, _)| n == "library_search").map(|(_, r)| r.lines().next().unwrap_or("").to_string()).unwrap_or_default();
         let calc = done.iter().find(|(n, _)| n == "calculate").map(|(_, r)| format!("算出来 {r}。")).unwrap_or_default();
+        let kb = done.iter().find(|(n, _)| n == "kb_search").map(|(_, r)| r.clone()).unwrap_or_default();
+        let cited: Vec<String> = crate::kb::cite::handles(&kb).into_iter().take(2).map(|id| format!("[P{id}]")).collect();
+        let kb_line = if cited.is_empty() { "知识库里没找到相关的段落。".to_string() } else { format!("知识库里最相关的是这几段{}，点编号能看原文。", cited.join("")) };
         Turn::text(format!(
-            "这是开发版的模拟回答：没有联网、不花钱，问题本身没有被回答。正式版（或设了 PITH_REAL_MODEL=1）这里是真的模型在答。\n\n刚才照真回答的样子走了一遍：{calc}在文献库里查了一下——{found}\n\n下面那张交付卡点「存进」，能看种子飞进知识库。"
+            "这是开发版的模拟回答：没有联网、不花钱，问题本身没有被回答。正式版（或设了 PITH_REAL_MODEL=1）这里是真的模型在答。\n\n刚才照真回答的样子走了一遍：{calc}{kb_line}在文献库里也查了一下——{found}\n\n下面那张交付卡点「存进」，能看种子飞进知识库。"
         ))
     })
 }

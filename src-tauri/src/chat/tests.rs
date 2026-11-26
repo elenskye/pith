@@ -4,20 +4,21 @@ use rusqlite::Connection;
 use serde_json::json;
 
 use super::run;
-use super::store::{self, Material, Role};
+use super::store::{self, Role};
+use crate::kb::store::{self as kbs, Material};
 use crate::db::tests::memory_db;
 
 const NOW: &str = "2026-11-25T10:00:00.000Z";
 
 /// 样本：一个知识库、两份材料（一份指回调查）、一段对话（问了一句、存了回答）、一个改过的内置角色、一个新建的角色
 pub(crate) fn sample(c: &Connection) {
-    let kb = store::kb_create(c, "读《国富论》", "斯密 1776", NOW).unwrap();
-    store::material_add(c, &Material { kb: kb.clone(), kind: "excerpt".into(), title: "Stigler 1951 的摘抄".into(), body: "行业年轻时，企业什么都自己做；分工受市场范围限制。".into(), stage: 1, ..Default::default() }, NOW).unwrap();
+    let kb = kbs::kb_create(c, "读《国富论》", "斯密 1776", NOW).unwrap();
+    kbs::material_add(c, &Material { kb: kb.clone(), kind: "excerpt".into(), title: "Stigler 1951 的摘抄".into(), body: "行业年轻时，企业什么都自己做；分工受市场范围限制。".into(), stage: 1, ..Default::default() }, NOW).unwrap();
     let conv = store::create(c, "斯密为什么说分工受市场范围限制？", "companion", std::slice::from_ref(&kb), None, None, NOW).unwrap();
     store::add_message(c, &conv, "you", &json!({ "text": "斯密为什么说分工受市场范围限制？" }), NOW).unwrap();
     let reply = json!({ "steps": [{ "agent": "think", "text": "想了想" }, { "agent": "write", "text": "写好了" }], "paragraphs": ["因为分工靠交换。"], "cites": [], "transcript": [{ "role": "assistant", "parts": [{ "type": "text", "text": "因为分工靠交换。" }] }] });
     store::add_message(c, &conv, "companion", &reply, NOW).unwrap();
-    store::material_add(c, &Material { kb, kind: "answer".into(), title: "分工受市场范围限制".into(), body: "演示".into(), conversation: Some(conv), ..Default::default() }, NOW).unwrap();
+    kbs::material_add(c, &Material { kb, kind: "answer".into(), title: "分工受市场范围限制".into(), body: "演示".into(), conversation: Some(conv), ..Default::default() }, NOW).unwrap();
     store::role_save(c, &Role { name: "审稿人".into(), mark: "审".into(), line: "只挑最要紧的".into(), ..store::role_get(c, "reviewer").unwrap() }, NOW).unwrap();
     store::role_save(c, &Role { uid: String::new(), name: "导师".into(), mark: String::new(), line: "看大方向".into(), prompt: String::new(), kb: String::new(), model: String::new(), skills: vec![], builtin: false, edited: false }, NOW).unwrap();
 }
@@ -49,7 +50,7 @@ fn roles_builtin_edit_reset_and_custom() {
 fn history_replays_what_was_sent_and_the_transcripts() {
     use crate::gateway::{Message, Part, Role as Who};
     let c = memory_db();
-    let kb = store::kb_create(&c, "读《国富论》", "", NOW).unwrap();
+    let kb = kbs::kb_create(&c, "读《国富论》", "", NOW).unwrap();
     let uid = store::create(&c, "分工", "pith", std::slice::from_ref(&kb), None, None, NOW).unwrap();
     let conv = store::get(&c, &uid).unwrap();
     // 站主这一句：给人看的和发给模型的分开存；@ 请了别的角色就在开头说
@@ -91,6 +92,16 @@ impl crate::harness::tools::Env for DbEnv {
     fn library_item(&self, id: i64) -> Result<String, String> {
         run::describe_item(&self.0.lock().unwrap(), id)
     }
+    fn kb_search(&self, query: &str, limit: usize) -> Result<crate::harness::tools::KbFound, String> {
+        let local = crate::local::LocalModels::new(crate::local::Mode::Off, std::path::PathBuf::from("/nonexistent"));
+        run::kb_search_in(&self.0, &local, &[], query, limit, || {})
+    }
+    fn kb_read(&self, req: &crate::harness::tools::KbRead) -> Result<String, String> {
+        crate::kb::read::read(&self.0.lock().unwrap(), req)
+    }
+    fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
+        crate::kb::read::chapter_for_subagent(&self.0.lock().unwrap(), passage, false)
+    }
 }
 
 #[test]
@@ -101,6 +112,8 @@ fn two_turns_with_the_dev_brain_replay_cleanly() {
     let item = crate::edit::item_create(&c, "book", None).unwrap();
     crate::edit::items_set_field(&c, &[item], "title", "An Inquiry into the Nature and Causes of the Wealth of Nations").unwrap();
     crate::search::rebuild(&c).ok();
+    let kb = kbs::kb_create(&c, "读书", "", NOW).unwrap();
+    kbs::material_add(&c, &Material { kb, kind: "note".into(), title: "读书笔记".into(), body: "Wealth of Nations 讲什么：分工、交换和市场。".into(), ..Default::default() }, NOW).unwrap();
     let uid = store::create(&c, "分工", "pith", &[], None, None, NOW).unwrap();
     let env = DbEnv(std::sync::Mutex::new(c));
     let spec = catalog::model("anthropic/claude-sonnet-5-5").unwrap();
@@ -128,11 +141,17 @@ fn two_turns_with_the_dev_brain_replay_cleanly() {
         assert!(o.text.contains("模拟回答"));
         assert!(o.delivery.is_some());
         turns.push(o.turns.clone());
-        let body = run::reply_body(&o, spec.label, None);
+        let cites = crate::kb::cite::cites(&env.0.lock().unwrap(), &crate::kb::cite::handles(&o.text)).unwrap();
+        let body = run::reply_body(&o, spec.label, None, &cites);
         store::add_message(&env.0.lock().unwrap(), &uid, "pith", &body, NOW).unwrap();
+        assert!(o.steps.iter().any(|s| s.agent == "search" && s.text.starts_with("在知识库里找")), "{:?}", o.steps);
         if n == 0 {
-            // 真的查了库里的那一条
+            // 真的查了库里的那一条；知识库里找到的那一段换成了 [1]、页边注是它
             assert!(o.steps.iter().any(|s| s.agent == "lib" && s.text.contains("1 条")), "{:?}", o.steps);
+            assert_eq!(cites.len(), 1, "{}", o.text);
+            assert!(cites[0].text.contains("Wealth of Nations") && cites[0].kind == "笔记");
+            assert!(body["paragraphs"].as_array().unwrap().iter().any(|p| p.as_str().unwrap().contains("[1]")));
+            assert!(body["delivery"]["body"].as_str().unwrap().contains("出处：\n[1] 《读书笔记》"));
         } else {
             assert!(o.steps.iter().any(|s| s.agent == "compute" && s.text.contains("= 0.2")), "{:?}", o.steps);
         }
@@ -157,7 +176,7 @@ fn reply_body_has_paragraphs_cards_and_the_transcript() {
         cost_usd: 0.012,
         ..Default::default()
     };
-    let b = run::reply_body(&o, "Claude Sonnet 5.5", Some(("kb1", "读《国富论》")));
+    let b = run::reply_body(&o, "Claude Sonnet 5.5", Some(("kb1", "读《国富论》")), &[]);
     assert_eq!(b["paragraphs"], json!(["第一段。", "第二段 **要点**。"]));
     assert_eq!(b["ask"]["options"], json!(["斯密"]));
     assert_eq!(b["delivery"]["meta"], "概念卡 • Claude Sonnet 5.5");
@@ -215,40 +234,10 @@ fn history_lists_old_runs_until_they_get_a_conversation() {
     assert_eq!(research[0].uid.as_deref(), Some(uid.as_str()));
 
     // 能种进知识库的：两份文本、做完的调查、研究的卡片
-    let cand = store::candidates(&c).unwrap();
+    let cand = kbs::candidates(&c).unwrap();
     assert_eq!(cand.iter().filter(|m| m.kind == "full").count(), 2);
     assert_eq!(cand.iter().filter(|m| m.kind == "report").count(), 1);
     assert!(cand.iter().any(|m| m.kind == "concept" && m.source_ref.as_deref().is_some_and(|r| r.contains('#'))));
-}
-
-#[test]
-fn knowledge_base_materials() {
-    let c = memory_db();
-    assert!(store::kb_create(&c, " ", "", NOW).is_err());
-    let kb = store::kb_create(&c, "毕业论文", "政治效能感", NOW).unwrap();
-    let m = Material { kb: kb.clone(), kind: "report".into(), title: "斯密怎么评价东印度公司".into(), source_kind: Some("research_run".into()), source_ref: Some("RUN1".into()), ..Default::default() };
-    let first = store::material_add(&c, &m, NOW).unwrap();
-    let again = store::material_add(&c, &m, "2026-11-25T11:00:00.000Z").unwrap();
-    assert_eq!(first.uid, again.uid, "同一个来源在同一个库里只种一次");
-    assert_eq!(again.tended_at, "2026-11-25T11:00:00.000Z", "再种就是照料一下");
-    assert!(store::material_add(&c, &Material { kind: "poem".into(), ..m.clone() }, NOW).is_err());
-    assert!(store::material_add(&c, &Material { kb: "nope".into(), ..m.clone() }, NOW).is_err());
-
-    let up = store::material_update(&c, &first.uid, "东印度公司", "垄断", 5, NOW).unwrap();
-    assert_eq!((up.title.as_str(), up.stage), ("东印度公司", 2), "阶段夹在 0–2");
-    assert_eq!(store::kbs_list(&c).unwrap()[0].count, 1);
-
-    let conv = store::create(&c, "问", "pith", &[], None, None, NOW).unwrap();
-    let saved = store::material_add(&c, &Material { kb: kb.clone(), kind: "answer".into(), title: "回答".into(), conversation: Some(conv.clone()), ..Default::default() }, NOW).unwrap();
-    assert_eq!(saved.conversation.as_deref(), Some(conv.as_str()));
-    store::delete(&c, &conv).unwrap();
-    assert_eq!(store::material_get(&c, &saved.uid).unwrap().conversation, None, "对话删了，材料还在");
-
-    store::kb_update(&c, &kb, "论文", "", NOW).unwrap();
-    assert_eq!(store::kbs_list(&c).unwrap()[0].name, "论文");
-    store::material_delete(&c, &saved.uid).unwrap();
-    store::kb_delete(&c, &kb).unwrap();
-    assert!(store::materials(&c, None).unwrap().is_empty(), "知识库删了，里面的材料也没了");
 }
 
 #[test]
@@ -256,6 +245,6 @@ fn sample_round_trips() {
     let c = memory_db();
     sample(&c);
     assert_eq!(store::list(&c).unwrap().len(), 1);
-    assert_eq!(store::materials(&c, None).unwrap().len(), 2);
+    assert_eq!(kbs::materials(&c, None).unwrap().len(), 2);
     assert_eq!(store::roles_list(&c).unwrap().len(), 5);
 }

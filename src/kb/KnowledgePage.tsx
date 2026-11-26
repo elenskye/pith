@@ -1,6 +1,7 @@
 // 知识库（R1，1.0.3 借文献库的两栏）：第一栏左边是一排知识库，右边是种类和搜索；第二栏是生长阶段；
 // 下面是卡片墙（瀑布流，shared/masonry），十种记录各一种样子；标题的字重跟着生长阶段（字会长）。
-// 点一张卡，右边滑出面板：正文、从哪来、在哪个库，能改、能照料（换阶段）、能打开原处。
+// 点一张卡，右边滑出面板：正文（书是原文：一章一章读，能对照译文）、从哪来、在哪几个库（一份材料能进几个库），
+// 能改、能照料（换阶段）、能打开原处。从对话的页边注点「知识库里这一段」过来时，读到那一段、它亮着。
 // 「种进来」：解析好的书（全文）、做完的调查（调查报告）、概念研究的卡片（概念卡），或者自己写一条笔记、记一条摘抄。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -155,7 +156,7 @@ export function KnowledgePage() {
           )}
         </div>
       </main>
-      <MaterialPanel m={current} kb={sel} onClose={() => setOpen(null)} />
+      <MaterialPanel m={current} kb={sel} kbs={list} focus={current && current.uid === nav.kb.material ? nav.kb.passage : null} onClose={() => setOpen(null)} />
       {planting && sel && <Plant kb={sel} onClose={() => setPlanting(false)} />}
     </div>
   );
@@ -334,7 +335,7 @@ function Card({ m, i, on, onClick }: { m: Material; i: number; on: boolean; onCl
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}……` : s);
 
 /** 右边的面板：一份材料 */
-function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBase | null; onClose: () => void }) {
+function MaterialPanel({ m, kb, kbs, focus, onClose }: { m: Material | null; kb: KnowledgeBase | null; kbs: KnowledgeBase[]; focus: number | null; onClose: () => void }) {
   const nav = useNav();
   const ui = useUi();
   const qc = useQueryClient();
@@ -357,15 +358,32 @@ function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBa
       ui.notify(String(e), "error");
     }
   };
-  const remove = async () => {
-    if (!m) return;
-    const ok = await ui.confirm({ title: `从「${kb?.name}」里拿掉？`, message: "只拿掉知识库里这一份，原来的书、调查、对话都还在。", confirm: "拿掉", danger: true });
-    if (!ok) return;
-    await api.kbMaterialDelete(m.uid);
+  const refresh = async () => {
     await qc.invalidateQueries({ queryKey: ["materials"] });
     void qc.invalidateQueries({ queryKey: ["kbs"] });
-    onClose();
   };
+  /** 从一个库里拿掉；别的库还有它就只是少一个库 */
+  const removeFrom = async (from: KnowledgeBase | null | undefined) => {
+    if (!m || !from) return;
+    const last = m.kbs.length <= 1;
+    const ok = await ui.confirm({
+      title: `从「${from.name}」里拿掉？`,
+      message: last ? "它只在这一个库里：拿掉就没了。原来的书、调查、对话都还在。" : "别的库里还有它，只是这个库里不再有。",
+      confirm: "拿掉",
+      danger: last,
+    });
+    if (!ok) return;
+    await api.kbMaterialDelete(m.uid, from.uid).catch((e) => ui.notify(String(e), "error"));
+    await refresh();
+    if (last || from.uid === kb?.uid) onClose();
+  };
+  const link = async (to: string) => {
+    if (!m || !to) return;
+    await api.kbMaterialLink(m.uid, to).catch((e) => ui.notify(String(e), "error"));
+    await refresh();
+  };
+  const others = kbs.filter((k) => !m?.kbs.includes(k.uid));
+  const reads = !!m && m.passages > 0 && (m.kind === "full" || !m.body.trim());
   const origin = m ? originOf(m) : null;
 
   return (
@@ -385,7 +403,7 @@ function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBa
             <h2 className={`w${m.stage}`}>{m.title}</h2>
           )}
           {m.sub && <p className="s">{m.sub}</p>}
-          {edit ? <textarea className="pith-field" value={body} onChange={(e) => setBody(e.target.value)} /> : m.body && <p className="t selectable">{m.body}</p>}
+          {edit ? <textarea className="pith-field" value={body} onChange={(e) => setBody(e.target.value)} /> : reads ? <Original m={m} focus={focus} /> : m.body && <p className="t selectable">{m.body}</p>}
           <p className="acts">
             {edit ? (
               <>
@@ -412,7 +430,7 @@ function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBa
                 <button className="pith-button pith-button--quiet" onClick={() => setEdit(true)}>
                   编辑
                 </button>
-                <button className="pith-button pith-button--quiet" onClick={remove}>
+                <button className="pith-button pith-button--quiet" onClick={() => void removeFrom(kb)}>
                   拿掉
                 </button>
               </>
@@ -433,12 +451,97 @@ function MaterialPanel({ m, kb, onClose }: { m: Material | null; kb: KnowledgeBa
             <dd>{dateOf(m.createdAt)}</dd>
             <dt>最近照料</dt>
             <dd>{dateOf(m.tendedAt)}</dd>
-            <dt>在这个知识库</dt>
-            <dd>{kb?.name}</dd>
+            <dt>在这些知识库</dt>
+            <dd className="kb-in">
+              {m.kbs.map((u) => {
+                const k = kbs.find((x) => x.uid === u);
+                return (
+                  k && (
+                    <span key={u} className="kb-chip">
+                      {k.name}
+                      {m.kbs.length > 1 && (
+                        <button aria-label={`从「${k.name}」里拿掉`} onClick={() => void removeFrom(k)}>
+                          <X size={11} />
+                        </button>
+                      )}
+                    </span>
+                  )
+                );
+              })}
+              {others.length > 0 && (
+                <Select value="" onChange={(v) => void link(v)} title="再放进一个知识库" render={() => "＋ 也放进…"}>
+                  {others.map((k) => (
+                    <option key={k.uid} value={k.uid}>
+                      {k.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </dd>
+            {m.passages > 0 && (
+              <>
+                <dt>检索</dt>
+                <dd className="num">切成 {m.passages} 块，对话里能找到、能引用</dd>
+              </>
+            )}
           </dl>
         </>
       )}
     </aside>
+  );
+}
+
+/** 原文：一章一章读（书有目录），从页边注过来时读到那一段、它亮着；书有对齐的译本时能对照 */
+function Original({ m, focus }: { m: Material; focus: number | null }) {
+  const [unit, setUnit] = useState<number | null>(null);
+  const [pairs, setPairs] = useState(false);
+  useEffect(() => setUnit(null), [m.uid, focus]);
+  const q = useQuery({ queryKey: ["kbRead", m.uid, unit, unit === null ? focus : null, m.passages], queryFn: () => api.kbRead(m.uid, unit, unit === null ? focus : null) });
+  const v = q.data;
+  const focusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [v?.focus, v?.unit]);
+  if (!v || v.passages.length === 0) return null;
+  const hasPairs = Object.keys(v.pairs).length > 0;
+  const name = (i: number) => {
+    const u = v.units[i];
+    return u.key && u.label && u.key !== u.label ? `${u.key}　${u.label}` : u.label || u.key || "正文";
+  };
+  return (
+    <section className="kb-read">
+      <div className="kb-read-bar">
+        {v.units.length > 1 ? (
+          <Select value={String(v.unit)} onChange={(x) => setUnit(Number(x))} title="换一章" className="min-w-0">
+            {v.units.map((u, i) => (
+              <option key={`${u.key}-${i}`} value={String(i)}>
+                {name(i)}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <span className="kb-read-name">{name(v.unit)}</span>
+        )}
+        {hasPairs && (
+          <button className={`pith-link ${pairs ? "is-on" : ""}`} onClick={() => setPairs(!pairs)}>
+            {pairs ? "收起对照" : `对照${v.pairTitle ? `《${v.pairTitle}》` : "译本"}`}
+          </button>
+        )}
+      </div>
+      {v.passages.map((p) =>
+        p.role === "matter" ? null : p.role === "heading" ? (
+          <p key={p.id} className="kb-read-h">
+            {p.text}
+          </p>
+        ) : (
+          <div key={p.id} ref={p.id === v.focus ? focusRef : undefined} className={`kb-read-p ${p.id === v.focus ? "is-focus" : ""} ${p.role !== "body" ? "is-aside" : ""}`}>
+            {(p.key || p.page) && <span className="kb-read-loc num">{[p.key, p.page && `第 ${p.page} 页`].filter(Boolean).join(" · ")}</span>}
+            <p className="selectable">{p.text}</p>
+            {pairs && v.pairs[String(p.id)] && <p className="kb-read-zh selectable">{v.pairs[String(p.id)]}</p>}
+          </div>
+        ),
+      )}
+    </section>
   );
 }
 

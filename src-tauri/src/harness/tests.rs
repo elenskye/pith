@@ -5,7 +5,7 @@ use std::sync::atomic::AtomicBool;
 
 use serde_json::json;
 
-use super::tools::{Env, LibHit, Toolbox};
+use super::tools::{Env, KbFound, KbRead, LibHit, Toolbox};
 use super::*;
 use crate::agent::usage::Prices;
 use crate::db::tests::temp_dir;
@@ -27,6 +27,21 @@ impl Env for FakeEnv {
 
     fn library_item(&self, id: i64) -> Result<String, String> {
         if id == 2 { Ok("Stigler (1951)，JPE 59(3)。摘要：……".into()) } else { Err("没有这个条目。".into()) }
+    }
+
+    fn kb_search(&self, query: &str, _limit: usize) -> Result<KbFound, String> {
+        Ok(KbFound { text: format!("知识库里和「{query}」最相关的 1 段：\n\n[P7] 《国富论》 · I.iii.1 · 第 121 页\nAs it is the power of exchanging…"), hits: 1, semantic: true })
+    }
+
+    fn kb_read(&self, req: &KbRead) -> Result<String, String> {
+        match req.passage {
+            Some(7) => Ok(format!("[P6] I.ii.5\n……\n\n[P7] I.iii.1\nAs it is the power of exchanging…（{}）", req.scope)),
+            _ => Err("没有这一段。".into()),
+        }
+    }
+
+    fn kb_chapter(&self, passage: i64) -> Result<(String, String), String> {
+        if passage == 7 { Ok(("第三章".into(), "《国富论》「第三章」：\n\n[P7] I.iii.1\nAs it is the power of exchanging…".into())) } else { Err("没有这一段。".into()) }
     }
 }
 
@@ -227,7 +242,7 @@ fn a_subagent_reads_with_the_stronger_model_and_reports_back() {
     assert_eq!(sub_reqs.len(), 4);
     assert!(sub_reqs[0].system[0].text.contains("规矩") || sub_reqs[0].system[0].text.contains("子代理"));
     let names: Vec<&str> = sub_reqs[0].tools.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["calculate", "library_search", "library_item"]);
+    assert_eq!(names, ["calculate", "kb_search", "kb_read", "library_search", "library_item"]);
     assert_eq!(sub_reqs[0].effort.as_deref(), Some("high"));
     assert!(sub_reqs[0].messages[0].text().starts_with("任务："));
     // 状态行：派的那一格，下面是它的步骤（带它的 id）
@@ -251,4 +266,31 @@ fn subagents_are_capped_per_answer() {
     let r = go(&main, Some(&strong), &meter("harness-sub-cap"), Limits { subagents: 2, ..Limits::default() }, false, "读三份");
     assert_eq!(r.out.subagents, 2);
     assert!(matches!(&r.out.turns[1].parts[2], Part::ToolResult { output, is_error: true, .. } if output.contains("到上限")));
+}
+
+#[test]
+fn knowledge_base_tools_and_a_whole_chapter_for_a_subagent() {
+    let main = MockModel::scripted(
+        spec(),
+        vec![
+            Turn::call("kb_search", json!({ "query": "分工 市场" })),
+            Turn::calls(vec![("kb_read", json!({ "passage": "P7", "scope": "chapter" })), ("delegate", json!({ "kind": "read", "title": "", "task": "读这一章，交回要点", "chapter": "[P7]" })), ("kb_read", json!({ "passage": "P99" }))]),
+            Turn::text("分工受市场范围限制 [P7]。"),
+        ],
+    );
+    let strong = MockModel::with_brain(strong_spec(), Box::new(|req| Turn::text(if req.messages[0].text().contains("[P7] I.iii.1") { "报告：拿到了整章 [P7]" } else { "报告：没有整章" })));
+    let r = go(&main, Some(&strong), &meter("harness-kb"), Limits::default(), false, "分工受什么限制");
+    let o = &r.out;
+    assert_eq!(o.ending, Ending::Done);
+    let texts: Vec<(&str, &str)> = o.steps.iter().filter(|s| s.sub.is_none()).map(|s| (s.agent.as_str(), s.text.as_str())).collect();
+    assert!(texts.contains(&("search", "在知识库里找「分工 市场」：1 段")), "{texts:?}");
+    assert!(texts.contains(&("read", "读了 P7 所在的整章")), "{texts:?}");
+    // 子代理拿到整章原文（不经主对话的上下文），标题用章名，报告里照样带编号
+    assert!(texts.iter().any(|(a, t)| *a == "bg" && t.contains("第三章")), "{texts:?}");
+    let results = &o.turns[3].parts;
+    assert!(matches!(&results[0], Part::ToolResult { output, is_error: false, .. } if output.contains("（chapter）")));
+    assert!(matches!(&results[1], Part::ToolResult { output, is_error: false, .. } if output.contains("子代理「第三章」交回的报告") && output.contains("拿到了整章 [P7]")));
+    // 没有的段落：出错的结果，模型接着做
+    assert!(matches!(&results[2], Part::ToolResult { is_error: true, .. }));
+    assert_eq!(o.text, "分工受市场范围限制 [P7]。");
 }

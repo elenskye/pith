@@ -1,6 +1,7 @@
 // 仅开发用：对话、角色、知识库的假后端（?mock）。内容照 Explore R1（visual-atelier canvases/pith-explore/src/content.mjs）：
-// 四个知识库、十种记录、读《国富论》那段对话。规则在 Rust（src-tauri/src/chat/），这里只大致模仿。
-import type { Chat, ChatBody, ChatLive, ChatStep, ChatSummary, KnowledgeBase, Material, MaterialKind, Role } from "@/shared/ipc";
+// 四个知识库、十种记录、读《国富论》那段对话。规则在 Rust（src-tauri/src/chat/、src-tauri/src/kb/），这里只大致模仿：
+// 一份材料能进几个库；《国富论》切成段落块（三章、带段落号和页码、中译对照）；回答在知识库里找、引用编号点开是那一段。
+import type { Chat, ChatBody, ChatCite, ChatLive, ChatStep, ChatSummary, KbPassage, KbUnit, KnowledgeBase, Material, MaterialKind, Role } from "@/shared/ipc";
 
 type Args = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -24,7 +25,7 @@ const kbs: (Omit<KnowledgeBase, "count">)[] = [
 ];
 
 const m = (kb: string, kind: MaterialKind, title: string, sub: string, body: string, stage: number, days: number, src: Partial<Material> = {}): Material => ({
-  uid: uid("m"), kb, kind, title, sub, body, stage, sourceKind: null, sourceRef: null, conversation: null, createdAt: ago(days + 3), tendedAt: ago(days), ...src,
+  uid: uid("m"), kb, kbs: kb ? [kb] : [], kind, title, sub, body, stage, sourceKind: null, sourceRef: null, conversation: null, createdAt: ago(days + 3), tendedAt: ago(days), passages: body ? 1 : 0, ...src,
 });
 
 const materials: Material[] = [
@@ -54,23 +55,43 @@ const materials: Material[] = [
 const Q = "斯密为什么说分工受市场范围限制？";
 const wnFull = materials.find((x) => x.title === "The Wealth of Nations")!;
 const stigler = materials.find((x) => x.title === "Stigler 1951 的摘抄")!;
+// 两份材料都在「读《国富论》」和「毕业论文」里（一份材料能进几个库）
+stigler.kbs.push("kb-thesis");
+
+// 《国富论》的段落块：三章、带段落号和页码；中译对照（合成的，大意）
+let pid = 5000;
+type Para = KbPassage & { zh: string };
+const para = (unitKey: string, unitLabel: string, n: number, page: string, text: string, zh: string): Para => ({ id: ++pid, seq: pid - 5001, role: "body", key: `${unitKey}.${n}`, unitKey, unitLabel, page, text, zh });
+const head = (unitKey: string, unitLabel: string): Para => ({ id: ++pid, seq: pid - 5001, role: "heading", key: "", unitKey, unitLabel, page: null, text: unitLabel, zh: "" });
+const book: Para[] = [
+  head("I.i", "Of the Division of Labour"),
+  para("I.i", "Of the Division of Labour", 1, "109", "The greatest improvement in the productive powers of labour, and the greater part of the skill, dexterity, and judgment with which it is any where directed, or applied, seem to have been the effects of the division of labour.", "劳动生产力最大的改进，以及劳动在任何地方运用时的技能、熟练和判断力的大部分，似乎都是分工的结果。"),
+  para("I.i", "Of the Division of Labour", 3, "110", "To take an example, therefore, from a very trifling manufacture; but one in which the division of labour has been very often taken notice of, the trade of the pin-maker… ten persons, therefore, could make among them upwards of forty-eight thousand pins in a day.", "举一个很小的制造业做例子，而它的分工常常引人注意，那就是扣针制造业……十个人每天就能做四万八千多枚针。"),
+  para("I.i", "Of the Division of Labour", 5, "112", "This great increase of the quantity of work which, in consequence of the division of labour, the same number of people are capable of performing, is owing to three different circumstances.", "由于分工，同样数量的人能完成的工作量大大增加，这归于三种不同的情况。"),
+  head("I.ii", "Of the Principle which gives occasion to the Division of Labour"),
+  para("I.ii", "Of the Principle which gives occasion to the Division of Labour", 1, "117", "This division of labour… is the necessary, though very slow and gradual consequence of a certain propensity in human nature… the propensity to truck, barter, and exchange one thing for another.", "这种分工……是人性中某种倾向的必然结果，虽然很缓慢、逐渐地发生……即互通有无、物物交换、以物易物的倾向。"),
+  para("I.ii", "Of the Principle which gives occasion to the Division of Labour", 2, "118", "It is not from the benevolence of the butcher, the brewer, or the baker, that we expect our dinner, but from their regard to their own interest.", "我们期望的晚餐，不是来自屠户、酿酒师或面包师的恩惠，而是来自他们对自身利益的关注。"),
+  head("I.iii", "That the Division of Labour is limited by the Extent of the Market"),
+  para("I.iii", "That the Division of Labour is limited by the Extent of the Market", 1, "121", "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.", "既然交换的能力引起分工，分工的程度就总要受交换能力大小的限制，换句话说，要受市场范围的限制。"),
+  para("I.iii", "That the Division of Labour is limited by the Extent of the Market", 2, "121", "In the lone houses and very small villages which are scattered about in so desert a country as the Highlands of Scotland, every farmer must be butcher, baker and brewer for his own family.", "在苏格兰高地这样荒凉的地方，散居的孤零零的人家和很小的村落里，每个农夫都得为自己一家当屠夫、面包师和酿酒人。"),
+  para("I.iii", "That the Division of Labour is limited by the Extent of the Market", 3, "122", "As by means of water-carriage a more extensive market is opened to every sort of industry than what land-carriage alone can afford it, so it is upon the sea-coast, and along the banks of navigable rivers, that industry of every kind naturally begins to subdivide and improve itself.", "水运为各种产业开辟的市场比陆运所能提供的更广，所以各种产业的分工和改良，自然最先出现在沿海和通航的河流两岸。"),
+];
+wnFull.passages = book.length;
+wnFull.kbs.push("kb-thesis");
+const byKey = (k: string) => book.find((p) => p.key === k)!;
+const bookCite = (n: number, p: Para): ChatCite => ({ n, kind: "原文", src: "《The Wealth of Nations》 Smith 1776", loc: `${p.key} · 第 ${p.page} 页`, text: p.text, translation: p.zh, translationLoc: `${p.key} · 杨敬年译本`, material: wnFull.uid, kb: "kb-wn", passage: p.id, item: 1 });
 const firstReply: ChatBody = {
   steps: [
-    { agent: "search", text: "在「读《国富论》」里找了 6 段" },
-    { agent: "read", text: "读了第一篇第三章的 3 段" },
-    { agent: "read", text: "又看了你记的 Stigler 摘抄" },
+    { agent: "search", text: "在知识库里找「分工 市场范围」：6 段" },
+    { agent: "read", text: "读了 P5009 的上下文" },
+    { agent: "search", text: "在知识库里找「Stigler 行业生命周期」：2 段" },
   ],
   paragraphs: [
     "斯密的推理只有一步：分工是因为能交换才出现的，所以分工能有多细，就看能交换多少，也就是市场有多大[1]。",
     "市场太小，一个人就没法只干一件事。他举苏格兰高地的散村：农夫得给自家当屠夫、面包师和酿酒人[2]。所以他紧接着讲水运：水路把市场一下子扩大，分工和改良最先出现在沿海和通航的河边[3]。",
     "一百多年后，Stigler 把这句话用到了企业上：行业刚起步、市场还小，企业只好什么都自己做；行业长大了，专门的环节才分出去，成了独立的厂家[4]。",
   ],
-  cites: [
-    { n: 1, kind: "全文", src: "《国富论》", loc: "I.iii.1", text: "As it is the power of exchanging that gives occasion to the division of labour, so the extent of this division must always be limited by the extent of that power, or, in other words, by the extent of the market.", material: wnFull.uid, kb: "kb-wn" },
-    { n: 2, kind: "全文", src: "《国富论》", loc: "I.iii.2", text: "In the lone houses and very small villages which are scattered about in so desert a country as the Highlands of Scotland, every farmer must be butcher, baker and brewer for his own family.", material: wnFull.uid, kb: "kb-wn" },
-    { n: 3, kind: "全文", src: "《国富论》", loc: "I.iii.3", text: "…so it is upon the sea-coast, and along the banks of navigable rivers, that industry of every kind naturally begins to subdivide and improve itself…", material: wnFull.uid, kb: "kb-wn" },
-    { n: 4, kind: "摘抄", src: "Stigler 1951 的摘抄", loc: "我的摘抄", text: stigler.body, material: stigler.uid, kb: "kb-wn" },
-  ],
+  cites: [bookCite(1, byKey("I.iii.1")), bookCite(2, byKey("I.iii.2")), bookCite(3, byKey("I.iii.3")), { n: 4, kind: "摘抄", src: "《Stigler 1951 的摘抄》 我的摘抄 · 8 条", loc: "", text: stigler.body, material: stigler.uid, kb: "kb-wn", passage: 9001 }],
   ask: { question: "想一想：今天的网购，算不算又把「市场」扩大了一次？", options: ["算，市场变大了", "不算，交换没变", "说不清，想听你讲"] },
   delivery: { kind: "concept", title: "分工受市场范围限制", desc: "分工因交换而起，所以受市场范围限制；高地散村和水运两个例子；Stigler 用到行业的一生。", meta: "概念卡 • Claude Sonnet 5.5", kb: { uid: "kb-wn", name: "读《国富论》" } },
   model: "Claude Sonnet 5.5",
@@ -103,8 +124,11 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
   const hits = pool.filter((x) => [...q].some((ch) => ch.trim() && `${x.title}${x.body}`.includes(ch))).slice(0, 3);
   const name = kbs.find((k) => k.uid === picked[0])?.name;
   const query = q.replace(/[？?。，,！!]/g, "").slice(0, 16);
+  // 知识库里找：《国富论》在范围里就挑两段讲分工和市场的
+  const found = picked.length === 0 || wnFull.kbs.some((k) => picked.includes(k)) ? [byKey("I.iii.1"), byKey("I.i.3")] : [];
   const steps: ChatStep[] = [
     { agent: "think", text: "想了想" },
+    { agent: "search", text: `在知识库里找「${query}」：${found.length} 段` },
     { agent: "lib", text: `在文献库里找「${query}」：${hits.length} 条` },
   ];
   const either = q.split("还是");
@@ -116,13 +140,14 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
     ? ["这个问题两头都能讲，先问你一句：你更想先看哪一边？选一个，我接着往下查。"]
     : [
         "这是 ?mock 里的模拟回答：照 Agent 循环的样子走一遍——想、查、做交付卡、写——问题本身没有被回答。",
+        found.length ? "知识库里最相关的是斯密讲市场范围的那一段[1]，和别针厂的例子[2]，点编号看原文和中译。" : "知识库里没有找到相关的段落。",
         hits.length ? `文献库里沾边的有：${hits.map((h) => `**${h.title}**`).join("、")}。` : "文献库里没有找到沾边的条目。",
         "- 真的回答在正式版里（或开发版设 PITH_REAL_MODEL=1）\n- 下面的交付卡点「存进」，种子会飞进知识库",
       ];
   const body: ChatBody = {
     steps,
     paragraphs,
-    cites: [],
+    cites: ask ? [] : found.map((p, i) => bookCite(i + 1, p)),
     ask,
     delivery: ask ? null : { kind: "answer", title: q.slice(0, 40), desc: "模拟回答：查了什么、找到了什么。", meta: "存下的回答 • Claude Sonnet 5.5", kb: name ? { uid: picked[0], name } : null, body: "" },
     model: "Claude Sonnet 5.5",
@@ -130,8 +155,8 @@ function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
     ending: ask ? "asked" : "done",
     note: null,
   };
-  const beats: Beat[] = [{ at: 0, step: steps[0] }, { at: 250, text: "我先在文献库里找找。" }, { at: 1000, reset: true }, { at: 1050, step: steps[1] }, { at: 1500, step: steps[2] }];
-  let at = 1800;
+  const beats: Beat[] = [{ at: 0, step: steps[0] }, { at: 250, text: "我先在知识库里找找。" }, { at: 900, reset: true }, { at: 950, step: steps[1] }, { at: 1350, step: steps[2] }, { at: 1700, step: steps[3] }];
+  let at = 2000;
   const full = paragraphs.join("\n\n");
   for (let i = 0; i < full.length; i += 3) beats.push({ at: (at += 40), text: full.slice(i, i + 3) });
   return { beats, body };
@@ -232,7 +257,7 @@ export const chatHandlers: Record<string, (a: Args) => unknown> = {
     if (i >= 0 && !roles[i].builtin) roles.splice(i, 1);
     else if (i >= 0) roles[i] = { ...roles[i], edited: false };
   },
-  kb_list: () => kbs.map((k) => ({ ...k, count: materials.filter((x) => x.kb === k.uid).length })),
+  kb_list: () => kbs.map((k) => ({ ...k, count: materials.filter((x) => x.kbs.includes(k.uid)).length })),
   kb_create: ({ name, note }) => {
     const k = { uid: uid("kb"), name: String(name), note: String(note ?? ""), createdAt: now() };
     kbs.push(k);
@@ -241,20 +266,65 @@ export const chatHandlers: Record<string, (a: Args) => unknown> = {
   kb_update: ({ uid: u, name, note }) => Object.assign(kbs.find((k) => k.uid === u)!, { name, note }),
   kb_delete: ({ uid: u }) => {
     kbs.splice(kbs.findIndex((k) => k.uid === u), 1);
-    for (let i = materials.length - 1; i >= 0; i--) if (materials[i].kb === u) materials.splice(i, 1);
+    for (let i = materials.length - 1; i >= 0; i--) {
+      const x = materials[i];
+      x.kbs = x.kbs.filter((k) => k !== u);
+      if (x.kbs.length === 0) materials.splice(i, 1);
+      else if (x.kb === u) x.kb = x.kbs[0];
+    }
   },
-  kb_materials: ({ kb }) => materials.filter((x) => !kb || x.kb === kb).sort((a, b) => b.tendedAt.localeCompare(a.tendedAt)),
+  kb_materials: ({ kb }) =>
+    materials
+      .filter((x) => !kb || x.kbs.includes(String(kb)))
+      .map((x) => ({ ...x, kb: kb ? String(kb) : x.kb }))
+      .sort((a, b) => b.tendedAt.localeCompare(a.tendedAt)),
   kb_material_add: ({ material }) => {
     const x = material as Material;
     const kb = x.kb || kbs[0]?.uid;
-    const had = materials.find((y) => y.kb === kb && x.sourceKind && y.sourceKind === x.sourceKind && y.sourceRef === x.sourceRef);
-    if (had) return (had.tendedAt = now()), had;
-    const made = { ...x, uid: uid("m"), kb, createdAt: now(), tendedAt: now() };
+    const had = materials.find((y) => x.sourceKind && y.sourceKind === x.sourceKind && y.sourceRef === x.sourceRef);
+    if (had) {
+      if (!had.kbs.includes(kb)) had.kbs.push(kb);
+      had.tendedAt = now();
+      return had;
+    }
+    const made: Material = { ...x, uid: uid("m"), kb, kbs: [kb], createdAt: now(), tendedAt: now(), passages: x.body?.trim() ? Math.max(1, x.body.split(/\n{2,}/).length) : 0 };
     materials.push(made);
     return made;
   },
   kb_material_update: ({ uid: u, title, body, stage }) => Object.assign(materials.find((x) => x.uid === u)!, { title, body, stage: Math.max(0, Math.min(2, Number(stage))), tendedAt: now() }),
-  kb_material_delete: ({ uid: u }) => void materials.splice(materials.findIndex((x) => x.uid === u), 1),
+  kb_material_delete: ({ uid: u, kb }) => {
+    const i = materials.findIndex((x) => x.uid === u);
+    if (i < 0) return;
+    const x = materials[i];
+    x.kbs = kb ? x.kbs.filter((k) => k !== kb) : [];
+    if (x.kbs.length === 0) materials.splice(i, 1);
+    else if (x.kb === kb) x.kb = x.kbs[0];
+  },
+  kb_material_link: ({ uid: u, kb }) => {
+    const x = materials.find((y) => y.uid === u)!;
+    if (!x.kbs.includes(String(kb))) x.kbs.push(String(kb));
+    x.tendedAt = now();
+    return x;
+  },
+  kb_read: ({ material, unit, passage }) => {
+    const x = materials.find((y) => y.uid === material);
+    if (!x) throw "这份材料不存在了。";
+    if (x !== wnFull) {
+      const ps: KbPassage[] = x.body.split(/\n{2,}/).filter((t) => t.trim()).map((text, i) => ({ id: 9000 + i, seq: i, role: "body", key: "", unitKey: "", unitLabel: "", page: null, text }));
+      return { units: [{ key: "", label: "", count: ps.length, chars: x.body.length, first: 9000 }], unit: 0, passages: ps, focus: null, pairs: {}, pairTitle: null };
+    }
+    const keys = [...new Set(book.map((p) => p.unitKey))];
+    const units: KbUnit[] = keys.map((k) => {
+      const ps = book.filter((p) => p.unitKey === k);
+      return { key: k, label: ps[0].unitLabel, count: ps.filter((p) => p.role === "body").length, chars: ps.reduce((a, p) => a + p.text.length, 0), first: ps[0].id };
+    });
+    const focus = book.find((p) => p.id === passage) ?? null;
+    const at = focus ? keys.indexOf(focus.unitKey) : Math.min(Number(unit ?? 0), keys.length - 1);
+    const ps = book.filter((p) => p.unitKey === keys[at]);
+    return { units, unit: at, passages: ps.map(({ zh: _zh, ...p }) => p), focus: focus?.id ?? null, pairs: Object.fromEntries(ps.filter((p) => p.zh).map((p) => [String(p.id), p.zh])), pairTitle: "国富论（杨敬年译）" };
+  },
+  kb_index_status: () => ({ total: 11_420, done: 11_420, running: false, error: null, model: "模拟向量模型", issue: null, materials: materials.length }),
+  kb_index_start: () => ({ total: 11_420, done: 11_420, running: false, error: null, model: "模拟向量模型", issue: null, materials: materials.length }),
   kb_candidates: () => [
     { ...m("", "full", "The Wealth of Nations (fixture)", "Smith · 英文 · 带段落号", "", 2, 0), sourceKind: "concept_text", sourceRef: "T-en" },
     { ...m("", "full", "国富论（合成）", "亚当·斯密 · 中文 · 带段落号", "", 2, 0), sourceKind: "concept_text", sourceRef: "T-zh" },

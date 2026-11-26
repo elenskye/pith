@@ -25,9 +25,9 @@ export type Nav = {
   openChat: (t: ChatTarget) => void;
   setSection: SetSection;
   openSettings: (s: SetSection) => void;
-  /** 知识库：哪个库、哪份材料（空串：照旧） */
-  kb: { uid: string | null; material: string | null };
-  openKb: (uid: string | null, material?: string | null) => void;
+  /** 知识库：哪个库、哪份材料、读到哪一段（空串：照旧） */
+  kb: { uid: string | null; material: string | null; passage: number | null };
+  openKb: (uid: string | null, material?: string | null, passage?: number | null) => void;
   /** 文献库：选中一条、看待确认的补全 */
   openLibrary: (r: LibRequest) => void;
   openItem: (id: number) => void;

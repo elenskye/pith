@@ -1437,7 +1437,8 @@ export type ChatSummary = {
 
 /** 状态行的一格：Agent 图标 + 一句话；sub 是子代理的 id（收在派它的那一格下面） */
 export type ChatStep = { agent: string; text: string; sub?: string | null };
-export type ChatCite = { n: number; kind: string; src: string; loc: string; text: string; material?: string | null; kb?: string | null };
+/** 页边注（1.1.0 第 3 期起是真的：回答里的 [P123] 换成 [n]，这是那一段原文） */
+export type ChatCite = { n: number; kind: string; src: string; loc: string; text: string; translation?: string | null; translationLoc?: string | null; material?: string | null; kb?: string | null; passage?: number | null; item?: number | null };
 export type ChatDelivery = { kind: string; title: string; desc: string; meta: string; kb: { uid: string; name: string } | null; body?: string };
 /** 问题卡（1.1.0）：一句问话、几个选项；1.0.x 的演示回答是一句话 */
 export type ChatAsk = string | { question: string; options: string[] };
@@ -1484,7 +1485,10 @@ export type MaterialKind = "full" | "excerpt" | "note" | "web" | "file" | "scan"
 
 export type Material = {
   uid: string;
+  /** 在一个库里列的时候是那个库；别的时候是它的家（第一次种进的库） */
   kb: string;
+  /** 它在哪几个知识库里（1.1.0 起一份材料能进几个库） */
+  kbs: string[];
   kind: MaterialKind;
   title: string;
   sub: string;
@@ -1496,7 +1500,17 @@ export type Material = {
   conversation: string | null;
   createdAt: string;
   tendedAt: string;
+  /** 切成了几块（书是段落数） */
+  passages: number;
 };
+
+/** 知识库的一块（书是一段：段落号、页码、所在的章） */
+export type KbPassage = { id: number; seq: number; role: "body" | "heading" | "sidenote" | "note" | "guide" | "matter"; key: string; unitKey: string; unitLabel: string; page: string | null; text: string };
+export type KbUnit = { key: string; label: string; count: number; chars: number; first: number };
+/** 面板里读一份材料：目录、这一章的块、要看的那一段、对照（块 id → 对面的文字） */
+export type KbView = { units: KbUnit[]; unit: number; passages: KbPassage[]; focus: number | null; pairs: Record<string, string>; pairTitle: string | null };
+/** 知识库的检索索引：能读的块一共多少、已经有向量的多少 */
+export type KbIndexStatus = { total: number; done: number; running: boolean; error: string | null; model: string | null; issue: string | null; materials: number };
 
 export const api = {
   // 对话、角色、知识库
@@ -1524,7 +1538,15 @@ export const api = {
   /** kb 是空串：种进第一个知识库，没有就建「随手存」 */
   kbMaterialAdd: (material: Partial<Material> & { kind: MaterialKind; title: string }) => invoke<Material>("kb_material_add", { material: { kb: "", sub: "", body: "", stage: 0, sourceKind: null, sourceRef: null, conversation: null, ...material } }),
   kbMaterialUpdate: (uid: string, title: string, body: string, stage: number) => invoke<Material>("kb_material_update", { uid, title, body, stage }),
-  kbMaterialDelete: (uid: string) => invoke<void>("kb_material_delete", { uid }),
+  /** 从一个库里拿掉（kb 空着：哪个库都不要了）；哪个库都没有了就删掉 */
+  kbMaterialDelete: (uid: string, kb: string | null) => invoke<void>("kb_material_delete", { uid, kb }),
+  /** 再放进一个库 */
+  kbMaterialLink: (uid: string, kb: string) => invoke<Material>("kb_material_link", { uid, kb }),
+  /** 读一份材料的原文：给了段落读它那一章，给了章（目录下标）读那一章 */
+  kbRead: (material: string, unit: number | null, passage: number | null) => invoke<KbView>("kb_read", { material, unit, passage }),
+  kbIndexStatus: () => invoke<KbIndexStatus>("kb_index_status"),
+  /** 在后台补齐向量 */
+  kbIndexStart: () => invoke<KbIndexStatus>("kb_index_start"),
   /** 能种进知识库的：解析好的书、做完的调查、概念研究的卡片 */
   kbCandidates: () => invoke<Material[]>("kb_candidates"),
   appInfo: () => invoke<AppInfo>("app_info"),

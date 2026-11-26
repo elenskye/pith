@@ -73,6 +73,13 @@ const LABELS: &[(&str, &str)] = &[
     ("concept_relations", "卡片的关系"),
     ("concept_sources", "评论的来源"),
     ("concept_rejected", "核对拦下的句子"),
+    ("conversations", "对话"),
+    ("messages", "对话的消息"),
+    ("roles", "角色"),
+    ("knowledge_bases", "知识库"),
+    ("kb_materials", "知识库的材料"),
+    ("kb_members", "材料在哪些知识库"),
+    ("passages", "材料的段落块"),
 ];
 
 fn label(table: &str) -> String {

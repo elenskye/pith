@@ -2,61 +2,53 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.1.0 第 1、2 期做完（2026-11-26）
+## 现在：1.1.0 第 3 期做完（2026-11-26）
 
-你 11-26 说开工 1.1.0 第 1、2 期，`0034`、`0035` 算认了（状态改成「现行」）。两期各一个提交。对话现在真的接上模型了：开发版用模拟模型（不花钱），正式版要等第 5 期装。
+你说开工第 3 期：知识库检索。一个提交。对话现在能在知识库里找原文、读上下文和整章，回答带编号 [n]，点开是那一段。开发版用模拟模型；真模型用这些工具的效果在第 5 期真实验收里看。
 
-### 第 1 期：模型和用量（`decisions/0036`）
+### 做了什么（`decisions/0038`）
 
-- **版本号 1.1.0**（三处一起改）。
-- **模型网关** `src-tauri/src/gateway/`：从 Peck 抽、改成同步（ureq + 线程）。四条线协议（Anthropic Messages、OpenAI Responses、DeepSeek Chat Completions、Gemini——API Key 和 Vertex AI 共用）的编码和流解析；重试 2 / 5 / 15 / 30 / 60 秒；读流放另一条线程，点停立刻返回；流断了按估计记账；模拟模型。
-- **每家三档**，默认 Anthropic · 均衡（Sonnet 5.5）：表在 `0036`。价格表带缓存读写价、长提示加价，`agent::usage::price` 先查它。
-- **Anthropic**：adaptive 思考 + 摘要、每档写明 effort、缓存断点（系统两块 + 最后两条站主消息）、工具边写边流、Opus / Sonnet 开服务端拒答回退。**和 `0018`「拒答不换模型」不同，理由在 `0036`，不要就说。**
-- **Vertex AI**：项目 ID、区域；gcloud 的 ADC 换令牌（不读凭据文件）。只接 Gemini。
-- **密钥**：新加 Google（`AIza…`）；别家用以前那一把。
-- **记账**：发送前按最坏情况查月上限；账本一行加了 `conversation`；子代理并行记账时一行一次写完、加了进程锁（原来并发会把两行写交错——测试里抓到的）。
-- **界面**：输入框下面一行（`src/chat/Usage.tsx`：左边模型名点开换一档、换一家；右边本月用量的小圈点开看明细）；设置 › 模型与费用照 R1 重画（`src/settings/ModelSettings.tsx`）。拿掉旧的 `KeysSettings.tsx` 和没人用的密钥行。
+- **冻结 v10 样本库**（`src-tauri/fixtures/library-v10.json`，加 migration 之前冻的，带对话和知识库）；升级测试里它升到 v11 一切照常。
+- **migration 0011**（只加表）：`kb_members`（一份材料能进几个库）、`passages`（段落块）。同一来源全库只有一份，再种进别的库只是多一个库；`kb_materials.kb_id` 改叫「家」，删一个库只删只在这个库里的材料。
+- **书迁进知识库**：第一次打开 1.1.0 时（启动时做一次，一个事务）：同一来源在几个库里各一份的并成一份；**解析好的书变成全文材料，没种过的放进新建的「书架」**；每份材料切段落块（书一段一块：段落号、页码、章；别的材料按空行切）。重新解析一本书，知识库里那份跟着重抄，同一位置的段落编号不变。
+- **检索**（`src-tauri/src/kb/`，新模块；知识库的代码从 `chat/` 挪过来）：`search.db` 里按词的索引 + 本机向量（Qwen3-Embedding-0.6B，书以前「问这本书」算过的直接拿来）→ 本机重排 → 前几段。译本里找到的映射回原著、带着中译。范围是对话勾的知识库，没勾是全部。没向量 / 本机模型用不了时只按词，说明原因。向量在后台补（种进来、改正文、检索时缺就开始；设置里能点「建索引」）。
+- **工具**（插件「知识库」）：`kb_search`（找段落，搜索词空着列材料）、`kb_read`（上下文、整章、目录、对照译文）；`delegate` 加了 `chapter`：整章原文直接交给强一档的子代理（不经主对话的上下文，最多约 6 万 token）。子代理也能用这两个工具。规矩里加了：引用知识库原文时写工具给的编号 `[P123]`。
+- **引用编号**：回答里的 `[P123]` 程序换成 `[1]`（正在写时也换好）；页边注：原文 / 注释 / 笔记…、书名、段落号和页码、那一段原文、对照译文、「知识库里这一段」、「文献库」。库里没有的编号原样留着（不改模型的话）。存进知识库的正文附「出处」。
+- **知识库面板**：书读原文——一章一章（下拉换章），从页边注过来的那一段亮着、慢慢退掉，「对照」展开中译；「在这些知识库」：× 拿掉、「＋ 也放进…」。
+- **设置 › 知识库与检索**：材料、块数、按意思的进度（建的时候进度条在流），「建索引」。
+- **中英对齐用上相似度**：原著和译本的块都有向量时自动用相似度重新对齐、记下模型。**在两本真《国富论》上走 App 的路比了一遍**（本机模型，不联网、不花钱，331 秒补 8112 块向量）：只用长度 36/36 章、2096/2118 段有中译；加相似度 35/36（附录不再硬对）、2083/2118；算法对的 1555 段里 99.1% 对法一样——和 11-15 引擎上的结果一致，数字在 `0038`。测完向量服务停了。
 
-### 第 2 期：Agent 循环（`decisions/0037`）
+### 改了哪些文件
 
-- **循环** `src-tauri/src/harness/`：调模型 → 跑工具（只读的并行，一次最多 3 个）→ 接回去。停：写完、问了你、16 轮（再给一轮收尾）、打转（同一调用同一结果第 3 次提醒、第 5 次收尾）、月上限、拒答、截断、停、出错——都存下来，回答下面一行说怎么结束的。
-- **提示分层**：App 的规矩 + 插件清单（所有对话一样）| 角色；今天几号、勾了哪些知识库、`@` 请了谁放进你那一句的开头，存成 `sent`，原样重放。
-- **工具（按插件分组）**：基础 `calculate`（精确十进制）、`ask_user`（问题卡）、`deliver`（交付卡）、`delegate`（子代理）；文献库 `library_search`、`library_item`。
-- **子代理（底子）**：同一家强一档、只读的工具、看不到主对话、不带角色；一次最多 12 个、同时 3 个；步骤收在派它的那一格下面，钱算进这一回。
-- **对话里**：`chat/run.rs` 后台跑，界面每 0.2 秒 `chat_live` 看进度：状态行一格格出来，正文一边写一边出来；输入框右边的方块停下；问题卡点选项就当你这样回答；交付卡「存进」存的是卡上的正文。回答下面一行写着模型和花了多少。**演示的回答（`chat/mock.rs`）拿掉了**；1.0.x 存下的演示回答还能看（标着「1.0 的演示回答」），不进给模型看的对话。
-- 开发版、`?mock` 的模拟模型：有算式先算，再查文献库（有英文词拿英文词搜）、做交付卡、写一段说明这是模拟的。
-
-### 改了哪些文件（两期合起来）
-
-- 新：`src-tauri/src/gateway/*`、`src-tauri/src/harness/*`、`src-tauri/src/chat/run.rs`、`src/chat/Usage.tsx`、`src/settings/ModelSettings.tsx`、`src/dev/mockModel.ts`、`docs/decisions/0036`、`0037`。
-- 改：`agent/usage.rs`（价格、账本）、`agent/secret.rs`（Google）、`research/commands.rs`、`research/meter.rs`、`chat/*`、`lib.rs`；`src/chat/{ChatScreen,Composer,Reply,Home}.tsx`、`src/settings/*`、`src/shared/ipc.ts`、`src/dev/{mockChat,mockIpc}.ts`、`src/styles/app.css`；文档 `architecture.md`、`schema.md`、`requirements.md`、`ROADMAP.md`、决策索引、`0034`、`0035`。
-- 删：`src-tauri/src/chat/mock.rs`、`src/settings/KeysSettings.tsx`。
+- 新：`src-tauri/migrations/0011_passages.sql`、`src-tauri/src/kb/*`（store、passages、index、retrieve、read、cite、align、commands、tests）、`src-tauri/fixtures/library-v10.json`、`docs/decisions/0038-kb-retrieval.md`。
+- 改：`chat/{store,commands,run,tests}.rs`（知识库挪走；AppEnv 接知识库；回答换编号）、`harness/{tools,prompt,brain,tests}.rs`、`concept/{reparse,semantic}.rs`、`db.rs`、`transfer.rs`、`transfer/tests.rs`、`lib.rs`；前端 `src/shared/ipc.ts`、`src/chat/Reply.tsx`、`src/kb/KnowledgePage.tsx`、`src/settings/SettingsScreen.tsx`、`src/app/{App,nav}.tsx`、`src/dev/mockChat.ts`、`src/styles/app.css`；文档 `architecture.md`、`schema.md`、`requirements.md`、`testing.md`、`ROADMAP.md`、决策索引。
 
 ### 测试
 
-- `pnpm check` 全过（`tsc --noEmit`、前端 node 测试、`cargo test --workspace`、poc 检查）。Rust 主库 321 个（新增：网关 18、循环 13、计算 1、提示 2、模拟脑子 1、对话 4——含「开发版脑子跑两句、第二句原样带着第一句」的整条路）。
-- `?mock` 里走过：首页问一句（状态行、流式正文、交付卡、模型和花费）、带「还是」的问题给问题卡、点选项接着答、写到一半点停（已写的留着）、用量明细、设置 › 模型与费用整页。控制台只有原来就有的「引文排版器没有启动」（`?mock` 里 Tauri 事件装得晚，和这次无关）。
-- **没有用真接口跑**：四家的线协议照 Peck 已经在真接口上跑过的写法改的，加上 Anthropic 的现行文档；真的一次都没调（真实验收是第 5 期，上限 $20）。开发版的 Tauri 窗口没有打开看（后台线程和轮询在 `?mock` 和单元测试里走过）。
+- `pnpm check` 全过（`tsc --noEmit`、前端 node 测试、`cargo test --workspace`、poc 检查）。Rust 主库 330 个（新增知识库 8 个、Agent 工具 1 个、引用编号 1 个；改了对话的两回模拟、v10 样本库升级）。
+- `real_alignment`（忽略的）真跑过一次，命令在 `docs/testing.md`「知识库检索」。
+- `?mock` 里走过：问一句（状态行「在知识库里找」、回答里 [1] [2]）→ 点 [1] 看页边注（原文、I.iii.1 · 第 121 页、中译）→「知识库里这一段」到面板、那一段亮着 →「对照」→ 在这些知识库的小标签 → 设置 › 知识库与检索。控制台只有原来就有的「引文排版器没有启动」。
+- **没有**：真模型用 `kb_search` / `kb_read` / 引用编号（第 5 期）；开发版的 Tauri 窗口没开（命令和后台线程在单元测试里走过）。
 
 ### 提交
 
-- `v1.1.0: add model gateway, usage ring, model settings`（第 1 期）
-- `v1.1.0: add agent loop, live replies, question and delivery cards`（第 2 期）
+- `v1.1.0: add knowledge base retrieval, passages, citations`
 
 ## 等你
 
-1. **推送**：Pith `main`（上一轮的计划 + 这两期）。
-2. **第 5 期要的**（不急）：四家的密钥放进密钥文件夹（Google 的 API Key 一起）；Vertex AI 的项目 ID、区域，终端里登一次 `gcloud auth application-default login`。
-3. 拒答回退默认开着（第 1 期加粗那条），不要就说。
-4. 想先摸一下真回答：开发版设 `PITH_REAL_MODEL=1` 和 `PITH_API_KEY_FILE` 能用真接口（会花钱，记进账本、受月上限管）。
+1. **推送**：Pith `main`（第 1、2 期 + 这一期）。
+2. **第 5 期要的**（不急，同上一轮）：四家的密钥放进密钥文件夹（Google 的 API Key 一起）；Vertex AI 的项目 ID、区域，终端里登一次 `gcloud auth application-default login`。
+3. 两个我自己定了、你不要就说：**解析好的书迁进新建的「书架」**（以后新解析的书照旧在「种进来」里，不自动放）；**有向量时对齐默认用相似度**（附录那一章从「对上了、置信度低」变成「没对上」）。
 
 ## 已知的、没做的
 
-- 输入框下面的模型名改的是**默认**，还不能每段对话各选各的。
-- 回答还不会在知识库里找、没有引用编号、不能联网（第 3、4 期）。
+- 联网和网页快照（第 4 期）；真模型的效果（第 5 期）。
+- 输入框下面的模型名改的是默认，还不能每段对话各选各的。
+- 向量整个知识库扫一遍算点积（一万多块几十毫秒），量大了再换存法。补完向量后用相似度重新对齐那一下拿着数据库锁约 5 秒（只在第一次）。
+- 概念研究打开时的审计用当时存下的对齐：对齐换成相似度的以后，个别原文句的中译核对结果可能变（只标出来，不改卡片）。
 - 子代理只有「读」一种、不能再派；后台任务、组队、插件库在后面的版本。
 - 1.0.5 那些照旧：卡片滑的时候宽度一下变；洇开的圈里是静的；文献库表格没虚拟滚动；技能页、导入页、设置旧块的样子没重画。
 
 ## 下一轮
 
-你说「进入下一期」，开 **1.1.0 第 3 期：知识库检索**：冻结 v10 样本库；migration 0011（材料能进多个库、段落块）；本机向量和重排进 `search.db`；v0.4 解析好的书迁成全文材料；中英对齐补上向量相似度、在两本《国富论》上和只用长度的比一遍；工具：检索、读原文（上下文、整章、对照译文）、引用（[n]、页边注、一步到文献库）。读整章交给第 2 期立好的子代理。
+你说「进入下一期」，开 **1.1.0 第 4 期：联网**：联网搜索（有自带搜索的用自带的，没有的用 Tavily）、取网页、快照存进知识库（网页快照材料，切段落块、能检索能引用）。

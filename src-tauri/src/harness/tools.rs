@@ -1,9 +1,11 @@
 //! 工具，按插件分组（`decisions/0035`「插件」：1.1.0 先按插件分组，1.4.0 立格式和插件库）。
 //!
 //! - 基础：`calculate`（精确计算）、`ask_user`（问题卡）、`deliver`（交付卡，站主点「存进」才存）、`delegate`（派子代理）；
+//! - 知识库：`kb_search`（按意思和词找段落）、`kb_read`（上下文、整章、目录、对照译文），只读；回答里写段落的编号 `[P123]`，
+//!   程序换成 [1] 和页边注（`crate::kb::cite`）；
 //! - 文献库：`library_search`、`library_item`（只读）。
 //!
-//! 只读的（计算、查文献库、子代理）一批里并行跑，最多 `Limits::parallel` 个一起；问题卡、交付卡按顺序。
+//! 只读的（计算、查知识库、查文献库、子代理）一批里并行跑，最多 `Limits::parallel` 个一起；问题卡、交付卡按顺序。
 //! 工具名用英文（各家接口都认），说明用中文。工具是 Rust 写的，只做程序该做的：给数、给条目，不规定回答怎么写（`0030`）。
 
 use serde_json::{Value, json};
@@ -11,11 +13,28 @@ use serde_json::{Value, json};
 use super::{AskCard, Ctx, Delivery, Limits, Outcome, Step, calc, prompt};
 use crate::gateway::{BAD_INPUT_KEY, Message, SystemBlock, Tokens, ToolSpec};
 
-/// 工具要碰的外面的东西（App 里是数据库；测试里是假的）
+/// 工具要碰的外面的东西（App 里是数据库和本机模型；测试里是假的）
 pub trait Env: Send + Sync {
     fn library_search(&self, query: &str, limit: usize) -> Result<Vec<LibHit>, String>;
     fn library_item(&self, id: i64) -> Result<String, String>;
+    /// 在这段对话勾的知识库里找（空的搜索词：列出有哪些材料）
+    fn kb_search(&self, query: &str, limit: usize) -> Result<KbFound, String>;
+    fn kb_read(&self, req: &KbRead) -> Result<String, String>;
+    /// 子代理读整章：（章名, 带编号的全文）
+    fn kb_chapter(&self, passage: i64) -> Result<(String, String), String>;
 }
+
+/// 知识库检索的结果（已经写成给模型看的文字）
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct KbFound {
+    pub text: String,
+    pub hits: usize,
+    /// 按意思找的（不是只按词）
+    pub semantic: bool,
+}
+
+/// `kb_read` 的参数（和知识库那边是同一个）
+pub use crate::kb::read::Req as KbRead;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LibHit {
@@ -93,14 +112,38 @@ pub static TOOLS: &[Tool] = &[
     Tool {
         plugin: "基础",
         name: "delegate",
-        description: "派一个子代理去做一件独立的事，它用强一档的模型、看不到这段对话，做完交回一份报告。适合：读很长的东西、写一段要深想的分析。task 写清楚要什么，materials 放它要用的材料原文。可以一次派几个，并行做。",
+        description: "派一个子代理去做一件独立的事，它用强一档的模型、看不到这段对话，做完交回一份报告。适合：读整章、读很长的东西、写一段要深想的分析。task 写清楚要什么；要它读知识库里的一整章，chapter 写那一章里任意一段的编号（如 P123），程序把整章原文交给它；别的材料原文放 materials。可以一次派几个，并行做。",
         schema: || {
             json!({ "type": "object", "properties": {
                 "kind": { "type": "string", "enum": ["read"], "description": "read：读、想、写报告" },
                 "title": { "type": "string", "description": "几个字的标题，给站主看" },
                 "task": { "type": "string" },
+                "chapter": { "type": "string", "description": "要它读的整章：这一章里任意一段的编号，如 P123" },
                 "materials": { "type": "string" }
             }, "required": ["kind", "title", "task"] })
+        },
+        read_only: true,
+    },
+    Tool {
+        plugin: "知识库",
+        name: "kb_search",
+        description: "在站主的知识库里找段落（读过的书、摘抄、笔记、调查报告、存下的回答），按意思和词找，返回最相关的几段原文，每段前面是编号（如 [P123]）、出处（段落号、页码），书有译本时带对照。范围是这段对话勾的知识库，没勾就是全部。query 空着：列出有哪些材料。",
+        schema: || json!({ "type": "object", "properties": { "query": { "type": "string", "description": "要找什么：一句话或几个词；书是英文的也可以用中文问" }, "limit": { "type": "integer", "minimum": 1, "maximum": 20 } }, "required": ["query"] }),
+        read_only: true,
+    },
+    Tool {
+        plugin: "知识库",
+        name: "kb_read",
+        description: "读知识库里的原文。passage 给一段的编号（如 P123）：scope=context 读它前后各 around 段（默认 2），scope=chapter 读它所在的整章（太长只给前一部分，整章交给 delegate）。material 给材料号（kb_search 结果里 [材料 12] 的数）：读这份材料的目录，短的直接给全文；再加 chapter（目录里的章号，如 I.iii）读那一章。translation=true 每段带上对照译文。",
+        schema: || {
+            json!({ "type": "object", "properties": {
+                "passage": { "type": "string", "description": "段落编号，如 P123" },
+                "scope": { "type": "string", "enum": ["context", "chapter"] },
+                "around": { "type": "integer", "minimum": 1, "maximum": 8 },
+                "material": { "type": "integer" },
+                "chapter": { "type": "string" },
+                "translation": { "type": "boolean" }
+            } })
         },
         read_only: true,
     },
@@ -230,7 +273,55 @@ impl Toolbox {
                 },
                 None => ToolOut::error("要给条目号 id（library_search 给的）。"),
             },
-            "delegate" => delegate(ctx, &s("title"), &s("task"), &s("materials"), seq),
+            "kb_search" => {
+                let q = s("query");
+                let limit = input.get("limit").and_then(Value::as_u64).unwrap_or(8).clamp(1, 20) as usize;
+                match ctx.env.kb_search(&q, limit) {
+                    Ok(f) => {
+                        let text = if q.is_empty() { "看了看知识库里有什么".to_string() } else { format!("在知识库里找「{}」：{} 段", short(&q, 20), f.hits) };
+                        ToolOut::ok(f.text, Step::new("search", text))
+                    }
+                    Err(e) => ToolOut::error(format!("知识库查不了：{e}")),
+                }
+            }
+            "kb_read" => {
+                let req = KbRead {
+                    passage: input.get("passage").and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_i64().map(|n| n.to_string()))).and_then(|h| crate::kb::read::handle(&h)),
+                    material: input.get("material").and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.trim().trim_start_matches("材料").trim().parse().ok()))),
+                    chapter: input.get("chapter").and_then(Value::as_str).map(str::to_string),
+                    scope: if s("scope") == "chapter" { "chapter".into() } else { "context".into() },
+                    around: input.get("around").and_then(Value::as_i64).unwrap_or(2),
+                    translation: input.get("translation").and_then(Value::as_bool).unwrap_or(false),
+                };
+                let what = match (&req.passage, &req.material, req.scope.as_str()) {
+                    (Some(p), _, "chapter") => format!("读了 P{p} 所在的整章"),
+                    (Some(p), ..) => format!("读了 P{p} 的上下文"),
+                    (None, Some(_), _) if req.chapter.is_some() => format!("读了「{}」一章", short(req.chapter.as_deref().unwrap_or(""), 16)),
+                    (None, Some(m), _) => format!("翻了翻材料 {m} 的目录"),
+                    _ => "读原文".into(),
+                };
+                match ctx.env.kb_read(&req) {
+                    Ok(text) => ToolOut::ok(text, Step::new("read", what)),
+                    Err(e) => ToolOut::error(e),
+                }
+            }
+            "delegate" => {
+                let mut materials = s("materials");
+                let chapter = input.get("chapter").and_then(Value::as_str).and_then(crate::kb::read::handle);
+                let mut title = s("title");
+                if let Some(p) = chapter {
+                    match ctx.env.kb_chapter(p) {
+                        Ok((name, text)) => {
+                            if title.is_empty() {
+                                title = name;
+                            }
+                            materials = if materials.is_empty() { text } else { format!("{text}\n\n{materials}") };
+                        }
+                        Err(e) => return ToolOut::error(format!("整章拿不到：{e}")),
+                    }
+                }
+                delegate(ctx, &title, &s("task"), &materials, seq)
+            }
             other => ToolOut::error(format!("没有叫 {other} 的工具。")),
         }
     }

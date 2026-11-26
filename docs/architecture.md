@@ -19,7 +19,8 @@ pith/
 │   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
 │   │                           Reply（状态行、轻量 Markdown、编号和页边注、问题卡、交付卡和「存进」；LiveReply 是正在回答的那一回）、
 │   │                           Usage（输入框下面一行：模型名、本月用量的小圈和明细，1.1.0）
-│   ├── kb/KnowledgePage.tsx    知识库：两栏（知识库 | 种类、搜索；生长阶段）、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
+│   ├── kb/KnowledgePage.tsx    知识库：两栏（知识库 | 种类、搜索；生长阶段）、卡片墙（十种记录各一种样子）、右边的面板（书读原文：一章一章、
+│   │                           读到的那一段亮着、对照译文；在哪几个库、再放进一个库）、「种进来」
 │   ├── library/                LibraryScreen（页头、两栏：范围 | 类型、搜索；集合；标签筛选；右边的面板）、Collections（集合一栏，子集合点开接在后面）、
 │   │                           TagTree（标签树，两指往右滑）、ItemList（表格、排序、多选、右键菜单、「新建」）、ItemDetail（可编辑详情、批量面板、合并）、scope、labels
 │   ├── settings/               SettingsScreen（枝桠 + 八页；角色、知识库、外观是新的，导入 1.0.3 从文献库挪来）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
@@ -43,7 +44,7 @@ pith/
 │   └── reader/                 阅读器（单独打包，第一次阅读时加载）：Reader（工具栏、浮动工具条、查找）、
 │                               controller（pdf.js 的 PDFViewer、标注层、选区 → PDF 坐标）、AnnotationList、useRead
 ├── src-tauri/                  Rust 后端（唯一读写 SQLite 的地方）
-│   ├── migrations/             0001_library … 0010_chat；顺序编号，用过永不改
+│   ├── migrations/             0001_library … 0011_passages；顺序编号，用过永不改
 │   ├── word/                   Word 一侧的源文件：Pith.bas（宏，ASCII）、customUI.xml（选项卡）、images/（选项卡图标 PNG）、Pith.applescript、pith-bridge.sh
 │   ├── fixtures/               冻结的样本库 library-vN.json（每个数据库版本一份，升级测试用，`decisions/0013`）；agent/（合成的示例规范与模拟模型的清单）；
 │   │                           research/（虚构「示例市」的网页、统计表原件，录制的 Anthropic / DeepSeek / Tavily 回复）
@@ -57,11 +58,15 @@ pith/
 │       ├── gateway/            模型网关（1.1.0，`decisions/0036`）：mod（中立的消息和片段、Model 接口）、catalog（每家三档、价格表）、
 │       │                       anthropic / openai / deepseek / gemini（四条线协议的编码和流）、http（地址、认证、重试、能停）、vertex（项目、gcloud ADC）、
 │       │                       keys（几把密钥放哪）、meter（月上限、记账）、mock（模拟模型）、commands（`model_*`、`usage_summary`）
-│       ├── chat/               对话、角色、知识库（1.0.2，`0031`）：store（0010 的五张表；内置四个角色；对话历史并上以前的调查和研究；能种进知识库的东西）、
-│       │                       run（一回回答：后台跑 Agent 循环、`chat_live` 给进度、跑完存成一条消息；给模型看的对话由存下的拼出来）、
-│       │                       commands（`chat_*`、`role_*`、`kb_*`）
+│       ├── chat/               对话、角色（1.0.2，`0031`）：store（对话、消息、角色；内置四个角色；对话历史并上以前的调查和研究）、
+│       │                       run（一回回答：后台跑 Agent 循环、`chat_live` 给进度、跑完存成一条消息，回答里的段落编号换成 [n] 和页边注；
+│       │                       给模型看的对话由存下的拼出来；工具环境 AppEnv：文献库、知识库）、commands（`chat_*`、`role_*`）
+│       ├── kb/                 知识库（1.0.2 建表，1.1.0 第 3 期能检索，`0038`）：store（知识库、材料进几个库、能种进来的、1.1.0 的升级：并重复、书迁进来）、
+│       │                       passages（段落块：书一段一块、别的按空行切；读一章、上下文、目录）、index（search.db 的按词索引和本机向量，后台补）、
+│       │                       retrieve（按意思 + 按词 → 重排，带对照译文）、read（kb_read、面板、子代理读整章）、cite（[P123] → [n]、页边注）、
+│       │                       align（向量齐了用相似度重新对齐）、commands（`kb_*`）
 │       ├── harness/            Agent 循环（1.1.0，`decisions/0037`）：mod（一轮一轮、停的条件、防打转、事件）、prompt（提示分层）、
-│       │                       tools（按插件分组的工具、子代理）、calc（精确计算）、brain（开发版的模拟模型）
+│       │                       tools（按插件分组的工具：基础、知识库、文献库；子代理）、calc（精确计算）、brain（开发版的模拟模型）
 │       ├── library.rs          文献库只读查询（概览、列表的范围 / 搜索 / 筛选 / 排序、四种详情、集合树、标签、附件打开位置）
 │       ├── edit.rs             写操作：编辑、新建、标签、集合、批量、回收站、合并、添加附件
 │       ├── fields.rs           条目字段规则：由字段推出常用列（导入与编辑共用）
@@ -138,7 +143,7 @@ pith/
 - **存**：`chat::store`，migration 0010 的五张表（`docs/schema.md`）。消息的 body 是 JSON：你说的 `{text, role, sent}`（`sent` 是发给模型的样子，1.1.0）；Pith 的 `{steps, paragraphs, cites, ask, delivery, model, costUsd, tokens, ending, note, transcript}`，前端照它画状态行、正文（`[n]` 是编号）、页边注、问题卡、交付卡和怎么结束的；`sent`、`transcript` 只给模型看，`chat_get` 不给前端。1.0.x 的演示回答带 `mock: true`、`ask` 是一句话，照样能显示，不进给模型看的对话。
 - **角色**：内置四个在 `chat::store::BUILTIN`，改过的用同一个 uid 存一份，删掉就是改回默认；新建的 uid 是 ULID。
 - **技能进对话**：`conversations.skill` + `ref_uid` 连到那次运行（research：调查 uid；concept：研究 uid；format：`规范 id:排版 id`）。点名了技能的对话先只存你说的那句，技能跑起来以后 `chat_link`。以前的调查和研究没有对话：`chat_list` 把每个问题最新的那次调查、每次研究也列出来（`uid` 是空的），接着问时 `chat_open_ref` 才建对话。
-- **知识库**：材料按 `(库, source_kind, source_ref)` 去重，再种一次只是更新「最近照料」。`kb_candidates` 列出能种的：解析好的书（`concept_text`）、做完的调查（`research_run`）、做完的研究的卡片（`concept_card`，`研究 uid#卡片 key`）。`kb_material_add` 不给库时种进第一个，没有就建「随手存」。
+- **知识库**（`crate::kb`，1.1.0 起，`0038`）：一份材料能进几个库（`kb_members`），同一来源 `(source_kind, source_ref)` 全库一份，再种进别的库只是多一个库、再种进同一个库只是照料；`kb_materials.kb_id` 是「家」。`kb_candidates` 列出能种的：解析好的书（`concept_text`）、做完的调查（`research_run`）、做完的研究的卡片（`concept_card`，`研究 uid#卡片 key`）。`kb_material_add` 不给库时种进第一个，没有就建「随手存」；种好、改了正文就切段落块、后台补向量。`kb_material_delete(uid, kb)` 从一个库里拿掉，哪个库都没有了才删。
 - **回答**（1.1.0，`decisions/0037`）：`chat_start` / `chat_send` 存下站主这一句、在后台线程开始一回（`chat::run::start`），马上返回（`running: true`）；界面每 0.2 秒 `chat_live` 看状态行和正文到哪了，`chat_stop` 停；跑完存成一条消息、`chat_live` 变 null，界面刷新这段对话和用量。同一段对话同时只答一句。
 - **界面**：外框的状态在 `app/nav.tsx`（哪一屏、哪段对话、设置哪一页、文献库要看的）；配色和明暗在 `shared/theme.ts`（localStorage，跟随系统时听系统的变化）；图形只从 `shared/marks.tsx` 取（内联同步来的 SVG，类名留给 `bundle.css` 的动效零件）。
 
@@ -162,8 +167,23 @@ pith/
    ─▶ 停（写完 / 问了 / 轮数 / 打转 / 月上限 / 拒答 / 截断 / 停 / 出错）─▶ Outcome（正文、状态行、问题卡、交付卡、transcript、花费）─▶ 存成一条消息
 ```
 
-- 事件攒在 `chat::run::Runs`（每段对话一份 `LiveView`），界面轮询；子代理的步骤带 `sub`。
-- 工具接口 `harness::tools::Env`：App 里查数据库（`library::items_list`、`item_get`），测试里是假的。
+- 事件攒在 `chat::run::Runs`（每段对话一份 `LiveView`），界面轮询；子代理的步骤带 `sub`；正在写的正文里的段落编号已经换成 [n]。
+- 工具接口 `harness::tools::Env`：App 里查数据库和本机模型（文献库 `library::items_list`、`item_get`；知识库 `kb::retrieve`、`kb::read`，范围是这段对话勾的库），测试里是假的。
+- 跑完：回答里的 `[P123]` 查库换成 `[1]`、页边注存进 body 的 `cites`（`kb::cite`）；交付卡的正文换好编号、附出处。
+
+## 知识库检索（1.1.0 第 3 期，`decisions/0038`）
+
+```
+种进来 / 改正文 / 重新解析书 ─▶ kb::passages::sync：切段落块（书一段一块：段落号、页码、章；同一位置留原来的 id）─▶ search.kb_fts（按词）
+   └▶ kb::index::start（后台）：缺向量的块 → 本机向量模型（书以前算过的直接抄）→ search.kb_vecs ─▶ 原著和译本都齐了：kb::align 用相似度重新对齐
+kb_search（工具）─▶ kb::retrieve：问题的向量 → 最像的 40 块 + 按词 24 块 → 译本那边映射回原著、并成一条 → 本机重排 → 前几段（带 [P123]、出处、对照）
+kb_read（工具）─▶ kb::read：上下文 / 整章（主对话约 9000 token，再长交给 delegate 的 chapter，子代理拿到整章原文）/ 目录 / 对照译文
+回答 ─▶ kb::cite：[P123] → [1]、页边注（原文、段落号、页码、对照、知识库里这一段、文献库）
+```
+
+- 范围：这段对话勾的知识库，没勾是全部。本机模型用不了或者还没有向量时只按词，重排用不了按向量排，都给模型一句说明。
+- 启动时（和整库恢复后）`kb::on_startup`：家补进 `kb_members`、第一次（`kb.v11`）并重复、书迁进「书架」、没切块的切一遍，按词索引对上主库。
+- 面板读原文：`kb_read` 命令给一章的块、读到的那一段、对照（块 id → 对面的文字）。设置 › 知识库与检索：`kb_index_status` / `kb_index_start`。
 
 ## 恢复的流程（`decisions/0013`）
 
@@ -259,7 +279,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 ## 本机模型与语义检索（2026-11-15 修 `0025` 的已知问题）
 
 - **本机模型**（`src-tauri/src/local/`）：用户的 `~/Documents/LLM`（和柚儿园共用）里的向量模型（8081，`/v1/embeddings`）和重排模型（8082，`/v1/rerank`）。Pith 只读清单 `config/models.json`（每类用第一个）、只经 `scripts/llmctl.sh` 启停，不改那个文件夹。用到时才启动（`ensure`：先看 `/health`，没开就 `start <key> --by pith`，最多等 45 秒）；只停自己启动的（`status` 里有 `By: pith`）：闲置 15 分钟停，退出 Pith 时停。只连 `127.0.0.1`，不走代理，不花钱。三种模式：`Real`、`Mock`（测试和 `PITH_LOCAL_MODELS=mock`：按字散列的 256 维向量）、`Off`（找不到文件夹或 `PITH_LOCAL_MODELS=off`）。`PITH_LLM_DIR` 可以另指位置。`AppState.local` 拿着它。
-- **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`，App 现在没喂，只用长度和锚点；用户 11-25 定要补上，排在 1.1.0 的知识库检索里，`requirements.md`「以后」）。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
+- **全书对齐**（v0.5，`concept-engine/src/align.rs`，算法第 2 版）：章内动态规划的单调对齐（1-1、1-2、2-1、1-3、3-1、落空），代价看长度比、两边都有的数字和拉丁字母词，可选调用方给的语义相似度（`align_with` 的 `Similarity`）。1.1.0 第 3 期起 App 喂上了：原著和译本在知识库里的段落块都有向量时用相似度重新对齐（`kb::align`，记下模型；真书上的比较在 `0038`）；没有向量时只用长度和锚点。每章记怎么对上的（`exact` / `fitted` / `none`）和置信度，低的在页面上标「对齐存疑」。存 `concept_aligned_pairs`（migration 0009，主键三列，能存一对多）；`concept_alignments.algorithm` 旧的读书时重算。解析器同时修了归类（编者导读、书名页、脚注小目录、挂错层的篇）并把数据表格整张算一段（`PARSER_VERSION` = `concept-text-2`）；已存的文本要「重新解析」才用上新的归类。
 - **向量是派生数据**：`search.concept_vecs(para_id, model, sig, vec)`，在 `search.db`，不写 migration。按模型的 key 分开存；`sig` 是段落文字的散列，段落换了（重新解析）就当作没有，重新算。归一化的 f32 小端连起来存，检索时整本书扫一遍算点积（一本书几千段，几十毫秒）。以后的内部知识库量大了再换存法。
 - **建索引**在后台线程（`concept::semantic`，命令 `concept_index_start`，事件 `concept-index`），一批 16 段，读库和写库各拿一次锁、联本机服务时不拿锁。真实的两本《国富论》9265 段约 6 分钟。
 - **「问这本书」**（`concept_ask_search`）：问题的向量 → 原著里最像的 40 段 + 译本里最像的 24 段（按对齐映射回原著）+ 按词检索的命中 → 重排模型打分 → 按相关度给前几段，只给正文段（旁注、注释算到它挂的正文段，编者的导读不要）。中文问题、有对齐的中译时重排比的是中译。退路：本机模型用不了、或索引还一段都没有 → 按词检索并说明原因；重排用不了 → 按向量相似度排。「追踪概念」仍按词（要的就是这个词出现在哪）。
@@ -272,7 +292,7 @@ format_apply ─▶ 排版器改副本 ─▶ 校验器（另一套解析器）�
 - v0.3 事实调查（见上）：连 `api.anthropic.com`、`api.deepseek.com`（地址可改）、`api.tavily.com`，以及检索到的网页（本机下载，只取单页）。每次发送模型和搜索前界面确认、查月度上限。
 - v0.4 概念研究（见上）：连 `api.openai.com`（或选 Opus 时的 `api.anthropic.com`）、`api.mathpix.com`（上传前确认页数和费用，用完删除），网页检索同 v0.3。
 - 本机模型（见上）：只连 `127.0.0.1:8081` / `8082`，不出这台电脑。
-- 1.0.2 的对话不联网（回答是模拟的）。
+- 1.0.2 的对话不联网（回答是模拟的）；1.1.0 起对话调模型（网关，`0036`），知识库检索只连本机的向量和重排服务。
 - 导入完成、改了 DOI / ISBN 后，命令层把文献放进 `AppState.lookups` 队列，后台线程一次一条地查：读库（拿锁）→ 联网（不拿锁）→ 写库（拿锁）并更新搜索索引。
 
 ## 资源约束
