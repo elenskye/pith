@@ -9,7 +9,7 @@ import { Stage } from "@/shared/marks";
 import { useNav, skillName, dateOf, when } from "@/app/nav";
 import { Home } from "@/chat/Home";
 import { Composer, type Ask } from "@/chat/Composer";
-import { Reply, YouLine } from "@/chat/Reply";
+import { LiveReply, Reply, YouLine } from "@/chat/Reply";
 import { UsageLine } from "@/chat/Usage";
 import { RunScreen as ResearchRun } from "@/research/RunScreen";
 import { PlanSend } from "@/research/Confirm";
@@ -27,7 +27,7 @@ export function ChatScreen() {
   return <ConvThread key={t.uid} uid={t.uid} />;
 }
 
-/** 接着问：点名了技能就开一段新对话，否则在这段里问 */
+/** 接着问：点名了技能就开一段新对话，否则在这段里问（回答在后台跑，ConvThread 轮询 chatLive） */
 function useFollowUp(uid: () => Promise<string>) {
   const nav = useNav();
   const qc = useQueryClient();
@@ -41,6 +41,7 @@ function useFollowUp(uid: () => Promise<string>) {
         nav.openChat({ kind: "chat", uid: chat.uid });
       } else {
         const id = await uid();
+        qc.removeQueries({ queryKey: ["chatLive", id] });
         const chat = await api.chatSend(id, a.text, a.role === "pith" ? null : a.role);
         qc.setQueryData(["chat", chat.uid], chat);
         if (nav.chat?.kind !== "chat" || nav.chat.uid !== chat.uid) nav.openChat({ kind: "chat", uid: chat.uid });
@@ -55,6 +56,20 @@ function useFollowUp(uid: () => Promise<string>) {
   return { busy, send };
 }
 
+/** 正在回答：每 0.2 秒问一次到哪了；答完（chatLive 是 null）刷新这段对话、用量、知识库 */
+function useLive(uid: string, running: boolean) {
+  const qc = useQueryClient();
+  const live = useQuery({ queryKey: ["chatLive", uid], queryFn: () => api.chatLive(uid), enabled: running, refetchInterval: running ? 200 : false, gcTime: 0 });
+  const done = running && live.isFetched && live.data === null;
+  useEffect(() => {
+    if (!done) return;
+    void qc.invalidateQueries({ queryKey: ["chat", uid] });
+    void qc.invalidateQueries({ queryKey: ["usage"] });
+    void qc.invalidateQueries({ queryKey: ["chats"] });
+  }, [done, uid, qc]);
+  return running ? (live.data ?? null) : null;
+}
+
 function ConvThread({ uid }: { uid: string }) {
   const nav = useNav();
   const ui = useUi();
@@ -63,14 +78,18 @@ function ConvThread({ uid }: { uid: string }) {
   const roles = useQuery({ queryKey: ["roles"], queryFn: api.roleList });
   const kbs = useQuery({ queryKey: ["kbs"], queryFn: api.kbList });
   const { busy, send } = useFollowUp(async () => uid);
-  // 打开时已经有的消息不再演；之后来的（接着问的回答）照节奏演出来
-  const seen = useRef<number | null>(null);
-  if (seen.current === null && chat.data) seen.current = Math.max(0, ...chat.data.messages.map((m) => m.position));
+  const running = !!chat.data?.running;
+  const live = useLive(uid, running);
   const scroller = useRef<HTMLDivElement>(null);
   const count = chat.data?.messages.length ?? 0;
+  const liveSize = live ? live.steps.length + live.text.length : 0;
   useEffect(() => {
-    if (count > 2) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [count]);
+    const el = scroller.current;
+    if (!el || count <= 1) return;
+    // 跟着写：离底不远时才跟（往上翻着看的时候不拽回去）
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 320 || liveSize === 0) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [count, liveSize]);
+  const stop = () => void api.chatStop(uid).catch((e) => nav.say(String(e)));
 
   if (chat.error) return <p className="empty selectable">{String(chat.error)}</p>;
   const c = chat.data;
@@ -127,13 +146,23 @@ function ConvThread({ uid }: { uid: string }) {
             m.author === "you" ? (
               <YouLine key={m.position} body={m.body} roles={rs} />
             ) : (
-              <Reply key={m.position} msg={m} conv={uid} roles={rs} fresh={m.position > (seen.current ?? 0)} first={!c.skill && i === 0} />
+              <Reply
+                key={m.position}
+                msg={m}
+                conv={uid}
+                roles={rs}
+                fresh={false}
+                first={!c.skill && i === 0}
+                last={!running && i === rest.length - 1}
+                onAnswer={(text) => void send({ text, role: c.role, kbs: c.kbs, skill: null })}
+              />
             ),
           )}
+          {running && <LiveReply live={live ?? { run: "", author: c.role, steps: [], text: "", startedAt: "" }} roles={rs} onStop={stop} />}
         </div>
       </div>
       <div className="composer-wrap">
-        <Composer placeholder={c.skill ? "接着问……（演示回答）" : "接着问……"} busy={busy} onSend={send} defaultKbs={c.kbs} />
+        <Composer placeholder="接着问……" busy={busy || running} onSend={send} defaultKbs={c.kbs} onStop={running ? stop : undefined} />
         <UsageLine conversation={uid} />
       </div>
     </div>
@@ -152,7 +181,7 @@ function RefThread({ skill, refUid, title }: { skill: SkillId; refUid: string; t
         </div>
       </div>
       <div className="composer-wrap">
-        <Composer placeholder="接着问……（演示回答）" busy={busy} onSend={send} />
+        <Composer placeholder="接着问……" busy={busy} onSend={send} />
       </div>
     </div>
   );
@@ -178,7 +207,7 @@ function BookThread({ text, title }: { text: string; title: string }) {
         </div>
       </div>
       <div className="composer-wrap">
-        <Composer placeholder="问这本书……（演示回答）" busy={busy} onSend={send} />
+        <Composer placeholder="问这本书……" busy={busy} onSend={send} />
       </div>
     </div>
   );

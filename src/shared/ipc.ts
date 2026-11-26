@@ -1417,7 +1417,7 @@ export type UsageSummary = {
   conversationUsd: number | null;
 };
 
-// ---------- 对话、角色、知识库（1.0.2，decisions/0030；回答这一版是模拟的，src-tauri/src/chat/mock.rs） ----------
+// ---------- 对话、角色、知识库（1.0.2，decisions/0030；1.1.0 起回答是 Agent 循环，src-tauri/src/harness/） ----------
 
 /** 技能：对话里点名用（/），跑的还是原来的那套流程 */
 export type SkillId = "research" | "concept" | "format";
@@ -1435,10 +1435,15 @@ export type ChatSummary = {
   updatedAt: string;
 };
 
-export type ChatStep = { agent: string; text: string };
+/** 状态行的一格：Agent 图标 + 一句话；sub 是子代理的 id（收在派它的那一格下面） */
+export type ChatStep = { agent: string; text: string; sub?: string | null };
 export type ChatCite = { n: number; kind: string; src: string; loc: string; text: string; material?: string | null; kb?: string | null };
-export type ChatDelivery = { kind: string; title: string; desc: string; meta: string; kb: { uid: string; name: string } | null };
-/** 一条消息的内容：你说的只有 text；Pith 的是状态行、段落（[n] 是编号）、出处、反问、交付卡 */
+export type ChatDelivery = { kind: string; title: string; desc: string; meta: string; kb: { uid: string; name: string } | null; body?: string };
+/** 问题卡（1.1.0）：一句问话、几个选项；1.0.x 的演示回答是一句话 */
+export type ChatAsk = string | { question: string; options: string[] };
+/** done 写完 / asked 问了你 / limit 轮数到了 / looping 打转 / stopped 停了 / budget 月上限 / refusal 拒答 / truncated 被截断 / error 出错 */
+export type ChatEnding = "done" | "asked" | "limit" | "looping" | "stopped" | "budget" | "refusal" | "truncated" | "error";
+/** 一条消息的内容：你说的只有 text；Pith 的是状态行、段落（[n] 是编号）、出处、问题卡、交付卡，和这一回用的模型、花的钱、怎么结束的 */
 export type ChatBody = {
   text?: string;
   role?: string;
@@ -1446,11 +1451,17 @@ export type ChatBody = {
   steps?: ChatStep[];
   paragraphs?: string[];
   cites?: ChatCite[];
-  ask?: string | null;
+  ask?: ChatAsk | null;
   delivery?: ChatDelivery | null;
+  model?: string;
+  costUsd?: number;
+  ending?: ChatEnding;
+  note?: string | null;
 };
 export type ChatMessage = { position: number; author: string; body: ChatBody; createdAt: string };
-export type Chat = Omit<ChatSummary, "uid"> & { uid: string; kbs: string[]; messages: ChatMessage[] };
+/** 正在回答的那一回（轮询 chat_live） */
+export type ChatLive = { run: string; author: string; steps: ChatStep[]; text: string; startedAt: string };
+export type Chat = Omit<ChatSummary, "uid"> & { uid: string; kbs: string[]; messages: ChatMessage[]; running: boolean };
 
 export type Role = {
   uid: string;
@@ -1491,9 +1502,12 @@ export const api = {
   // 对话、角色、知识库
   chatList: () => invoke<ChatSummary[]>("chat_list"),
   chatGet: (uid: string) => invoke<Chat>("chat_get", { uid }),
-  /** skill 是 null：Pith 直接回答（模拟）；点名了技能：先建对话，技能跑起来以后 chatLink */
+  /** skill 是 null：Pith 在后台回答（running，轮询 chatLive）；点名了技能：先建对话，技能跑起来以后 chatLink */
   chatStart: (text: string, role: string, kbs: string[], skill: SkillId | null) => invoke<Chat>("chat_start", { text, role, kbs, skill }),
   chatSend: (uid: string, text: string, role: string | null) => invoke<Chat>("chat_send", { uid, text, role }),
+  /** 正在回答的那一回到哪了；没在回答是 null */
+  chatLive: (uid: string) => invoke<ChatLive | null>("chat_live", { uid }),
+  chatStop: (uid: string) => invoke<void>("chat_stop", { uid }),
   chatOpenRef: (skill: SkillId, refUid: string, title: string) => invoke<string>("chat_open_ref", { skill, refUid, title }),
   chatLink: (uid: string, skill: SkillId, refUid: string) => invoke<void>("chat_link", { uid, skill, refUid }),
   chatRename: (uid: string, title: string) => invoke<void>("chat_rename", { uid, title }),

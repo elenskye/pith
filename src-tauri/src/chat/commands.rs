@@ -1,22 +1,23 @@
-//! 对话、角色、知识库的 Tauri 命令。规则都在 `store`、`mock` 里，这里只取连接、记时间。
+//! 对话、角色、知识库的 Tauri 命令。规则都在 `store`、`run` 里，这里只取连接、记时间。
+//! 1.1.0 起回答由 Agent 循环在后台给（`run`）：`chat_start` / `chat_send` 存下站主这一句就返回，界面轮询 `chat_live`。
 
-use serde_json::{Value, json};
-use tauri::State;
+use tauri::{AppHandle, State};
 
+use super::run::{self, LiveView, Runs};
 use super::store::{self, ConvSummary, Conversation, KnowledgeBase, Material, Role};
-use super::mock;
 use crate::AppState;
 use crate::common::Tx;
 use crate::text::now_iso;
 
-/// 你说一句、Pith（或点名的角色）回一句：都在一个事务里
-fn exchange(c: &rusqlite::Connection, uid: &str, text: &str, role_uid: &str) -> Result<(), String> {
+fn today() -> String {
+    now_iso().get(..10).unwrap_or("").to_string()
+}
+
+/// 存下站主这一句（带发给模型的样子）
+fn say(c: &rusqlite::Connection, uid: &str, text: &str, role: &str) -> Result<(), String> {
     let conv = store::get(c, uid)?;
-    let role = store::role_get(c, role_uid).or_else(|_| store::role_get(c, "pith"))?;
-    let now = now_iso();
-    store::add_message(c, uid, "you", &json!({ "text": text, "role": role.uid }), &now)?;
-    let reply: Value = mock::answer(c, text, &role, &conv.kbs)?;
-    store::add_message(c, uid, &role.uid, &reply, &now)
+    let body = run::you_body(c, &conv, text, role, &today())?;
+    store::add_message(c, uid, "you", &body, &now_iso())
 }
 
 #[tauri::command]
@@ -25,39 +26,57 @@ pub fn chat_list(state: State<AppState>) -> Result<Vec<ConvSummary>, String> {
 }
 
 #[tauri::command]
-pub fn chat_get(state: State<AppState>, uid: String) -> Result<Conversation, String> {
-    state.with_db(|c| store::get(c, &uid))
+pub fn chat_get(state: State<AppState>, runs: State<Runs>, uid: String) -> Result<Conversation, String> {
+    let conv = state.with_db(|c| store::get(c, &uid))?;
+    Ok(run::for_ui(conv, runs.running(&uid)))
 }
 
-/// 开始一段对话。skill 是空的：Pith 直接回答（模拟）；点名了技能：先建对话，技能跑起来以后 `chat_link`
+/// 开始一段对话。skill 是空的：Pith 在后台回答；点名了技能：先建对话，技能跑起来以后 `chat_link`
 #[tauri::command]
-pub fn chat_start(state: State<AppState>, text: String, role: String, kbs: Vec<String>, skill: Option<String>) -> Result<Conversation, String> {
-    state.with_db(|c| {
+pub fn chat_start(app: AppHandle, state: State<AppState>, runs: State<Runs>, text: String, role: String, kbs: Vec<String>, skill: Option<String>) -> Result<Conversation, String> {
+    let uid = state.with_db(|c| {
         let tx = Tx::begin(c)?;
         let uid = store::create(c, &text, &role, &kbs, skill.as_deref(), None, &now_iso())?;
-        match skill {
-            None => exchange(c, &uid, &text, &role)?,
-            // 点名了技能：留下你说的那句（技能拿它当问题），回答由技能给
-            Some(_) => store::add_message(c, &uid, "you", &json!({ "text": text, "role": role }), &now_iso())?,
-        }
+        say(c, &uid, &text, &role)?;
         tx.commit()?;
-        store::get(c, &uid)
-    })
+        Ok(uid)
+    })?;
+    if skill.is_none() {
+        run::start(&app, &uid, &role)?;
+    }
+    let conv = state.with_db(|c| store::get(c, &uid))?;
+    Ok(run::for_ui(conv, runs.running(&uid)))
 }
 
 /// 接着问。role 是这一句点名的角色（@），空的就用对话的角色
 #[tauri::command]
-pub fn chat_send(state: State<AppState>, uid: String, text: String, role: Option<String>) -> Result<Conversation, String> {
-    state.with_db(|c| {
-        let tx = Tx::begin(c)?;
+pub fn chat_send(app: AppHandle, state: State<AppState>, runs: State<Runs>, uid: String, text: String, role: Option<String>) -> Result<Conversation, String> {
+    if runs.running(&uid) {
+        return Err("上一句还在回答。等它答完，或者先点停。".into());
+    }
+    let role = state.with_db(|c| {
         let role = match role {
             Some(r) => r,
             None => store::get(c, &uid)?.role,
         };
-        exchange(c, &uid, &text, &role)?;
-        tx.commit()?;
-        store::get(c, &uid)
-    })
+        say(c, &uid, &text, &role)?;
+        Ok(role)
+    })?;
+    run::start(&app, &uid, &role)?;
+    let conv = state.with_db(|c| store::get(c, &uid))?;
+    Ok(run::for_ui(conv, runs.running(&uid)))
+}
+
+/// 正在回答的那一回到哪了（没在回答是 null）
+#[tauri::command]
+pub fn chat_live(runs: State<Runs>, uid: String) -> Option<LiveView> {
+    runs.view(&uid)
+}
+
+/// 停下正在回答的那一回（已经写出来的照样存下）
+#[tauri::command]
+pub fn chat_stop(runs: State<Runs>, uid: String) {
+    runs.stop(&uid);
 }
 
 /// 以前的调查、研究：接着问之前建一段对话连上它，返回对话的 uid

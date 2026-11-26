@@ -17,7 +17,8 @@ pith/
 │   │                           water（换配色的整页水面：原生截图 + WebGL 着色器，`0033`）、
 │   │                           TopBar、History（对话历史的枝桠）、Palette（⌘K）、branch（枝桠的画法，历史和设置共用）、SideNav（技能左边那一列）
 │   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
-│   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）、Usage（输入框下面一行：模型名、本月用量的小圈和明细，1.1.0）
+│   │                           Reply（状态行、轻量 Markdown、编号和页边注、问题卡、交付卡和「存进」；LiveReply 是正在回答的那一回）、
+│   │                           Usage（输入框下面一行：模型名、本月用量的小圈和明细，1.1.0）
 │   ├── kb/KnowledgePage.tsx    知识库：两栏（知识库 | 种类、搜索；生长阶段）、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
 │   ├── library/                LibraryScreen（页头、两栏：范围 | 类型、搜索；集合；标签筛选；右边的面板）、Collections（集合一栏，子集合点开接在后面）、
 │   │                           TagTree（标签树，两指往右滑）、ItemList（表格、排序、多选、右键菜单、「新建」）、ItemDetail（可编辑详情、批量面板、合并）、scope、labels
@@ -57,7 +58,10 @@ pith/
 │       │                       anthropic / openai / deepseek / gemini（四条线协议的编码和流）、http（地址、认证、重试、能停）、vertex（项目、gcloud ADC）、
 │       │                       keys（几把密钥放哪）、meter（月上限、记账）、mock（模拟模型）、commands（`model_*`、`usage_summary`）
 │       ├── chat/               对话、角色、知识库（1.0.2，`0031`）：store（0010 的五张表；内置四个角色；对话历史并上以前的调查和研究；能种进知识库的东西）、
-│       │                       mock（模拟的回答，1.1.0 换成 Agent 循环）、commands（`chat_*`、`role_*`、`kb_*`）
+│       │                       run（一回回答：后台跑 Agent 循环、`chat_live` 给进度、跑完存成一条消息；给模型看的对话由存下的拼出来）、
+│       │                       commands（`chat_*`、`role_*`、`kb_*`）
+│       ├── harness/            Agent 循环（1.1.0，`decisions/0037`）：mod（一轮一轮、停的条件、防打转、事件）、prompt（提示分层）、
+│       │                       tools（按插件分组的工具、子代理）、calc（精确计算）、brain（开发版的模拟模型）
 │       ├── library.rs          文献库只读查询（概览、列表的范围 / 搜索 / 筛选 / 排序、四种详情、集合树、标签、附件打开位置）
 │       ├── edit.rs             写操作：编辑、新建、标签、集合、批量、回收站、合并、添加附件
 │       ├── fields.rs           条目字段规则：由字段推出常用列（导入与编辑共用）
@@ -131,11 +135,11 @@ pith/
 
 ## 对话、角色、知识库（1.0.2，`decisions/0031`）
 
-- **存**：`chat::store`，migration 0010 的五张表（`docs/schema.md`）。消息的 body 是 JSON：你说的 `{text, role}`；Pith 的 `{steps, paragraphs, cites, ask, delivery, mock}`，前端照它画状态行、正文（`[n]` 是编号）、页边注、交付卡。1.1.0 的 Agent 循环照这个形状写消息。
+- **存**：`chat::store`，migration 0010 的五张表（`docs/schema.md`）。消息的 body 是 JSON：你说的 `{text, role, sent}`（`sent` 是发给模型的样子，1.1.0）；Pith 的 `{steps, paragraphs, cites, ask, delivery, model, costUsd, tokens, ending, note, transcript}`，前端照它画状态行、正文（`[n]` 是编号）、页边注、问题卡、交付卡和怎么结束的；`sent`、`transcript` 只给模型看，`chat_get` 不给前端。1.0.x 的演示回答带 `mock: true`、`ask` 是一句话，照样能显示，不进给模型看的对话。
 - **角色**：内置四个在 `chat::store::BUILTIN`，改过的用同一个 uid 存一份，删掉就是改回默认；新建的 uid 是 ULID。
 - **技能进对话**：`conversations.skill` + `ref_uid` 连到那次运行（research：调查 uid；concept：研究 uid；format：`规范 id:排版 id`）。点名了技能的对话先只存你说的那句，技能跑起来以后 `chat_link`。以前的调查和研究没有对话：`chat_list` 把每个问题最新的那次调查、每次研究也列出来（`uid` 是空的），接着问时 `chat_open_ref` 才建对话。
 - **知识库**：材料按 `(库, source_kind, source_ref)` 去重，再种一次只是更新「最近照料」。`kb_candidates` 列出能种的：解析好的书（`concept_text`）、做完的调查（`research_run`）、做完的研究的卡片（`concept_card`，`研究 uid#卡片 key`）。`kb_material_add` 不给库时种进第一个，没有就建「随手存」。
-- **模拟的回答**：`chat::mock::answer`，在勾的知识库（没勾就全部）里按问题里的字两两一组粗略地挑三份当出处，出状态行、段落、反问（伴读、审稿人才有）、交付卡，标 `mock: true`。
+- **回答**（1.1.0，`decisions/0037`）：`chat_start` / `chat_send` 存下站主这一句、在后台线程开始一回（`chat::run::start`），马上返回（`running: true`）；界面每 0.2 秒 `chat_live` 看状态行和正文到哪了，`chat_stop` 停；跑完存成一条消息、`chat_live` 变 null，界面刷新这段对话和用量。同一段对话同时只答一句。
 - **界面**：外框的状态在 `app/nav.tsx`（哪一屏、哪段对话、设置哪一页、文献库要看的）；配色和明暗在 `shared/theme.ts`（localStorage，跟随系统时听系统的变化）；图形只从 `shared/marks.tsx` 取（内联同步来的 SVG，类名留给 `bundle.css` 的动效零件）。
 
 ## 模型网关（1.1.0，`decisions/0036`）
@@ -149,6 +153,17 @@ pith/
 - 选模型：设置里一家 + 一档（`model.prefs`）；`catalog::tier(家, 档)` 给模型和 effort。Vertex 的项目、区域在 `model.vertex.*`，令牌由 gcloud 换。
 - 私有数据（思考签名、密文、Gemini 的 thought signature、Anthropic 回退的块）只回放给同一来源；换了模型就丢掉。
 - 开发版、测试、`?mock` 用模拟模型（不联网、不花钱，账本记「模拟」）；正式版或 `PITH_REAL_MODEL=1` 用真接口。
+
+## Agent 循环（1.1.0，`decisions/0037`）
+
+```
+站主一句 ─▶ chat::run：拼出给模型看的对话（sent + transcript，只往后追加）、提示分层（App 规矩 + 插件 | 角色）、选模型（设置的一家一档；强一档给子代理）
+   ─▶ harness::run：调模型（gateway::meter::send，流式）─▶ 有工具调用？─ 只读的并行跑（计算、查文献库、子代理）、问题卡 / 交付卡按顺序 ─▶ 结果接回去 ─▶ 下一轮
+   ─▶ 停（写完 / 问了 / 轮数 / 打转 / 月上限 / 拒答 / 截断 / 停 / 出错）─▶ Outcome（正文、状态行、问题卡、交付卡、transcript、花费）─▶ 存成一条消息
+```
+
+- 事件攒在 `chat::run::Runs`（每段对话一份 `LiveView`），界面轮询；子代理的步骤带 `sub`。
+- 工具接口 `harness::tools::Env`：App 里查数据库（`library::items_list`、`item_get`），测试里是假的。
 
 ## 恢复的流程（`decisions/0013`）
 

@@ -1,6 +1,6 @@
 // 仅开发用：对话、角色、知识库的假后端（?mock）。内容照 Explore R1（visual-atelier canvases/pith-explore/src/content.mjs）：
 // 四个知识库、十种记录、读《国富论》那段对话。规则在 Rust（src-tauri/src/chat/），这里只大致模仿。
-import type { Chat, ChatBody, ChatSummary, KnowledgeBase, Material, MaterialKind, Role } from "@/shared/ipc";
+import type { Chat, ChatBody, ChatLive, ChatStep, ChatSummary, KnowledgeBase, Material, MaterialKind, Role } from "@/shared/ipc";
 
 type Args = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -8,7 +8,6 @@ const ago = (days: number) => new Date(Date.now() - days * 86400000).toISOString
 let seq = 100;
 const uid = (p: string) => `${p}${++seq}`;
 
-const KIND: Record<MaterialKind, string> = { full: "全文", excerpt: "摘抄", note: "笔记", web: "网页快照", file: "本机文件", scan: "扫描件", concept: "概念卡", report: "调查报告", wonder: "WonderLab 作品", answer: "存下的回答" };
 
 const roles: Role[] = [
   { uid: "pith", name: "Pith", mark: "P", line: "研究助手 · 默认", prompt: "你是站主的研究助手。什么都能问：先给结论，再给依据和编号；该用哪个技能自己挑。", kb: "上一次勾的", model: "", skills: [], builtin: true, edited: false },
@@ -72,12 +71,15 @@ const firstReply: ChatBody = {
     { n: 3, kind: "全文", src: "《国富论》", loc: "I.iii.3", text: "…so it is upon the sea-coast, and along the banks of navigable rivers, that industry of every kind naturally begins to subdivide and improve itself…", material: wnFull.uid, kb: "kb-wn" },
     { n: 4, kind: "摘抄", src: "Stigler 1951 的摘抄", loc: "我的摘抄", text: stigler.body, material: stigler.uid, kb: "kb-wn" },
   ],
-  ask: "想一想：今天的网购，算不算又把「市场」扩大了一次？",
-  delivery: { kind: "concept", title: "分工受市场范围限制", desc: "分工因交换而起，所以受市场范围限制；高地散村和水运两个例子；Stigler 用到行业的一生。", meta: "概念卡 • 3 处原文 · 1 条摘抄", kb: { uid: "kb-wn", name: "读《国富论》" } },
+  ask: { question: "想一想：今天的网购，算不算又把「市场」扩大了一次？", options: ["算，市场变大了", "不算，交换没变", "说不清，想听你讲"] },
+  delivery: { kind: "concept", title: "分工受市场范围限制", desc: "分工因交换而起，所以受市场范围限制；高地散村和水运两个例子；Stigler 用到行业的一生。", meta: "概念卡 • Claude Sonnet 5.5", kb: { uid: "kb-wn", name: "读《国富论》" } },
+  model: "Claude Sonnet 5.5",
+  costUsd: 0.0186,
+  ending: "asked",
 };
 
 const chats: Chat[] = [
-  { uid: "c-wn", title: Q, role: "companion", kbs: ["kb-wn"], skill: null, refUid: null, stage: 0, createdAt: ago(2), updatedAt: ago(0.01), messages: [
+  { uid: "c-wn", title: Q, role: "companion", kbs: ["kb-wn"], skill: null, refUid: null, stage: 0, createdAt: ago(2), updatedAt: ago(0.01), running: false, messages: [
     { position: 1, author: "you", body: { text: Q, role: "companion" }, createdAt: ago(0.02) },
     { position: 2, author: "companion", body: firstReply, createdAt: ago(0.01) },
   ] },
@@ -86,36 +88,112 @@ const chats: Chat[] = [
     { t: "四大古文明发源的地理条件", role: "companion", days: 5, stage: 0, kbs: ["kb-gh"] },
     { t: "第 2 章的引文格式", role: "editor", days: 8, stage: 2, kbs: ["kb-thesis"] },
     { t: "政治效能感最早怎么定义", role: "pith", days: 30, stage: 2, kbs: ["kb-thesis"] },
-  ].map((c, i) => ({ uid: `c-old${i}`, title: c.t, role: c.role, kbs: c.kbs, skill: null, refUid: null, stage: c.stage, createdAt: ago(c.days + 1), updatedAt: ago(c.days), messages: [{ position: 1, author: "you", body: { text: c.t }, createdAt: ago(c.days) }, { position: 2, author: c.role, body: reply(c.t, c.role, c.kbs), createdAt: ago(c.days) }] })),
+  ].map((c, i) => ({ uid: `c-old${i}`, title: c.t, role: c.role, kbs: c.kbs, skill: null, refUid: null, stage: c.stage, createdAt: ago(c.days + 1), updatedAt: ago(c.days), running: false, messages: [{ position: 1, author: "you", body: { text: c.t }, createdAt: ago(c.days) }, { position: 2, author: c.role, body: reply(c.t, c.kbs).body, createdAt: ago(c.days) }] })),
 ];
 
-function reply(q: string, role: string, picked: string[]): ChatBody {
+// ---------- 一回回答（1.1.0）：照 Agent 循环的样子，几秒里一格格出来、一个字一个字写；能停 ----------
+
+type Beat = { at: number; step?: ChatStep; text?: string; reset?: true };
+type Sim = { conv: string; author: string; run: string; started: number; beats: Beat[]; end: number; reply: ChatBody };
+const sims = new Map<string, Sim>();
+
+/** 这一问的回答：先查、再做交付卡、再写；问题里有「还是」就给一张问题卡 */
+function reply(q: string, picked: string[]): { beats: Beat[]; body: ChatBody } {
   const pool = materials.filter((x) => picked.length === 0 || picked.includes(x.kb));
   const hits = pool.filter((x) => [...q].some((ch) => ch.trim() && `${x.title}${x.body}`.includes(ch))).slice(0, 3);
   const name = kbs.find((k) => k.uid === picked[0])?.name;
-  return {
-    mock: true,
-    steps: [{ agent: "think", text: "想了想怎么回答" }, ...(pool.length ? [{ agent: "search", text: `在${name ? `「${name}」` : "知识库"}里找了 ${pool.length} 份` }, { agent: "read", text: `读了 ${hits.length} 份` }] : []), { agent: "write", text: "写好了（演示）" }],
-    paragraphs: ["这是一段演示回答：这一版 Pith 还没接上模型对话，先照真回答的样子走一遍——找、读、写、编号，问题本身没有被回答。", hits.length ? `和这个问题最近的是${hits.map((h, i) => `「${h.title}」[${i + 1}]`).join("、")}。` : "你勾的知识库里还没有沾边的材料。", "要真的查证，用 /调查；要读一本书，用 /概念。"],
-    cites: hits.map((h, i) => ({ n: i + 1, kind: KIND[h.kind], src: h.title, loc: h.sub, text: h.body, material: h.uid, kb: h.kb })),
-    ask: role === "companion" ? "想一想：这个问题里，哪个词你最想先弄清楚？" : null,
-    delivery: { kind: "answer", title: q.slice(0, 40), desc: "演示回答", meta: `存下的回答 • ${hits.length} 处出处`, kb: name ? { uid: picked[0], name } : null },
+  const query = q.replace(/[？?。，,！!]/g, "").slice(0, 16);
+  const steps: ChatStep[] = [
+    { agent: "think", text: "想了想" },
+    { agent: "lib", text: `在文献库里找「${query}」：${hits.length} 条` },
+  ];
+  const either = q.split("还是");
+  const ask = either.length === 2 ? { question: "你想先从哪一边看？", options: [either[0].replace(/^.*[，,]/, "").trim() || "前一个", either[1].replace(/[？?]/g, "").trim() || "后一个"] } : null;
+  if (!ask) steps.push({ agent: "save", text: `做了一张交付卡：${q.slice(0, 14)}` });
+  else steps.push({ agent: "ask", text: "问你一句" });
+  steps.push({ agent: "write", text: "写好了" });
+  const paragraphs = ask
+    ? ["这个问题两头都能讲，先问你一句：你更想先看哪一边？选一个，我接着往下查。"]
+    : [
+        "这是 ?mock 里的模拟回答：照 Agent 循环的样子走一遍——想、查、做交付卡、写——问题本身没有被回答。",
+        hits.length ? `文献库里沾边的有：${hits.map((h) => `**${h.title}**`).join("、")}。` : "文献库里没有找到沾边的条目。",
+        "- 真的回答在正式版里（或开发版设 PITH_REAL_MODEL=1）\n- 下面的交付卡点「存进」，种子会飞进知识库",
+      ];
+  const body: ChatBody = {
+    steps,
+    paragraphs,
+    cites: [],
+    ask,
+    delivery: ask ? null : { kind: "answer", title: q.slice(0, 40), desc: "模拟回答：查了什么、找到了什么。", meta: "存下的回答 • Claude Sonnet 5.5", kb: name ? { uid: picked[0], name } : null, body: "" },
+    model: "Claude Sonnet 5.5",
+    costUsd: 0.0123,
+    ending: ask ? "asked" : "done",
+    note: null,
   };
+  const beats: Beat[] = [{ at: 0, step: steps[0] }, { at: 250, text: "我先在文献库里找找。" }, { at: 1000, reset: true }, { at: 1050, step: steps[1] }, { at: 1500, step: steps[2] }];
+  let at = 1800;
+  const full = paragraphs.join("\n\n");
+  for (let i = 0; i < full.length; i += 3) beats.push({ at: (at += 40), text: full.slice(i, i + 3) });
+  return { beats, body };
+}
+
+function liveOf(sim: Sim, t: number): ChatLive {
+  let text = "";
+  const steps: ChatStep[] = [];
+  for (const b of sim.beats) {
+    if (b.at > t) break;
+    if (b.step) steps.push(b.step);
+    if (b.text) text += b.text;
+    if (b.reset) text = "";
+  }
+  return { run: sim.run, author: sim.author, steps, text, startedAt: new Date(sim.started).toISOString() };
+}
+
+/** 答完（或停了）：存成一条消息 */
+function finish(sim: Sim, stopped = false) {
+  sims.delete(sim.conv);
+  const c = chats.find((x) => x.uid === sim.conv);
+  if (!c) return;
+  let body = sim.reply;
+  if (stopped) {
+    const l = liveOf(sim, Date.now() - sim.started);
+    body = { steps: l.steps, paragraphs: l.text.split(/\n{2,}/).filter((p) => p.trim()), cites: [], model: sim.reply.model, costUsd: 0.004, ending: "stopped", note: "已经写出来的留着。" };
+  }
+  c.messages.push({ position: c.messages.length + 1, author: sim.author, body, createdAt: now() });
+  c.running = false;
+  c.updatedAt = now();
+}
+
+function tick(conv: unknown) {
+  const sim = sims.get(String(conv));
+  if (sim && Date.now() - sim.started > sim.end) finish(sim);
 }
 
 const summary = (c: Chat): ChatSummary => ({ uid: c.uid, title: c.title, role: c.role, skill: c.skill, refUid: c.refUid, stage: c.stage, createdAt: c.createdAt, updatedAt: c.updatedAt });
 const find = (u: unknown) => chats.find((c) => c.uid === u) ?? (() => { throw "这段对话不存在了。"; })();
 const say = (c: Chat, text: string, role: string) => {
-  const p = c.messages.length;
-  c.messages.push({ position: p + 1, author: "you", body: { text, role }, createdAt: now() }, { position: p + 2, author: role, body: reply(text, role, c.kbs), createdAt: now() });
+  if (sims.has(c.uid)) throw "上一句还在回答。等它答完，或者先点停。";
+  c.messages.push({ position: c.messages.length + 1, author: "you", body: { text, role }, createdAt: now() });
+  const { beats, body } = reply(text, c.kbs);
+  sims.set(c.uid, { conv: c.uid, author: role, run: uid("run"), started: Date.now(), beats, end: beats[beats.length - 1].at + 300, reply: body });
+  c.running = true;
   c.updatedAt = now();
 };
 
 export const chatHandlers: Record<string, (a: Args) => unknown> = {
   chat_list: () => [...chats].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(summary),
-  chat_get: ({ uid: u }) => structuredClone(find(u)),
+  chat_get: ({ uid: u }) => (tick(u), structuredClone(find(u))),
+  chat_live: ({ uid: u }) => {
+    tick(u);
+    const sim = sims.get(String(u));
+    return sim ? liveOf(sim, Date.now() - sim.started) : null;
+  },
+  chat_stop: ({ uid: u }) => {
+    const sim = sims.get(String(u));
+    if (sim) finish(sim, true);
+  },
   chat_start: ({ text, role, kbs: picked, skill }) => {
-    const c: Chat = { uid: uid("c"), title: String(text).slice(0, 40), role: String(role), kbs: picked as string[], skill: (skill as Chat["skill"]) ?? null, refUid: null, stage: 0, createdAt: now(), updatedAt: now(), messages: [] };
+    const c: Chat = { uid: uid("c"), title: String(text).slice(0, 40), role: String(role), kbs: picked as string[], skill: (skill as Chat["skill"]) ?? null, refUid: null, stage: 0, createdAt: now(), updatedAt: now(), running: false, messages: [] };
     chats.push(c);
     if (skill) c.messages.push({ position: 1, author: "you", body: { text: String(text), role: String(role) }, createdAt: now() });
     else say(c, String(text), String(role));
@@ -129,7 +207,7 @@ export const chatHandlers: Record<string, (a: Args) => unknown> = {
   chat_open_ref: ({ skill, refUid, title }) => {
     const had = chats.find((c) => c.skill === skill && c.refUid === refUid);
     if (had) return had.uid;
-    const c: Chat = { uid: uid("c"), title: String(title), role: "pith", kbs: [], skill: skill as Chat["skill"], refUid: String(refUid), stage: 0, createdAt: now(), updatedAt: now(), messages: [] };
+    const c: Chat = { uid: uid("c"), title: String(title), role: "pith", kbs: [], skill: skill as Chat["skill"], refUid: String(refUid), stage: 0, createdAt: now(), updatedAt: now(), running: false, messages: [] };
     chats.push(c);
     return c.uid;
   },

@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 use serde_json::json;
 
-use super::mock;
+use super::run;
 use super::store::{self, Material, Role};
 use crate::db::tests::memory_db;
 
@@ -15,8 +15,7 @@ pub(crate) fn sample(c: &Connection) {
     store::material_add(c, &Material { kb: kb.clone(), kind: "excerpt".into(), title: "Stigler 1951 的摘抄".into(), body: "行业年轻时，企业什么都自己做；分工受市场范围限制。".into(), stage: 1, ..Default::default() }, NOW).unwrap();
     let conv = store::create(c, "斯密为什么说分工受市场范围限制？", "companion", std::slice::from_ref(&kb), None, None, NOW).unwrap();
     store::add_message(c, &conv, "you", &json!({ "text": "斯密为什么说分工受市场范围限制？" }), NOW).unwrap();
-    let role = store::role_get(c, "companion").unwrap();
-    let reply = mock::answer(c, "斯密为什么说分工受市场范围限制？", &role, std::slice::from_ref(&kb)).unwrap();
+    let reply = json!({ "steps": [{ "agent": "think", "text": "想了想" }, { "agent": "write", "text": "写好了" }], "paragraphs": ["因为分工靠交换。"], "cites": [], "transcript": [{ "role": "assistant", "parts": [{ "type": "text", "text": "因为分工靠交换。" }] }] });
     store::add_message(c, &conv, "companion", &reply, NOW).unwrap();
     store::material_add(c, &Material { kb, kind: "answer".into(), title: "分工受市场范围限制".into(), body: "演示".into(), conversation: Some(conv), ..Default::default() }, NOW).unwrap();
     store::role_save(c, &Role { name: "审稿人".into(), mark: "审".into(), line: "只挑最要紧的".into(), ..store::role_get(c, "reviewer").unwrap() }, NOW).unwrap();
@@ -47,31 +46,124 @@ fn roles_builtin_edit_reset_and_custom() {
 }
 
 #[test]
-fn mock_answer_cites_materials_in_picked_kbs() {
+fn history_replays_what_was_sent_and_the_transcripts() {
+    use crate::gateway::{Message, Part, Role as Who};
     let c = memory_db();
-    let role = store::role_get(&c, "pith").unwrap();
-    let none = mock::answer(&c, "分工受什么限制？", &role, &[]).unwrap();
-    assert_eq!(none["cites"].as_array().unwrap().len(), 0);
-    assert!(none["mock"].as_bool().unwrap());
+    let kb = store::kb_create(&c, "读《国富论》", "", NOW).unwrap();
+    let uid = store::create(&c, "分工", "pith", std::slice::from_ref(&kb), None, None, NOW).unwrap();
+    let conv = store::get(&c, &uid).unwrap();
+    // 站主这一句：给人看的和发给模型的分开存；@ 请了别的角色就在开头说
+    let you = run::you_body(&c, &conv, "分工受什么限制？", "reviewer", "2026-11-26").unwrap();
+    assert_eq!(you["text"], "分工受什么限制？");
+    let sent = you["sent"].as_str().unwrap();
+    assert!(sent.starts_with("（今天是 2026-11-26；这一问勾了知识库：读《国富论》。）") && sent.contains("「审稿人」") && sent.ends_with("分工受什么限制？"));
+    store::add_message(&c, &uid, "you", &you, NOW).unwrap();
+    // Pith 的一回：问了一张问题卡（停在工具结果上）
+    let turns = vec![
+        Message { role: Who::Assistant, parts: vec![Part::ToolCall { call_id: "c1".into(), name: "ask_user".into(), input: json!({ "question": "哪一个？" }), signature: None }] },
+        Message { role: Who::User, parts: vec![Part::ToolResult { call_id: "c1".into(), output: "问题卡已经给站主了。".into(), is_error: false }] },
+    ];
+    store::add_message(&c, &uid, "reviewer", &json!({ "paragraphs": [], "transcript": turns }), NOW).unwrap();
+    // 1.0.x 的演示回答不进
+    store::add_message(&c, &uid, "pith", &json!({ "mock": true, "paragraphs": ["演示"] }), NOW).unwrap();
+    store::add_message(&c, &uid, "you", &json!({ "text": "斯密", "sent": "（今天是 2026-11-26。）\n\n斯密" }), NOW).unwrap();
+    let h = run::history(&store::get(&c, &uid).unwrap());
+    assert_eq!(h.len(), 3);
+    assert_eq!(h[0].text(), sent);
+    // 回答问题卡的那一句并进工具结果那一条（几家都认）
+    assert_eq!(h[2].role, Who::User);
+    assert!(matches!(&h[2].parts[0], Part::ToolResult { .. }));
+    assert_eq!(h[2].text(), "（今天是 2026-11-26。）\n\n斯密");
 
-    let a = store::kb_create(&c, "读《国富论》", "", NOW).unwrap();
-    let b = store::kb_create(&c, "随手存", "", NOW).unwrap();
-    store::material_add(&c, &Material { kb: a.clone(), kind: "excerpt".into(), title: "分工与市场".into(), body: "分工受市场范围限制".into(), ..Default::default() }, NOW).unwrap();
-    store::material_add(&c, &Material { kb: a.clone(), kind: "note".into(), title: "城市".into(), body: "搬运工".into(), ..Default::default() }, NOW).unwrap();
-    store::material_add(&c, &Material { kb: b.clone(), kind: "web".into(), title: "数字花园".into(), ..Default::default() }, NOW).unwrap();
+    // 给界面的：去掉只给模型看的
+    let ui = run::for_ui(store::get(&c, &uid).unwrap(), true);
+    assert!(ui.running);
+    assert!(ui.messages.iter().all(|m| m.body.get("sent").is_none() && m.body.get("transcript").is_none()));
+}
 
-    let r = mock::answer(&c, "斯密为什么说分工受市场范围限制？", &role, std::slice::from_ref(&a)).unwrap();
-    let cites = r["cites"].as_array().unwrap();
-    assert_eq!(cites.len(), 1, "只挑沾边的");
-    assert_eq!(cites[0]["src"], "分工与市场");
-    assert_eq!(cites[0]["kb"], a);
-    assert!(r["paragraphs"][1].as_str().unwrap().contains("[1]"));
-    assert_eq!(r["delivery"]["kb"]["uid"], a);
-    assert_eq!(r["steps"].as_array().unwrap().len(), 4);
+/// 文献库查询给 Agent 用（测试里直接连一个库）
+struct DbEnv(std::sync::Mutex<Connection>);
 
-    let other = mock::answer(&c, "完全无关的问题", &store::role_get(&c, "companion").unwrap(), std::slice::from_ref(&b)).unwrap();
-    assert_eq!(other["cites"][0]["src"], "数字花园", "没有沾边的就拿最近的");
-    assert!(other["ask"].is_string(), "伴读会反问");
+impl crate::harness::tools::Env for DbEnv {
+    fn library_search(&self, query: &str, limit: usize) -> Result<Vec<crate::harness::tools::LibHit>, String> {
+        run::search_library(&self.0.lock().unwrap(), query, limit)
+    }
+    fn library_item(&self, id: i64) -> Result<String, String> {
+        run::describe_item(&self.0.lock().unwrap(), id)
+    }
+}
+
+#[test]
+fn two_turns_with_the_dev_brain_replay_cleanly() {
+    use crate::gateway::{catalog, meter::Meter, mock::MockModel};
+    use crate::harness::{self, Ctx, Ending, Limits, prompt, tools::Toolbox};
+    let c = memory_db();
+    let item = crate::edit::item_create(&c, "book", None).unwrap();
+    crate::edit::items_set_field(&c, &[item], "title", "An Inquiry into the Nature and Causes of the Wealth of Nations").unwrap();
+    crate::search::rebuild(&c).ok();
+    let uid = store::create(&c, "分工", "pith", &[], None, None, NOW).unwrap();
+    let env = DbEnv(std::sync::Mutex::new(c));
+    let spec = catalog::model("anthropic/claude-sonnet-5-5").unwrap();
+    let model = MockModel::with_brain(spec, harness::brain::brain());
+    let mut meter = Meter::new(&crate::db::tests::temp_dir("chat-two-turns"), 30.0, Default::default());
+    meter.now = || NOW.into();
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let sink = |_e: harness::Event| {};
+    let role = store::role_get(&env.0.lock().unwrap(), "pith").unwrap();
+    let mut histories = Vec::new();
+    let mut turns = Vec::new();
+    for (n, q) in ["Wealth of Nations 讲什么？", "(120-100)/100 是多少"].iter().enumerate() {
+        {
+            let c = env.0.lock().unwrap();
+            let conv = store::get(&c, &uid).unwrap();
+            let you = run::you_body(&c, &conv, q, "pith", "2026-11-26").unwrap();
+            store::add_message(&c, &uid, "you", &you, NOW).unwrap();
+        }
+        let conv = store::get(&env.0.lock().unwrap(), &uid).unwrap();
+        let history = run::history(&conv);
+        histories.push(history.clone());
+        let ctx = Ctx { model: &model, effort: Some("medium"), strong: None, meter: &meter, conversation: Some(&uid), env: &env, cancel: &cancel, sink: &sink, limits: Limits::default() };
+        let o = harness::run(&ctx, &prompt::system(&role), &Toolbox::main(), history, "chat");
+        assert_eq!(o.ending, Ending::Done, "第 {} 句", n + 1);
+        assert!(o.text.contains("模拟回答"));
+        assert!(o.delivery.is_some());
+        turns.push(o.turns.clone());
+        let body = run::reply_body(&o, spec.label, None);
+        store::add_message(&env.0.lock().unwrap(), &uid, "pith", &body, NOW).unwrap();
+        if n == 0 {
+            // 真的查了库里的那一条
+            assert!(o.steps.iter().any(|s| s.agent == "lib" && s.text.contains("1 条")), "{:?}", o.steps);
+        } else {
+            assert!(o.steps.iter().any(|s| s.agent == "compute" && s.text.contains("= 0.2")), "{:?}", o.steps);
+        }
+    }
+    // 第二句发出去时：第一句（原样）+ 第一回的全部（原样）+ 第二句，只往后追加
+    let mut expected = histories[0].clone();
+    expected.extend(turns[0].clone());
+    assert_eq!(histories[1][..expected.len()], expected[..]);
+    assert_eq!(histories[1].len(), expected.len() + 1);
+    assert!(histories[1].last().unwrap().text().ends_with("(120-100)/100 是多少"));
+}
+
+#[test]
+fn reply_body_has_paragraphs_cards_and_the_transcript() {
+    use crate::harness::{AskCard, Delivery, Ending, Outcome, Step};
+    let o = Outcome {
+        text: "第一段。\n\n  第二段 **要点**。\n\n".into(),
+        steps: vec![Step::new("think", "想了想")],
+        ask: Some(AskCard { question: "先看哪一个？".into(), options: vec!["斯密".into()] }),
+        delivery: Some(Delivery { kind: "concept".into(), title: "分工".into(), desc: "一句话".into(), body: String::new() }),
+        ending: Ending::Asked,
+        cost_usd: 0.012,
+        ..Default::default()
+    };
+    let b = run::reply_body(&o, "Claude Sonnet 5.5", Some(("kb1", "读《国富论》")));
+    assert_eq!(b["paragraphs"], json!(["第一段。", "第二段 **要点**。"]));
+    assert_eq!(b["ask"]["options"], json!(["斯密"]));
+    assert_eq!(b["delivery"]["meta"], "概念卡 • Claude Sonnet 5.5");
+    assert_eq!(b["delivery"]["kb"]["name"], "读《国富论》");
+    assert_eq!(b["ending"], "asked");
+    assert!(b["transcript"].is_array());
 }
 
 #[test]

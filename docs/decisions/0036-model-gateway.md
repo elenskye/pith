@@ -7,7 +7,7 @@
 ## 做法
 
 - **代码在 `src-tauri/src/gateway/`**，同步写（ureq + 线程，和 Pith 别处一样），不引 tokio、reqwest。Peck 的四个编码器和流解析照搬思路、改写成 Pith 的类型：
-  - 中立的 `Message` / `Part`（文字、思考、工具调用、工具结果、各家私有块）；思考的签名和密文、Gemini 的 thought signature、Anthropic 回退的块挂在 `Opaque` 上，**只回放给同一来源**（换了模型整块丢掉）。
+  - 中立的 `Message` / `Part`（文字、思考、工具调用、工具结果、各家私有块）；思考的签名和密文、Gemini 的 thought signature、Anthropic 回退的块挂在 `Opaque` 上。OpenAI、DeepSeek、Gemini 的**只回放给同一个模型**；Anthropic 的照现行文档，换了 Claude 模型也原样放回（读不了的 API 自己丢、不计费），换到别家才丢。
   - 四条线协议：Anthropic Messages、OpenAI Responses（`store: false`，思考带密文回来）、DeepSeek Chat Completions（`reasoning_content` 放回）、Gemini（API Key 和 Vertex AI 共用）。
   - 重试：连不上、408 / 409 / 429 / 5xx / 529 照 2、5、15、30、60 秒重发，有 `retry-after` 听它的；流开始以后断了不重发（已经在计费），按估计记账。
   - 能停：读流在另一条线程里，这边每 0.1 秒看一次「停」，点了立刻返回。

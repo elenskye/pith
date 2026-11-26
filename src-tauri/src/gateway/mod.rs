@@ -72,10 +72,6 @@ impl Provider {
             Provider::Google | Provider::Vertex => Wire::Gemini,
         }
     }
-
-    pub fn parse(s: &str) -> Option<Provider> {
-        Provider::ALL.into_iter().find(|p| p.id() == s)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

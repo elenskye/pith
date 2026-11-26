@@ -12,9 +12,8 @@ mod db;
 mod dedup;
 mod edit;
 mod fields;
-// 1.1.0 第 1 期：网关先立起来，第 2 期的 Agent 循环才用上全部
-#[cfg_attr(not(test), allow(dead_code))]
 mod gateway;
+mod harness;
 mod import;
 mod library;
 mod local;
@@ -693,6 +692,8 @@ pub fn run() {
             concept::commands::manage(app);
             // 本机的向量和重排模型（语义检索）
             concept::semantic::manage(app);
+            // 对话：后台正在回答的几回（1.1.0 的 Agent 循环）
+            chat::run::manage(app);
             word::start_service(app.handle());
             Ok(())
         })
@@ -806,6 +807,8 @@ pub fn run() {
             chat::commands::chat_get,
             chat::commands::chat_start,
             chat::commands::chat_send,
+            chat::commands::chat_live,
+            chat::commands::chat_stop,
             chat::commands::chat_open_ref,
             chat::commands::chat_link,
             chat::commands::chat_rename,

@@ -139,10 +139,10 @@ function Roles() {
             <input className="pith-field" placeholder="头像字" value={draft.mark} maxLength={2} onChange={(e) => setDraft({ ...draft, mark: e.target.value })} />
           </div>
           <input className="pith-field" placeholder="一句话：什么时候请它" value={draft.line} onChange={(e) => setDraft({ ...draft, line: e.target.value })} />
-          <textarea className="pith-field" placeholder="它怎么说话、先做什么后做什么（这一版回答是演示的，接上模型后照这个说）" value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} />
+          <textarea className="pith-field" placeholder="它是谁、怎么说话、先做什么后做什么（工具和边界由 Pith 管，这里只写做事方式）" value={draft.prompt} onChange={(e) => setDraft({ ...draft, prompt: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
             <input className="pith-field" placeholder="默认知识库，例如：在读的那本书" value={draft.kb} onChange={(e) => setDraft({ ...draft, kb: e.target.value })} />
-            <input className="pith-field" placeholder="偏好的模型（空着跟随全局）" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
+            <input className="pith-field" placeholder="偏好的模型，例如 anthropic/claude-opus-5-5（空着跟设置）" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
           </div>
           <input className="pith-field" placeholder="常用技能，用顿号隔开" value={draft.skills.join("、")} onChange={(e) => setDraft({ ...draft, skills: e.target.value.split(/[、,，]/).map((s) => s.trim()).filter(Boolean) })} />
           <div className="flex gap-2 pt-2">
@@ -257,7 +257,7 @@ function KnowledgeBases() {
       </button>
       <p className="set-h3">检索</p>
       <p className="text-sm text-muted-foreground">
-        这一版的回答是演示的：按问题里的字在你勾的库里粗略地挑几份当出处。接上模型（1.1.0）以后改成语义检索，本机向量模型的设置在 设置 › 技能 › 概念研究。
+        对话已经接上模型，但还不会在知识库里找（1.1.0 第 3 期接上：段落块、本机向量和重排、读原文、引用编号）。本机向量模型的设置在 设置 › 技能 › 概念研究。
       </p>
     </>
   );

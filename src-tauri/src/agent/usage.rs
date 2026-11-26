@@ -170,13 +170,16 @@ impl Ledger {
         Ledger { path: data_dir.join("agent").join("usage.jsonl") }
     }
 
+    /// 一行一次写完；1.1.0 起子代理会并行记账，进程里再加一把锁，行不会交错
     pub fn append(&self, call: &Call) -> Result<(), String> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(dir) = self.path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
         }
         let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&self.path).map_err(|e| format!("无法写用量账本 {}：{e}", self.path.display()))?;
-        let line = serde_json::to_string(call).map_err(|e| e.to_string())?;
-        writeln!(f, "{line}").map_err(|e| format!("无法写用量账本：{e}"))
+        let line = serde_json::to_string(call).map_err(|e| e.to_string())? + "\n";
+        f.write_all(line.as_bytes()).map_err(|e| format!("无法写用量账本：{e}"))
     }
 
     /// 读不懂的行不丢：返回错误，预算检查据此拒绝调用（账本坏了不能当成没花过钱）

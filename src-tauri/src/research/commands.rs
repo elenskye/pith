@@ -177,7 +177,7 @@ impl Settings {
     }
 }
 
-fn settings(state: &AppState) -> Settings {
+pub(crate) fn settings(state: &AppState) -> Settings {
     format_agent::setting(state, SETTINGS_KEY).and_then(|v| serde_json::from_str(&v).ok()).unwrap_or_default()
 }
 

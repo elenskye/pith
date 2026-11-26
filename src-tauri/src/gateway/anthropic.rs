@@ -5,7 +5,7 @@
 //!   顺序固定为 工具 → 系统 → 对话，对话只往后追加。
 //! - 工具开 `eager_input_streaming`（流式时参数边写边来）；参数读不成完整 JSON 的交给循环回一个出错的结果。
 //! - Opus 5.5、Sonnet 5.5 开服务端的拒答回退（`fallbacks: "default"` + beta 头）；回答里的 `fallback` 块和别的不认识的块
-//!   原样存成 `Part::Native`、只回放给同一来源。
+//!   原样存成 `Part::Native`。思考块和这些块换了 Claude 模型也原样放回（API 读不了的自己丢、不计费），换到别家才丢。
 //! - 不发 `temperature`（API 版本 2026-10-21 起一律 400）。
 
 use std::collections::BTreeMap;
@@ -78,13 +78,19 @@ pub fn encode(req: &Request, spec: &ModelSpec, origin: &Origin) -> Value {
     body
 }
 
-/// 一条消息 → content 块。思考、私有块只在来源一样时放回
+/// Anthropic 自己的私有块（思考、回退的块）：换了 Claude 模型也原样放回，读不了的由 API 自己丢掉、不计费（现行文档的要求）；
+/// 别家的丢掉
+fn ours<'a>(o: &'a Opaque, target: &Origin) -> Option<&'a Value> {
+    (o.origin.provider == target.provider).then_some(&o.data)
+}
+
+/// 一条消息 → content 块
 fn assistant_blocks(m: &Message, target: &Origin) -> Vec<Value> {
     let mut out = Vec::new();
     for part in &m.parts {
         match part {
             Part::Reasoning { text, opaque } => {
-                let Some(data) = opaque.as_ref().and_then(|o| o.for_origin(target)) else { continue };
+                let Some(data) = opaque.as_ref().and_then(|o| ours(o, target)) else { continue };
                 if data["type"] == "redacted_thinking" {
                     out.push(data.clone());
                 } else {
@@ -96,7 +102,7 @@ fn assistant_blocks(m: &Message, target: &Origin) -> Vec<Value> {
             Part::ToolCall { call_id, name, input, .. } => out.push(json!({ "type": "tool_use", "id": call_id, "name": name, "input": input })),
             Part::ToolResult { call_id, output, is_error } => out.push(tool_result(call_id, output, *is_error)),
             Part::Native { opaque } => {
-                if let Some(d) = opaque.for_origin(target) {
+                if let Some(d) = ours(opaque, target) {
                     out.push(d.clone());
                 }
             }

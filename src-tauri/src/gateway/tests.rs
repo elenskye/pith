@@ -79,10 +79,12 @@ fn anthropic_body_has_cache_breakpoints_thinking_and_fallback() {
     assert_eq!(msgs[1]["content"][2]["type"], "tool_use");
     assert_eq!(msgs[2]["content"][0]["type"], "tool_result");
     assert!(msgs[3]["content"][0]["cache_control"].is_object());
-    // 换了模型：思考不放回
+    // 换了一个 Claude 模型：思考照样放回（API 自己丢读不了的）；别家的思考不放
     let other = body("anthropic/claude-opus-5-5", &request(&origin(id)));
-    assert_eq!(other["messages"][1]["content"][0]["type"], "text");
+    assert_eq!(other["messages"][1]["content"][0]["type"], "thinking");
     assert!(other["fallbacks"] == "default");
+    let from_openai = body(id, &request(&origin("openai/gpt-6.2-sol")));
+    assert_eq!(from_openai["messages"][1]["content"][0]["type"], "text");
     // Haiku 没有服务端回退；收尾那一轮不许调工具
     let mut r = request(&origin(id));
     r.no_tools = true;

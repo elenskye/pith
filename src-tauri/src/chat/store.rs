@@ -155,6 +155,8 @@ pub struct Conversation {
     pub created_at: String,
     pub updated_at: String,
     pub messages: Vec<Message>,
+    /// 正在后台回答（1.1.0）
+    pub running: bool,
 }
 
 pub(crate) fn conv_id(c: &Connection, uid: &str) -> Result<i64, String> {
@@ -213,7 +215,7 @@ pub fn get(c: &Connection, uid: &str) -> Result<Conversation, String> {
         .map_err(err)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(err)?;
-    Ok(Conversation { uid: uid.into(), title, role, kbs: serde_json::from_str(&kbs).unwrap_or_default(), skill, ref_uid, stage, created_at, updated_at, messages })
+    Ok(Conversation { uid: uid.into(), title, role, kbs: serde_json::from_str(&kbs).unwrap_or_default(), skill, ref_uid, stage, created_at, updated_at, messages, running: false })
 }
 
 /// 技能的那次运行有没有对话

@@ -17,6 +17,7 @@ export function Composer({
   defaultKbs,
   allowSkill = true,
   onTyping,
+  onStop,
 }: {
   placeholder: string;
   busy?: boolean;
@@ -24,6 +25,8 @@ export function Composer({
   defaultKbs?: string[];
   allowSkill?: boolean;
   onTyping?: (typing: boolean) => void;
+  /** 正在回答时给一个「停」 */
+  onStop?: () => void;
 }) {
   const [text, setText] = useState("");
   const [skill, setSkill] = useState<SkillId | null>(null);
@@ -176,9 +179,15 @@ export function Composer({
           </button>
         </div>
       )}
-      <button className="pith-send pith-sweep" onClick={send} disabled={!ready} aria-label="发送">
-        <Mark path="icons/send" />
-      </button>
+      {busy && onStop ? (
+        <button className="pith-send comp-stop" onClick={onStop} aria-label="停下这一回" title="停下（已经写出来的照样留着）">
+          <i />
+        </button>
+      ) : (
+        <button className="pith-send pith-sweep" onClick={send} disabled={!ready} aria-label="发送">
+          <Mark path="icons/send" />
+        </button>
+      )}
       {menu === "/" && (
         <div className="comp-menu">
           <p>/ 技能：点名用一个，不点 Pith 自己挑</p>
