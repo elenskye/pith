@@ -9,13 +9,14 @@ import { useNav, roleTone, type SetSection } from "@/app/nav";
 import { branch, labelDelay } from "@/app/branch";
 import { SettingsPage, type SettingsSection } from "@/settings/SettingsPage";
 import { ImportPage } from "@/import/ImportPage";
+import { ModelSettings } from "@/settings/ModelSettings";
 import { warmWater } from "@/app/water";
 
 const PAGES: { id: SetSection; name: string; line: string; blocks?: [SettingsSection, string][] }[] = [
   { id: "roles", name: "角色", line: "请谁来答：每个角色有自己的说话方式、默认的知识库和常用的技能。" },
   { id: "skills", name: "技能", line: "对话里用 / 点名的技能：用哪个模型、想得多深、怎么检索。", blocks: [["research", "事实调查"], ["concept", "概念研究"], ["format", "排版"]] },
   { id: "kb", name: "知识库与检索", line: "知识库是文献库和对话之间的一层；回答时在你勾的库里找。" },
-  { id: "keys", name: "模型与费用", line: "几家接口的密钥，和每个月最多花多少。", blocks: [["keys", ""]] },
+  { id: "keys", name: "模型与费用", line: "用哪家的模型、每个月最多花多少；花了多少一直看得见。" },
   { id: "word", name: "Word 与引文", line: "Word 里的 Pith 选项卡、引文样式、把 Zotero 的引文换过来。", blocks: [["word", ""]] },
   { id: "import", name: "导入", line: "把 Zotero 库、BibTeX、RIS 里的文献搬进文献库；原来的文件一个字也不动。" },
   { id: "data", name: "数据", line: "数据放在哪、备份和恢复、整库导出、联网补全。", blocks: [["general", "数据目录"], ["backup", "备份与导出"], ["library", "联网补全"]] },
@@ -64,6 +65,7 @@ export function SettingsScreen({ onRestored }: { onRestored: () => void }) {
           {page.id === "roles" && <Roles />}
           {page.id === "kb" && <KnowledgeBases />}
           {page.id === "look" && <Appearance />}
+          {page.id === "keys" && <ModelSettings />}
           {page.id === "import" && <ImportPage onDone={() => nav.go("lib")} />}
           {page.blocks?.map(([s, title]) => (
             <section key={s} className="set-block">

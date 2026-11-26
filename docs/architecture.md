@@ -17,17 +17,18 @@ pith/
 │   │                           water（换配色的整页水面：原生截图 + WebGL 着色器，`0033`）、
 │   │                           TopBar、History（对话历史的枝桠）、Palette（⌘K）、branch（枝桠的画法，历史和设置共用）、SideNav（技能左边那一列）
 │   ├── chat/                   对话：Home（问候、叶子、最近照料的五份材料）、Composer（/ @ #）、ChatScreen（一段对话；技能放进对话：调查、概念、排版原来那一页）、
-│   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）
+│   │                           Reply（状态行、编号和页边注、反问、交付卡和「存进」）、Usage（输入框下面一行：模型名、本月用量的小圈和明细，1.1.0）
 │   ├── kb/KnowledgePage.tsx    知识库：两栏（知识库 | 种类、搜索；生长阶段）、卡片墙（十种记录各一种样子）、右边的面板、「种进来」
 │   ├── library/                LibraryScreen（页头、两栏：范围 | 类型、搜索；集合；标签筛选；右边的面板）、Collections（集合一栏，子集合点开接在后面）、
 │   │                           TagTree（标签树，两指往右滑）、ItemList（表格、排序、多选、右键菜单、「新建」）、ItemDetail（可编辑详情、批量面板、合并）、scope、labels
 │   ├── settings/               SettingsScreen（枝桠 + 八页；角色、知识库、外观是新的，导入 1.0.3 从文献库挪来）、SettingsPage（原来八页的内容块：数据目录与备份、Word、密钥、三个技能……）、
-│   │                           Transfer、WordSettings、CiteSettings、KeysSettings、ResearchSettings、ConceptSettings、AgentSettings
+│   │                           Transfer、WordSettings、CiteSettings、ResearchSettings、ConceptSettings、AgentSettings；
+│   │                           ModelSettings（模型与费用：本月用量、默认模型、各家密钥、Vertex，1.1.0 重画）
 │   ├── shared/                 ipc.ts（带类型的 api 对象，唯一的 invoke 入口）、ui.tsx（弹窗、右键菜单、提示条、就地编辑、标签输入）、
 │   │                           controls.tsx（下拉框 Select、弹出列表 Menu、退场 usePresence、横排滚轮 useWheelX；不用系统的 <select>）、
 │   │                           marks.tsx（内联 vendor/pith/marks 的图形）、masonry.ts（知识库的瀑布流：绝对定位，宽变了卡片滑过去，不用 CSS 多栏）、theme.ts（配色和明暗，记在 localStorage；换的时候用 View Transitions 洇开）、plainInputs.ts
 │   ├── picker/                 置顶搜索窗（v0.2 W2）：Word 里插入 / 编辑引文时选文献、填页码；v0.4 加「卡片里的原文」和页 / 段定位（conceptLocator）
-│   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、
+│   ├── dev/                    `pnpm dev` → http://localhost:1430/?mock 的假后端，打包时剔除：mockIpc（文献库等）、mockChat（对话、知识库，内容照 R1）、mockModel（模型和用量）、
 │   │                           mockResearch / mockConcept / mockAgent（三个技能，数据由各自的引擎生成）；perfProbe（?perf 量换配色的帧）
 │   ├── concept/                概念研究（v0.4，放在对话里）：ConceptPage（书架 → 一本书 → 一章 → 研究）、ConceptSidebar（书的目录）、Reader（原文段落、中英并排、划选）、
 │   │                           Entries（问这本书、追踪概念）、Confirm、RunView（卡片、关系图、导出）、ParseDialog（附件解析成文本）
@@ -52,6 +53,9 @@ pith/
 │       ├── backup.rs           VACUUM INTO 快照、daily / manual / before-*、清理规则；恢复用的检查、整库复制（backup API）；
 │       │                       还有备份用到的附件文件不删（sweep_files）
 │       ├── common.rs           Tx（SAVEPOINT 嵌套事务）、ULID uid
+│       ├── gateway/            模型网关（1.1.0，`decisions/0036`）：mod（中立的消息和片段、Model 接口）、catalog（每家三档、价格表）、
+│       │                       anthropic / openai / deepseek / gemini（四条线协议的编码和流）、http（地址、认证、重试、能停）、vertex（项目、gcloud ADC）、
+│       │                       keys（几把密钥放哪）、meter（月上限、记账）、mock（模拟模型）、commands（`model_*`、`usage_summary`）
 │       ├── chat/               对话、角色、知识库（1.0.2，`0031`）：store（0010 的五张表；内置四个角色；对话历史并上以前的调查和研究；能种进知识库的东西）、
 │       │                       mock（模拟的回答，1.1.0 换成 Agent 循环）、commands（`chat_*`、`role_*`、`kb_*`）
 │       ├── library.rs          文献库只读查询（概览、列表的范围 / 搜索 / 筛选 / 排序、四种详情、集合树、标签、附件打开位置）
@@ -133,6 +137,18 @@ pith/
 - **知识库**：材料按 `(库, source_kind, source_ref)` 去重，再种一次只是更新「最近照料」。`kb_candidates` 列出能种的：解析好的书（`concept_text`）、做完的调查（`research_run`）、做完的研究的卡片（`concept_card`，`研究 uid#卡片 key`）。`kb_material_add` 不给库时种进第一个，没有就建「随手存」。
 - **模拟的回答**：`chat::mock::answer`，在勾的知识库（没勾就全部）里按问题里的字两两一组粗略地挑三份当出处，出状态行、段落、反问（伴读、审稿人才有）、交付卡，标 `mock: true`。
 - **界面**：外框的状态在 `app/nav.tsx`（哪一屏、哪段对话、设置哪一页、文献库要看的）；配色和明暗在 `shared/theme.ts`（localStorage，跟随系统时听系统的变化）；图形只从 `shared/marks.tsx` 取（内联同步来的 SVG，类名留给 `bundle.css` 的动效零件）。
+
+## 模型网关（1.1.0，`decisions/0036`）
+
+```
+对话（第 2 期的 Agent 循环）─ Request（系统几块、工具、对话、上限、effort）─▶ meter::send：按最坏情况查月上限
+   ─▶ Model::send：HttpModel（四家编码 → POST 流式 → 读流线程 → 每家的流解析 → Reply）或 MockModel（脚本 / 脑子）
+   ─▶ 记一行账（回报的模型 × 价格表，含缓存读写；对话 uid）─▶ Reply（中立的消息、停的原因、用量）
+```
+
+- 选模型：设置里一家 + 一档（`model.prefs`）；`catalog::tier(家, 档)` 给模型和 effort。Vertex 的项目、区域在 `model.vertex.*`，令牌由 gcloud 换。
+- 私有数据（思考签名、密文、Gemini 的 thought signature、Anthropic 回退的块）只回放给同一来源；换了模型就丢掉。
+- 开发版、测试、`?mock` 用模拟模型（不联网、不花钱，账本记「模拟」）；正式版或 `PITH_REAL_MODEL=1` 用真接口。
 
 ## 恢复的流程（`decisions/0013`）
 

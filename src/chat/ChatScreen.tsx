@@ -10,6 +10,7 @@ import { useNav, skillName, dateOf, when } from "@/app/nav";
 import { Home } from "@/chat/Home";
 import { Composer, type Ask } from "@/chat/Composer";
 import { Reply, YouLine } from "@/chat/Reply";
+import { UsageLine } from "@/chat/Usage";
 import { RunScreen as ResearchRun } from "@/research/RunScreen";
 import { PlanSend } from "@/research/Confirm";
 import { ConceptPage, type ConceptAt } from "@/concept/ConceptPage";
@@ -133,6 +134,7 @@ function ConvThread({ uid }: { uid: string }) {
       </div>
       <div className="composer-wrap">
         <Composer placeholder={c.skill ? "接着问……（演示回答）" : "接着问……"} busy={busy} onSend={send} defaultKbs={c.kbs} />
+        <UsageLine conversation={uid} />
       </div>
     </div>
   );

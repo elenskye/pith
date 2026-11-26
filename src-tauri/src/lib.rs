@@ -12,6 +12,9 @@ mod db;
 mod dedup;
 mod edit;
 mod fields;
+// 1.1.0 第 1 期：网关先立起来，第 2 期的 Agent 循环才用上全部
+#[cfg_attr(not(test), allow(dead_code))]
+mod gateway;
 mod import;
 mod library;
 mod local;
@@ -778,6 +781,12 @@ pub fn run() {
             word::word_reveal_file,
             agent::agent_status,
             agent::agent_budget_set,
+            gateway::commands::model_status,
+            gateway::commands::model_prefs_set,
+            gateway::commands::model_key_set,
+            gateway::commands::model_key_clear,
+            gateway::commands::model_vertex_set,
+            gateway::commands::usage_summary,
             agent::agent_send_mode_set,
             agent::format_rulesets_list,
             agent::format_ruleset_get,

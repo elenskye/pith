@@ -256,22 +256,25 @@ impl Drop for Busy<'_> {
     }
 }
 
-fn key_saved_setting(which: ApiKey) -> &'static str {
+pub(crate) fn key_saved_setting(which: ApiKey) -> &'static str {
     match which {
         ApiKey::Anthropic => format_agent::KEY_SAVED,
         ApiKey::Deepseek => "research.key_saved.deepseek",
         ApiKey::Tavily => "research.key_saved.tavily",
         // v0.4 概念研究的两把（`concept::keys`）
         ApiKey::Openai | ApiKey::Mathpix => crate::concept::keys::saved_setting(which),
+        // 1.1.0 模型网关的（`gateway::keys`）
+        ApiKey::Google => crate::gateway::keys::GOOGLE_SAVED,
     }
 }
 
-fn secret_of<'a>(which: ApiKey, agent: &'a AgentState, research: &'a ResearchState) -> &'a Secret {
+pub(crate) fn secret_of<'a>(which: ApiKey, agent: &'a AgentState, research: &'a ResearchState) -> &'a Secret {
     match which {
         ApiKey::Anthropic => agent.secret(),
         ApiKey::Deepseek => &research.deepseek,
         ApiKey::Tavily => &research.tavily,
         ApiKey::Openai | ApiKey::Mathpix => crate::concept::keys::secret(which),
+        ApiKey::Google => crate::gateway::keys::google(),
     }
 }
 

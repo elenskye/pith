@@ -11,10 +11,9 @@ import { CiteStylesSection, ZoteroConvertSection } from "@/settings/CiteSettings
 import { AgentSettingsSection } from "@/settings/AgentSettings";
 import { ResearchSettingsSection } from "@/settings/ResearchSettings";
 import { ConceptSettingsSection } from "@/settings/ConceptSettings";
-import { KeysSettingsSection } from "@/settings/KeysSettings";
 
 /** 原来的八页（decisions/0023）。1.0.2 起设置照 R1 分七页（SettingsScreen），这几页是其中的内容块 */
-export type SettingsSection = "general" | "backup" | "library" | "word" | "keys" | "format" | "research" | "concept";
+export type SettingsSection = "general" | "backup" | "library" | "word" | "format" | "research" | "concept";
 
 /** onRestored：库被整个换掉（恢复）之后，让外框回到初始状态 */
 export function SettingsPage({ section, onKeys, onRestored }: { section: SettingsSection; onKeys: () => void; onRestored: () => void }) {
@@ -181,7 +180,6 @@ export function SettingsPage({ section, onKeys, onRestored }: { section: Setting
         </>
       )}
 
-      {section === "keys" && <KeysSettingsSection />}
       {section === "format" && <AgentSettingsSection onKeys={onKeys} />}
       {section === "research" && <ResearchSettingsSection onKeys={onKeys} />}
       {section === "concept" && <ConceptSettingsSection onKeys={onKeys} />}

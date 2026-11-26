@@ -27,15 +27,15 @@ pub struct Price {
     pub output: f64,
 }
 
-/// 单价表。按接口说的实际回答的模型计价（现在只会是 `MODEL`）；不认识的模型按最贵的算，宁可多记。
+/// 单价表。按接口说的实际回答的模型计价；1.1.0 起先查模型网关的清单（`gateway::catalog`，带缓存价和长提示加价），
+/// 清单里没有的再查这里的旧表；都不认识的按最贵的算，宁可多记。
 pub fn price(model: &str) -> Price {
+    if let Some(r) = crate::gateway::catalog::price_of(model) {
+        return Price { input: r.base.input, output: r.base.output };
+    }
     match model {
-        "claude-opus-5-5" => Price { input: 4.0, output: 20.0 },
         "claude-opus-5" | "claude-opus-4-8" | "claude-opus-4-7" => Price { input: 5.0, output: 25.0 },
-        "claude-sonnet-5-5" | "claude-sonnet-5" => Price { input: 2.0, output: 10.0 },
-        "claude-haiku-5-5" => Price { input: 0.5, output: 2.5 },
-        // DeepSeek 高峰价（闲时半价也按这个记，宁可多记）
-        "deepseek-flash" => Price { input: 0.30, output: 1.20 },
+        "claude-sonnet-5" => Price { input: 2.0, output: 10.0 },
         // v0.4 概念研究（缓存命中 $0.10、单次输入超 272K 的加价在 `concept::responses` 里算）
         "gpt-6.1-sol" => Price { input: 2.0, output: 10.0 },
         _ => UNKNOWN_PRICE,
@@ -144,6 +144,9 @@ pub struct Call {
     pub note: Option<String>,
     #[serde(default)]
     pub request_id: Option<String>,
+    /// 1.1.0 起对话里的调用记着是哪段对话（用量明细按对话看）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<String>,
 }
 
 fn anthropic() -> String {
@@ -248,7 +251,7 @@ mod tests {
     use crate::db::tests::temp_dir;
 
     fn call(at: &str, cost: f64, mock: bool) -> Call {
-        Call { at: at.into(), purpose: "extract".into(), provider: PROVIDER_ANTHROPIC.into(), kind: KIND_MODEL.into(), searches: 0, model: MODEL.into(), tokens: Tokens::default(), cost_usd: cost, estimated: false, mock, note: None, request_id: None }
+        Call { at: at.into(), purpose: "extract".into(), provider: PROVIDER_ANTHROPIC.into(), kind: KIND_MODEL.into(), searches: 0, model: MODEL.into(), tokens: Tokens::default(), cost_usd: cost, estimated: false, mock, note: None, request_id: None, conversation: None }
     }
 
     #[test]

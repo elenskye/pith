@@ -1,86 +1,17 @@
 // 设置 › 事实调查（decisions/0020）：计划模型和执行模型、各接口的专用搜索、下载失败时的网页抓取、单价、可信度等级表、最近的调用。
-// 三把密钥和月度上限在「设置 › 密钥与费用」（KeysSettings，decisions/0023）；KeyRow 在这里定义、那边用。
+// 密钥和月上限在「设置 › 模型与费用」（1.1.0 起是 ModelSettings，decisions/0036）。
 // 密钥只交给 Rust 保存：输入框保存后立即清空，界面上不显示。
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { api, type AgentKeyPlace, type ResearchEndpoint, type ResearchKeyWhich, type ResearchSettings, type ResearchStatus, type ResearchTier } from "@/shared/ipc";
+import { LoaderCircle } from "lucide-react";
+import { api, type ResearchEndpoint, type ResearchSettings, type ResearchStatus, type ResearchTier } from "@/shared/ipc";
 import { useUi } from "@/shared/ui";
 import { Badge, Notice } from "@/format/parts";
 import { count, when } from "@/format/labels";
 import { ENGINE, PROVIDER, PURPOSE, TIER, TIERS, money } from "@/research/labels";
 import { Select } from "@/shared/controls";
 
-const PLACE: Record<AgentKeyPlace, string> = {
-  keychain: "存在 macOS 钥匙串",
-  memory: "只在这次运行的内存里，退出 Pith 就没了",
-  file: "来自 PITH_API_KEY_FILE 指的文件",
-};
 
-const KEY_HINT: Record<ResearchKeyWhich, { placeholder: string; where: string }> = {
-  anthropic: { placeholder: "sk-ant-…", where: "console.anthropic.com 的 API Keys。和「排版 Agent」用的是同一把。" },
-  deepseek: { placeholder: "sk-…", where: "platform.deepseek.com 的 API keys（要先充值少量余额）。" },
-  tavily: { placeholder: "tvly-…", where: "app.tavily.com（免费额度每月 1000 点）。" },
-};
-
-export function KeyRow({ k, onStatus }: { k: ResearchStatus["keys"][number]; onStatus: (s: ResearchStatus) => void }) {
-  const { confirm, notify } = useUi();
-  const [key, setKey] = useState("");
-  const [saving, setSaving] = useState(false);
-  const save = async () => {
-    const v = key.trim();
-    if (!v) return;
-    setKey("");
-    setSaving(true);
-    try {
-      onStatus(await api.researchKeySet(k.which, v));
-      notify(`${k.label} 的密钥已保存`);
-    } catch (e) {
-      notify(String(e), "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-  const clear = async () => {
-    if (!(await confirm({ title: `清除 ${k.label} 的密钥？`, message: k.which === "anthropic" ? "排版 Agent 也用这一把，清除后两边都发不了。" : "清除后用到它的调查发不了，要用时再填。", confirm: "清除", danger: true }))) return;
-    try {
-      onStatus(await api.researchKeyClear(k.which));
-    } catch (e) {
-      notify(String(e), "error");
-    }
-  };
-  return (
-    <div className="contents">
-      <dt className="pt-0.5 text-muted-foreground">{k.label}</dt>
-      <dd className="min-w-0">
-        <p className="flex items-center gap-1.5">
-          {k.has ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed ? "text-warn" : "text-muted-foreground"}`} />}
-          <span>{k.has ? "已填" : "还没有填"}</span>
-          <span className="text-xs text-muted-foreground">（{PLACE[k.place]}）</span>
-          {!k.needed && k.which !== "anthropic" && <Badge>现在的调查设置用不到</Badge>}
-        </p>
-        {k.place !== "file" && (
-          <form
-            className="mt-1 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void save();
-            }}
-          >
-            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={k.has ? "填新的密钥来替换" : KEY_HINT[k.which].placeholder} autoComplete="off" className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-ring" />
-            <button type="submit" disabled={!key.trim() || saving} className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground disabled:opacity-50">
-              保存
-            </button>
-            <button type="button" onClick={() => void clear()} disabled={!k.has} className="shrink-0 rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50">
-              清除
-            </button>
-          </form>
-        )}
-        <p className="mt-0.5 text-xs text-muted-foreground">{KEY_HINT[k.which].where}</p>
-      </dd>
-    </div>
-  );
-}
 
 function EndpointEditor({ value, onChange }: { value: ResearchEndpoint; onChange: (e: ResearchEndpoint) => void }) {
   return (

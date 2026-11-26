@@ -6,6 +6,7 @@ import { agentHandlers } from "./mockAgent";
 import { researchHandlers } from "./mockResearch";
 import { conceptHandlers } from "./mockConcept";
 import { chatHandlers } from "./mockChat";
+import { modelHandlers } from "./mockModel";
 import type {
   Annotation,
   AnnotationPatch,
@@ -772,6 +773,9 @@ const handlers: Record<string, (a: Args) => unknown> = {
   ...conceptHandlers,
   // 对话、角色、知识库（mockChat.ts）
   ...chatHandlers,
+  // 模型和用量（mockModel.ts）；月上限两边都记
+  ...modelHandlers,
+  agent_budget_set: (a) => (modelHandlers.agent_budget_set(a), agentHandlers.agent_budget_set(a)),
   // 系统对话框（@tauri-apps/plugin-dialog）：返回合成路径
   "plugin:dialog|open": (a) => {
     const o = (a.options ?? {}) as { directory?: boolean; multiple?: boolean; title?: string; filters?: unknown[] };

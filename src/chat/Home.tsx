@@ -7,6 +7,7 @@ import { api } from "@/shared/ipc";
 import { Leaf, KIND_NAMES } from "@/shared/marks";
 import { useNav, dateOf } from "@/app/nav";
 import { Composer, type Ask } from "@/chat/Composer";
+import { UsageLine } from "@/chat/Usage";
 
 // 叶子图里五颗芽的位置（viewBox 100 286 1032 324）；标签放哪：左、下、下、下、右（和 R1 一样）
 const VIEW = { x: 100, y: 286, w: 1032, h: 324 };
@@ -75,6 +76,7 @@ export function Home() {
       </div>
       <div className="composer-wrap">
         <Composer placeholder="问 Pith……" busy={busy} onSend={send} onTyping={setTyping} />
+        <UsageLine below />
       </div>
     </div>
   );

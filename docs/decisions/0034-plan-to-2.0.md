@@ -1,7 +1,7 @@
 # 0034 · 到 2.0.0 的计划：小步十版，每期停下等你
 
 - 日期：2026-11-26
-- 状态：草案，等用户认（认了改成「现行」）
+- 状态：现行（用户 2026-11-26 说开工 1.1.0 第 1、2 期，算认了）
 - 来源：规划问卷（https://claude.ai/artifact/HG1MF86byAvZQZVTojni68 ，2026-11-26 交，源 `docs/questionnaire/v2-plan.html`）；用户 11-26「Pith Dev Plan」两条：PDF 全交给 engine-pdf（这两天竣工）；以后还有 engine-word、engine-excel、engine-txt，Pith 照常做、不等，接引擎时小范围重构。Agent 的结构另写 `0035`。
 
 ## 问卷的答案（原样记下，之后照这个做）

@@ -29,6 +29,8 @@ pub enum ApiKey {
     Tavily,
     Openai,
     Mathpix,
+    /// 1.1.0：Gemini 的 API Key（Vertex AI 不用密钥，用 gcloud 的 ADC）
+    Google,
 }
 
 impl ApiKey {
@@ -40,6 +42,7 @@ impl ApiKey {
             ApiKey::Tavily => "tavily-api-key",
             ApiKey::Openai => "openai-api-key",
             ApiKey::Mathpix => "mathpix-api-key",
+            ApiKey::Google => "google-api-key",
         }
     }
 
@@ -50,6 +53,7 @@ impl ApiKey {
             ApiKey::Tavily => "Tavily",
             ApiKey::Openai => "OpenAI",
             ApiKey::Mathpix => "Mathpix",
+            ApiKey::Google => "Google",
         }
     }
 
@@ -61,10 +65,11 @@ impl ApiKey {
             ApiKey::Tavily => &["tavily"],
             ApiKey::Openai => &["openai"],
             ApiKey::Mathpix => &["mathpix"],
+            ApiKey::Google => &["google", "gemini"],
         }
     }
 
-    pub const ALL: [ApiKey; 5] = [ApiKey::Anthropic, ApiKey::Deepseek, ApiKey::Tavily, ApiKey::Openai, ApiKey::Mathpix];
+    pub const ALL: [ApiKey; 6] = [ApiKey::Anthropic, ApiKey::Deepseek, ApiKey::Tavily, ApiKey::Openai, ApiKey::Mathpix, ApiKey::Google];
 
     /// 形状对不对（不联网）。DeepSeek 的也以 sk- 开头，所以要排除 Anthropic 的 sk-ant-；
     /// OpenAI 的也是 sk- 开头（sk-proj-…），和 DeepSeek 按形状分不开，密钥文件里要写名字
@@ -83,6 +88,8 @@ impl ApiKey {
                 ApiKey::Deepseek => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=200).contains(&len),
                 ApiKey::Tavily => k.starts_with("tvly-") && (20..=200).contains(&len),
                 ApiKey::Openai => k.starts_with("sk-") && !k.starts_with("sk-ant-") && (20..=400).contains(&len),
+                // Google 的 API Key：AIza 开头、39 个字符
+                ApiKey::Google => k.starts_with("AIza") && (35..=60).contains(&len),
                 ApiKey::Mathpix => false,
             }
     }
@@ -99,6 +106,7 @@ impl ApiKey {
             ApiKey::Tavily => "这看起来不是 Tavily 的 API 密钥（应以 tvly- 开头）。到 app.tavily.com 复制完整的一串。",
             ApiKey::Openai => "这看起来不是 OpenAI 的 API 密钥（应以 sk- 开头）。到 platform.openai.com 的 API keys 里复制完整的一串。",
             ApiKey::Mathpix => "这看起来不是 Mathpix 的 app_id 和 app_key。到 console.mathpix.com 复制两项，分别填进两个框。",
+            ApiKey::Google => "这看起来不是 Google 的 API Key（应以 AIza 开头）。到 aistudio.google.com 的 API keys 里复制完整的一串。",
         }
         .into())
     }
@@ -367,6 +375,16 @@ mod tests {
         let accounts: std::collections::HashSet<_> = ApiKey::ALL.iter().map(|k| k.account()).collect();
         assert_eq!(accounts.len(), ApiKey::ALL.len());
         assert_eq!((ApiKey::Openai.account(), ApiKey::Mathpix.account()), ("openai-api-key", "mathpix-api-key"));
+    }
+
+    #[test]
+    fn google_key_has_its_own_shape() {
+        const GOOGLE: &str = "AIzaSyA0123456789abcdefABCDEF012345678";
+        assert_eq!(ApiKey::Google.check(&format!(" {GOOGLE} ")).unwrap(), GOOGLE);
+        assert!(ApiKey::Google.check(OPENAI).is_err());
+        assert!(ApiKey::Deepseek.check(GOOGLE).is_err());
+        assert_eq!(ApiKey::Google.find_in(&format!("GEMINI_API_KEY={GOOGLE}\nopenai={OPENAI}\n")).as_deref(), Some(GOOGLE));
+        assert_eq!(ApiKey::Google.find_in(&format!("{GOOGLE}\n")).as_deref(), Some(GOOGLE));
     }
 
     #[test]

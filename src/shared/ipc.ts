@@ -1382,6 +1382,41 @@ export type ConceptQuote = {
 };
 
 
+// ---------- 模型和用量（1.1.0，decisions/0036；src-tauri/src/gateway/） ----------
+
+export type ModelProvider = "anthropic" | "openai" | "deepseek" | "google" | "vertex";
+export type ModelTier = "cheap" | "balanced" | "strong";
+export type ApiKeyWhich = "anthropic" | "deepseek" | "tavily" | "openai" | "mathpix" | "google";
+export type ModelPrefs = { provider: ModelProvider; tier: ModelTier };
+export type ModelTierView = { tier: ModelTier; label: string; model: string; modelLabel: string; effort: string | null; input: number; output: number; cacheRead: number };
+export type ModelProviderView = { id: ModelProvider; label: string; ready: boolean; key: ApiKeyWhich | null; keyPlace: AgentKeyPlace | null; tiers: ModelTierView[] };
+export type ModelKeyView = { which: ApiKeyWhich; label: string; has: boolean; place: AgentKeyPlace; note: string };
+export type ModelStatus = {
+  /** 开发版、测试：模拟模型，不联网、不花钱 */
+  mock: boolean;
+  prefs: ModelPrefs;
+  providers: ModelProviderView[];
+  otherKeys: ModelKeyView[];
+  vertex: { project: string; location: string; adc: boolean; gcloud: boolean };
+  budgetUsd: number;
+};
+export type UsageSlice = { key: string; label: string; usd: number; calls: number };
+export type UsageCall = AgentCall & { provider: string; kind: string; searches: number; conversation?: string | null };
+export type UsageSummary = {
+  month: string;
+  spentUsd: number;
+  budgetUsd: number;
+  mock: boolean;
+  ledgerError: string | null;
+  byProvider: UsageSlice[];
+  byPurpose: UsageSlice[];
+  /** 本月每天（1 号起） */
+  days: number[];
+  cache: { input: number; read: number; write: number; hitRate: number };
+  recent: UsageCall[];
+  conversationUsd: number | null;
+};
+
 // ---------- 对话、角色、知识库（1.0.2，decisions/0030；回答这一版是模拟的，src-tauri/src/chat/mock.rs） ----------
 
 /** 技能：对话里点名用（/），跑的还是原来的那套流程 */
@@ -1564,6 +1599,14 @@ export const api = {
   /** 排版 Agent：状态、密钥、月度上限 */
   agentStatus: () => invoke<AgentStatus>("agent_status"),
   agentBudgetSet: (usd: number) => invoke<AgentStatus>("agent_budget_set", { usd }),
+  // 模型和用量（1.1.0）
+  modelStatus: () => invoke<ModelStatus>("model_status"),
+  modelPrefsSet: (prefs: ModelPrefs) => invoke<ModelStatus>("model_prefs_set", { prefs }),
+  /** Mathpix 要两项：key 是 app_id，appKey 是 app_key */
+  modelKeySet: (which: ApiKeyWhich, key: string, appKey?: string) => invoke<ModelStatus>("model_key_set", { which, key, appKey: appKey ?? null }),
+  modelKeyClear: (which: ApiKeyWhich) => invoke<ModelStatus>("model_key_clear", { which }),
+  modelVertexSet: (config: { project: string; location: string }) => invoke<ModelStatus>("model_vertex_set", { config }),
+  usageSummary: (conversation?: string | null) => invoke<UsageSummary>("usage_summary", { conversation: conversation ?? null }),
   agentSendModeSet: (mode: FormatMode) => invoke<AgentStatus>("agent_send_mode_set", { mode }),
   formatRulesetsList: () => invoke<FormatRulesetSummary[]>("format_rulesets_list"),
   formatRulesetGet: (id: string) => invoke<FormatRulesetView>("format_ruleset_get", { id }),

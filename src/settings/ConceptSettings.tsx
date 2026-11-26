@@ -1,95 +1,16 @@
 // 设置 › 概念研究（v0.4，decisions/0024）：模型（默认 GPT-6.1 Sol，可选 Opus 5.5）、推理深浅、专用搜索、PDF 页数上限、单价，
 // 技能列表（内置的、用户的、覆盖内置的；在访达中打开技能文件夹），最近的调用。
-// 「密钥与费用」里的 OpenAI、Mathpix 两行也在这里（ConceptKeyRows）。
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, FolderOpen, LoaderCircle } from "lucide-react";
-import { api, type ConceptSettings, type ConceptStatus, type LocalStatus } from "@/shared/ipc";
+import { FolderOpen, LoaderCircle } from "lucide-react";
+import { api, type ConceptSettings, type LocalStatus } from "@/shared/ipc";
 import { useUi } from "@/shared/ui";
 import { Badge, Notice, SectionTitle, Switch } from "@/format/parts";
 import { money } from "@/research/labels";
 import { EFFORT, EFFORTS, MODEL_NAME, SEARCH_ENGINE } from "@/concept/labels";
 
-const PLACE: Record<string, string> = { keychain: "钥匙串", memory: "只在内存里，退出就没了", file: "来自 PITH_API_KEY_FILE 指的文件" };
 const ENTRY: Record<string, string> = { chapter: "整章", selection: "划选", question: "问题", concept: "追踪", card: "卡片" };
 
-/** 密钥与费用页里的 OpenAI、Mathpix */
-export function ConceptKeyRows() {
-  const qc = useQueryClient();
-  const { confirm, notify } = useUi();
-  const status = useQuery({ queryKey: ["conceptStatus"], queryFn: api.conceptStatus, staleTime: 0 });
-  const [openai, setOpenai] = useState("");
-  const [appId, setAppId] = useState("");
-  const [appKey, setAppKey] = useState("");
-  const s = status.data;
-  if (!s) return null;
-  const put = (next: ConceptStatus) => qc.setQueryData(["conceptStatus"], next);
-  const save = async (which: "openai" | "mathpix") => {
-    try {
-      put(which === "openai" ? await api.conceptKeySet("openai", openai.trim()) : await api.conceptKeySet("mathpix", appId.trim(), appKey.trim()));
-      setOpenai("");
-      setAppId("");
-      setAppKey("");
-      notify(`${which === "openai" ? "OpenAI" : "Mathpix"} 的密钥已保存`);
-    } catch (e) {
-      notify(String(e), "error");
-    }
-  };
-  const clear = async (which: "openai" | "mathpix", label: string) => {
-    if (!(await confirm({ title: `清除 ${label} 的密钥？`, message: "清除后用到它的概念研究发不了，要用时再填。", confirm: "清除", danger: true }))) return;
-    try {
-      put(await api.conceptKeyClear(which));
-    } catch (e) {
-      notify(String(e), "error");
-    }
-  };
-  return (
-    <>
-      {s.keys.map((k) => (
-        <div key={k.which} className="contents">
-          <dt className="pt-0.5 text-muted-foreground">{k.label}</dt>
-          <dd className="min-w-0">
-            <p className="flex items-center gap-1.5">
-              {k.has ? <CircleCheck size={13} className="shrink-0 text-ok" /> : <CircleAlert size={13} className={`shrink-0 ${k.needed && k.which === "openai" ? "text-warn" : "text-muted-foreground"}`} />}
-              <span>{k.has ? "已填" : "还没有填"}</span>
-              <span className="text-xs text-muted-foreground">（{PLACE[k.place]}）</span>
-              <Badge>概念研究</Badge>
-            </p>
-            {k.place !== "file" && (
-              <form
-                className="mt-1 flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void save(k.which);
-                }}
-              >
-                {k.which === "openai" ? (
-                  <input type="password" value={openai} onChange={(e) => setOpenai(e.target.value)} placeholder={k.has ? "填新的密钥来替换" : "sk-…"} autoComplete="off" className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-ring" />
-                ) : (
-                  <>
-                    <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="app_id" autoComplete="off" className="w-36 min-w-0 rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-ring" />
-                    <input type="password" value={appKey} onChange={(e) => setAppKey(e.target.value)} placeholder={k.has ? "填新的 app_key 来替换" : "app_key"} autoComplete="off" className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-ring" />
-                  </>
-                )}
-                <button type="submit" disabled={k.which === "openai" ? !openai.trim() : !appId.trim() || !appKey.trim()} className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground disabled:opacity-50">
-                  保存
-                </button>
-                <button type="button" onClick={() => void clear(k.which, k.label)} disabled={!k.has} className="shrink-0 rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50">
-                  清除
-                </button>
-              </form>
-            )}
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {k.which === "openai"
-                ? "platform.openai.com › API keys（账号要能用 gpt-6.1-sol）。概念研究的默认模型和它的网页搜索用这一把。"
-                : "console.mathpix.com 的 app_id 和 app_key：短 PDF 转文字用，每页 $0.005（开通第一个 API 密钥要一次性付 $19.99）。不填就用本机取文字。"}
-            </p>
-          </dd>
-        </div>
-      ))}
-    </>
-  );
-}
 
 export function ConceptSettingsSection({ onKeys }: { onKeys: () => void }) {
   const qc = useQueryClient();

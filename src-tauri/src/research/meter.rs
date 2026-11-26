@@ -52,7 +52,7 @@ impl Meter {
     /// 一行账：`provider` 接口、`kind` 模型 / 搜索
     #[allow(clippy::too_many_arguments)]
     pub fn call(&self, purpose: &str, provider: &str, kind: &str, model: &str, tokens: Tokens, searches: u64, cost_usd: f64, estimated: bool, note: Option<String>, request_id: Option<String>) -> Call {
-        Call { at: (self.now)(), purpose: purpose.into(), provider: provider.into(), kind: kind.into(), searches, model: model.into(), tokens, cost_usd, estimated, mock: false, note, request_id }
+        Call { at: (self.now)(), purpose: purpose.into(), provider: provider.into(), kind: kind.into(), searches, model: model.into(), tokens, cost_usd, estimated, mock: false, note, request_id, conversation: None }
     }
 }
 
@@ -168,6 +168,7 @@ impl<T: Model> Model for Logged<T> {
             mock: true,
             note: None,
             request_id: None,
+            conversation: None,
         };
         self.ledger.append(&call).map_err(|e| PortError::new(ErrorKind::Fatal, e))?;
         Ok(reply)
@@ -198,6 +199,7 @@ impl<T: Search> Search for Logged<T> {
             mock: true,
             note: None,
             request_id: None,
+            conversation: None,
         };
         self.ledger.append(&call).map_err(|e| PortError::new(ErrorKind::Fatal, e))?;
         Ok(reply)
@@ -225,7 +227,7 @@ mod tests {
         let mut m = Meter::new(&dir, 1.0, Prices::default());
         m.now = || "2026-11-12T09:00:00".into();
         // 排版 Agent 本月已经花了 $0.6
-        m.ledger.append(&Call { at: "2026-11-02T10:00:00".into(), purpose: "extract".into(), provider: "anthropic".into(), kind: "model".into(), searches: 0, model: "claude-opus-5-5".into(), tokens: Tokens::default(), cost_usd: 0.6, estimated: false, mock: false, note: None, request_id: None }).unwrap();
+        m.ledger.append(&Call { at: "2026-11-02T10:00:00".into(), purpose: "extract".into(), provider: "anthropic".into(), kind: "model".into(), searches: 0, model: "claude-opus-5-5".into(), tokens: Tokens::default(), cost_usd: 0.6, estimated: false, mock: false, note: None, request_id: None, conversation: None }).unwrap();
         let small = worst_case(&m.prices, "claude-opus-5-5", &req(1000, 0), 0.01);
         assert!(small < 0.4);
         m.check(small, "这次计划").unwrap();
