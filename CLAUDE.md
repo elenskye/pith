@@ -27,7 +27,7 @@
 
 各文档管什么见 `README.md`「文档分工」：一件事只写一处，别处指过去。
 
-动 Visual Atelier 之前，先读它的 `CLAUDE.md` 和 `ROADMAP.md`（规则 9）。
+这次要用到 Visual Atelier（改视觉、同步方案、用 `dw` 看画布、改 Atelier 本身），开工前先读它的 `CLAUDE.md`，再照它说的读（规则 9）。
 
 重要选型写成 `docs/decisions/NNNN-*.md`，一事一文，编号接着写。
 
@@ -89,15 +89,15 @@
 - **不署名**：不加 `Co-Authored-By` 或其他署名。仓库的 `.claude/settings.json` 已关掉 Claude Code 默认加的署名。
 - 不 force push、不改写历史、不删分支、不改远端设置；打标签等用户说。
 
-## 规则 9：和 Visual Atelier 联动（2026-11-16 用户定，`decisions/0027`）
+## 规则 9：和 Visual Atelier 联动（2026-11-16 用户定，`decisions/0027`；权限 2026-11-27）
 
 - **Pith 的视觉都从 `../visual-atelier` 来**：App 的界面用方案 `pith`（Design System「Pith」）；WonderLab 的作品每种图形语言一套 `pith-wonder-<名字>`（「Pith Wonder - <名字>」）。App 和 WonderLab 的不共用。
 - **用别的项目的设计系统就复制一份**，原来那份不动，例：用 Pomelo 的 → 复制成 `pith-wonder-pomelo`「Pith Wonder - Pomelo」。Pomelo、Peck、网站照常用 Atelier，Pith 的改动不能影响它们。
-- **两边都能改**：开在本仓库、把 Atelier 加为第二个目录的会话（「pith 环境」）两边都做。在 Atelier 里照它自己的 `CLAUDE.md` 做：谁能动哪些文件看「几个会话怎么分」的 Pith 那一行；Git 照它的规矩，不照本文件规则 8。工作区里有别的会话没提交的改动，别动也别还原。
-- **反过来改 Atelier**：Pith 开发、使用中发现 Atelier 的工具、Skill、流程不顺，就在 Atelier 里改，并记进它的 `CHANGELOG.md`。
+- **先读它的 `CLAUDE.md`**：用到 Atelier 就先读（规则 2）。在那边做事照它的规矩：版本、Git、提交信息、自己打 tag、几个会话一起做，不照本文件规则 7、8。开在本仓库、把 Atelier 加为第二个目录的会话叫「pith 环境」，两边都做。那边的工作区里有别的会话没提交的改动，别动也别还原，只提交自己改的。
+- **全部权限**（2026-11-27 用户定）：本仓库的会话对 Atelier 有全部权限：Atelier 本体（`bench/`、共用的 `tooling/`、`skills/`、`docs/`、根目录的规则和配置）和 Pith 负责的那块（`schemes/pith/`、`schemes/pith-wonder-*/`、`canvases/pith-*/`、`tooling/pith/`）都能直接编辑、优化、更新，照那边的规矩提交、打 tag，不用问、不用另开会话。Pith 开发、使用中发现 Atelier 的工具、Skill、流程不顺，就在那边改，记进它的 `CHANGELOG.md`。只有两件先问：改别的项目的方案（Pomelo、Peck、Vermilion）；给 Atelier 加新功能（修小毛病、改顺手的直接做）。细则见 Atelier `CLAUDE.md`「几个会话怎么分」。
 - **同步只单向**：已发版本（tag `pith-v<版本>`）照 Atelier 的 `docs/adoption.md` 复制进本仓库 `src/vendor/pith/`，带 `VERSION`、`SHA256SUMS`，不手改。要改回 Atelier 改、再发版。每次同步要用户在对话里说一声。
 - **计划分开**：Pith 的视觉写在本仓库 `ROADMAP.md`，Atelier 自己的计划写在它的 `ROADMAP.md`。
-- **归属**：Atelier 的 `schemes/pith/`、`canvases/pith-*/`、`tooling/pith/` 归本仓库的会话（pith 环境）。同步进来的是哪一版看 `src/vendor/pith/VERSION`，接法在它的 `DESIGN.md` 第 9 节。
+- **同步进来的是哪一版**看 `src/vendor/pith/VERSION`，接法在它的 `DESIGN.md` 第 9 节。
 
 ## 规则 10：改用到的引擎（2026-11-27 用户定）
 

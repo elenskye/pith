@@ -47,7 +47,7 @@ pnpm check
 
 | 文件 | 写什么 | 谁看 |
 | --- | --- | --- |
-| `CLAUDE.md` | Agent 的工作规则：开工前读什么、硬边界、工程约定、版本与 Git、和 Atelier 联动 | Agent，每次开工必读 |
+| `CLAUDE.md`（`AGENTS.md` 指向它） | Agent 的工作规则：开工前读什么、硬边界、工程约定、版本与 Git、和 Atelier 联动 | Agent，每次开工必读 |
 | `HANDOFF.md` | 只写现在：上一轮做了什么、测试、等用户的、下一轮从哪开始 | 用户、接手的 Agent |
 | `ROADMAP.md` | 版本计划（现在、做完的、到 2.0.0）、用户验收清单 | 用户、Agent |
 | `docs/requirements.md` | 拍过板、仍然管用的需求 | 动功能前 |
