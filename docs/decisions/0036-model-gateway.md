@@ -1,7 +1,7 @@
 # 0036 · 模型网关：四家、每家三档、价格表和用量圈（1.1.0 第 1 期）
 
 - 日期：2026-11-26
-- 状态：现行。落实 `0034` 的 1.1.0 第 1 期、`0035`「循环」一节的网关部分
+- 状态：现行。落实 `0034` 的 1.1.0 第 1 期、`0035`「循环」一节的网关部分。「每家三档」一节被 `0041` 取代（改成每家一份模型清单、每个模型各定思考）
 - 来源：`0035`（网关从 Peck 抽）；Peck 的 `../personal-cli-studio/peck/src-tauri/src/gateway/`（只读参考：`convert/anthropic.rs`、`responses.rs`、`chat.rs`、`gemini.rs`、`providers.rs`、`config.rs`、`defaults/prices.json`）；Anthropic 的现行文档（claude-api 技能，2026-11）
 
 ## 做法

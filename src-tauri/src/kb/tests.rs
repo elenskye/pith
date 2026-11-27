@@ -149,7 +149,7 @@ fn upgrade_moves_parsed_books_in_and_merges_duplicates() {
             assert_eq!((reports[0].stage, reports[0].kbs.len()), (2, 2));
             let books: Vec<&Material> = all.iter().filter(|m| m.kind == "full").collect();
             assert_eq!(books.len(), 2);
-            let shelf = store::kbs_list(c)?.into_iter().find(|k| k.name == store::SHELF).unwrap();
+            let shelf = store::kbs_list(c)?.into_iter().find(|k| k.name == store::INBOX).unwrap();
             assert_eq!(shelf.count, 1);
             // 书的段落块：一段一块，段落号、页码、章照文本
             let t = crate::concept::store::text_load(c, &en)?;
@@ -170,7 +170,30 @@ fn upgrade_moves_parsed_books_in_and_merges_duplicates() {
         .unwrap();
 }
 
-/// 两本书都迁进知识库（书架），返回（原著的材料 id, 译本的材料 id）
+#[test]
+fn the_old_shelf_becomes_an_inbox_that_empties_as_books_get_filed() {
+    let c = memory_db();
+    // 1.1.0 第 3 期建的「书架」：改名暂存箱；站主自己建的同名库不动
+    let mine = store::kb_create(&c, "书架", "我自己的", NOW).unwrap();
+    let shelf = store::kb_create(&c, "书架", "解析好的书（1.1.0 从概念研究迁过来）", NOW).unwrap();
+    let paper = store::kb_create(&c, "论文", "", NOW).unwrap();
+    let book = store::material_add(&c, &Material { kb: shelf.clone(), kind: "full".into(), title: "国富论".into(), source_kind: Some("concept_text".into()), source_ref: Some("t1".into()), ..Default::default() }, NOW).unwrap();
+    store::upgrade(&c, NOW).unwrap();
+    let names: Vec<(String, String)> = store::kbs_list(&c).unwrap().into_iter().map(|k| (k.uid, k.name)).collect();
+    assert!(names.contains(&(shelf.clone(), store::INBOX.to_string())) && names.contains(&(mine, "书架".to_string())), "{names:?}");
+    // 放进「论文」：从暂存箱里拿出来，家挪过去
+    let filed = store::material_link(&c, &book.uid, &paper, NOW).unwrap();
+    assert_eq!(filed.kbs, vec![paper.clone()]);
+    assert_eq!(store::materials(&c, Some(&shelf)).unwrap().len(), 0);
+    // 同一来源再种一次进论文：也不回暂存箱
+    store::material_add(&c, &Material { kb: paper.clone(), kind: "full".into(), title: "国富论".into(), source_kind: Some("concept_text".into()), source_ref: Some("t1".into()), ..Default::default() }, NOW).unwrap();
+    assert_eq!(store::materials(&c, Some(&paper)).unwrap().len(), 1);
+    // 再启动：不再改名
+    store::upgrade(&c, NOW).unwrap();
+    assert_eq!(store::kbs_list(&c).unwrap().iter().filter(|k| k.name == store::INBOX).count(), 1);
+}
+
+/// 两本书都迁进知识库（暂存箱），返回（原著的材料 id, 译本的材料 id）
 fn shelve(state: &crate::AppState, en: &str, zh: &str) -> (i64, i64) {
     state
         .with_db(|c| {

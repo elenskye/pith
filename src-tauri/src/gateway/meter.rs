@@ -13,6 +13,8 @@ pub struct Meter {
     pub budget_usd: f64,
     pub prices: Prices,
     pub now: fn() -> String,
+    /// 用免费额度的几家（设置里标的，Google、Vertex）：账本记 0、不占月上限，备注里写按价目约多少
+    pub free: Vec<super::Provider>,
 }
 
 /// 这一次调用是干什么的（账本里的 purpose）、哪段对话
@@ -26,7 +28,7 @@ pub const UNKNOWN: PriceRow = PriceRow { base: Rate { input: usage::UNKNOWN_PRIC
 
 impl Meter {
     pub fn new(data_dir: &std::path::Path, budget_usd: f64, prices: Prices) -> Meter {
-        Meter { ledger: Ledger::new(data_dir), budget_usd, prices, now: crate::text::now_iso }
+        Meter { ledger: Ledger::new(data_dir), budget_usd, prices, now: crate::text::now_iso, free: Vec::new() }
     }
 
     /// 一个模型（供应商回报的名字）的价：清单里的，设置里改过输入、输出价的按比例换；都没有的按最贵的
@@ -81,25 +83,35 @@ impl Meter {
 /// 发一次：查上限 → 发 → 记账。返回回答和这一次花的美元数（模拟的是 0）
 pub fn send(model: &dyn Model, meter: &Meter, u: &Use, req: &Request, on: &mut dyn FnMut(Delta), cancel: &AtomicBool) -> Result<(Reply, f64), GateError> {
     let spec = model.spec();
-    if !model.is_mock() {
+    let free = meter.free.contains(&spec.provider);
+    if !model.is_mock() && !free {
         meter.check(catalog::worst_usd(&meter.row(spec.api_model), req.input_estimate(), req.max_output_tokens))?;
     }
+    // 免费额度：记 0，备注里留按价目的数
+    let charge = |cost: f64, note: Option<String>| -> (f64, Option<String>) {
+        if free {
+            let list = format!("免费额度（按价目约 ${cost:.4}）");
+            (0.0, Some(note.map_or(list.clone(), |n| format!("{n}；{list}"))))
+        } else {
+            (cost, note)
+        }
+    };
     match model.send(req, on, cancel) {
         Ok(reply) => {
-            let cost = meter.row(&reply.model).usd(&reply.tokens);
             let note = match &reply.stop {
                 super::Stop::Refusal => Some("模型拒答".to_string()),
                 super::Stop::MaxTokens => Some("写到上限被截断".to_string()),
                 _ => (reply.model != spec.api_model).then(|| format!("由 {} 回答", reply.model)),
             };
+            let (cost, note) = charge(meter.row(&reply.model).usd(&reply.tokens), note);
             meter.record(model, u, &reply.model, reply.tokens, cost, false, note, reply.request_id.clone())?;
             Ok((reply, if model.is_mock() { 0.0 } else { cost }))
         }
         Err(e) => {
             if let Some(t) = e.spent {
-                let cost = meter.row(spec.api_model).usd(&t);
                 let note = if e.kind == ErrorKind::Cancelled { "中途停止，按估计记" } else { "中途出错，按估计记" };
-                meter.record(model, u, spec.api_model, t, cost, true, Some(note.into()), None)?;
+                let (cost, note) = charge(meter.row(spec.api_model).usd(&t), Some(note.into()));
+                meter.record(model, u, spec.api_model, t, cost, true, note, None)?;
             }
             Err(e)
         }

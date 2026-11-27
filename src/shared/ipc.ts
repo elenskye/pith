@@ -1385,16 +1385,52 @@ export type ConceptQuote = {
 // ---------- 模型和用量（1.1.0，decisions/0036；src-tauri/src/gateway/） ----------
 
 export type ModelProvider = "anthropic" | "openai" | "deepseek" | "google" | "vertex";
-export type ModelTier = "cheap" | "balanced" | "strong";
 export type ApiKeyWhich = "anthropic" | "deepseek" | "tavily" | "openai" | "mathpix" | "google";
-export type ModelPrefs = { provider: ModelProvider; tier: ModelTier };
-export type ModelTierView = { tier: ModelTier; label: string; model: string; modelLabel: string; effort: string | null; input: number; output: number; cacheRead: number };
-export type ModelProviderView = { id: ModelProvider; label: string; ready: boolean; key: ApiKeyWhich | null; keyPlace: AgentKeyPlace | null; tiers: ModelTierView[] };
+/** 对话用的模型、子代理用的模型（null：对话那一家最强的）。都是清单 id，例如 anthropic/claude-sonnet-5-5 */
+export type ModelPrefs = { model: string; subagent: string | null };
+/** always 一直想（只能调深浅）；switch 能关；never 不想 */
+export type ModelThinking = "always" | "switch" | "never";
+/** builtin Pith 自带、核过的；api 接口报的；inferred 照同系列推断 */
+export type ModelSource = "builtin" | "api" | "inferred";
+/** 一个模型的思考设置：开不开（能关的才看）、多深 */
+export type ModelChoice = { on: boolean; effort: string | null };
+export type ModelView = {
+  id: string;
+  label: string;
+  apiModel: string;
+  thinking: ModelThinking;
+  /** 认的深浅，从浅到深 */
+  efforts: string[];
+  source: ModelSource;
+  /** 刷新从接口拿到的（不在自带清单里） */
+  found: boolean;
+  /** false：价格表里没有，按最贵的估 */
+  priced: boolean;
+  input: number;
+  output: number;
+  cacheRead: number;
+  context: number;
+  choice: ModelChoice;
+  defaultChoice: ModelChoice;
+  custom: boolean;
+};
+export type ModelProviderView = {
+  id: ModelProvider;
+  label: string;
+  ready: boolean;
+  key: ApiKeyWhich | null;
+  keyPlace: AgentKeyPlace | null;
+  models: ModelView[];
+  refreshedAt: string | null;
+  refreshNote: string | null;
+  /** Google、Vertex：标了用免费额度（账本记 0）；别家是 null */
+  free: boolean | null;
+};
 export type ModelKeyView = { which: ApiKeyWhich; label: string; has: boolean; place: AgentKeyPlace; note: string };
 export type ModelStatus = {
   /** 开发版、测试：模拟模型，不联网、不花钱 */
   mock: boolean;
-  prefs: ModelPrefs;
+  prefs: ModelPrefs & { subagentUsed: string };
   providers: ModelProviderView[];
   otherKeys: ModelKeyView[];
   vertex: { project: string; location: string; adc: boolean; gcloud: boolean };
@@ -1655,6 +1691,11 @@ export const api = {
   // 模型和用量（1.1.0）
   modelStatus: () => invoke<ModelStatus>("model_status"),
   modelPrefsSet: (prefs: ModelPrefs) => invoke<ModelStatus>("model_prefs_set", { prefs }),
+  /** choice 空着：回到这个模型的默认 */
+  modelThinkingSet: (model: string, choice: ModelChoice | null) => invoke<ModelStatus>("model_thinking_set", { model, choice }),
+  /** 问这一家的接口现在有哪些模型、能不能想（不花钱） */
+  modelRefresh: (provider: ModelProvider) => invoke<ModelStatus>("model_refresh", { provider }),
+  modelFreeSet: (provider: ModelProvider, free: boolean) => invoke<ModelStatus>("model_free_set", { provider, free }),
   /** Mathpix 要两项：key 是 app_id，appKey 是 app_key */
   modelKeySet: (which: ApiKeyWhich, key: string, appKey?: string) => invoke<ModelStatus>("model_key_set", { which, key, appKey: appKey ?? null }),
   modelKeyClear: (which: ApiKeyWhich) => invoke<ModelStatus>("model_key_clear", { which }),

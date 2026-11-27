@@ -4,7 +4,7 @@
 //!   思考、Gemini 的签名、各家私有的块挂在 `Opaque` 上，只回放给同一来源（换了模型整块丢掉）。
 //! - 四条线协议：Anthropic Messages（`anthropic`）、OpenAI Responses（`openai`）、DeepSeek Chat Completions（`deepseek`）、
 //!   Gemini（`gemini`，API Key 和 Vertex AI 共用）。地址、认证、重试在 `http`；Vertex 的项目和 ADC 令牌在 `vertex`。
-//! - 每家三档（便宜、均衡、强），价格表、模型清单在 `catalog`；记账、月上限在 `meter`（接现有的账本 `agent/usage.jsonl`）。
+//! - 模型清单、每个模型的思考设置、价格表在 `catalog`，刷新清单在 `discover`（`decisions/0041`）；记账、月上限在 `meter`（接现有的账本 `agent/usage.jsonl`）。
 //! - 模拟模型（`mock`）：脚本化，测试和开发版用，不联网、不花钱。
 //! - 密钥（`keys`）：沿用 `agent::secret` 的钥匙串 / 内存 / 密钥文件，加 Google 一把。
 
@@ -12,6 +12,7 @@ pub mod anthropic;
 pub mod catalog;
 pub mod commands;
 pub mod deepseek;
+pub mod discover;
 pub mod gemini;
 pub mod http;
 pub mod keys;
@@ -29,7 +30,7 @@ pub use crate::agent::usage::Tokens;
 
 // ---------- 供应商 ----------
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     Anthropic,

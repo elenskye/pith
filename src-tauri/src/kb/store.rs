@@ -198,6 +198,13 @@ pub fn by_source(c: &Connection, kind: &str, r: &str) -> Result<Option<String>, 
 fn join(c: &Connection, kb: i64, material: i64, now: &str) -> Result<(), String> {
     c.execute("INSERT OR IGNORE INTO kb_members (kb_id, material_id, added_at) VALUES (?1, ?2, ?3)", params![kb, material, now]).map_err(err)?;
     c.execute("UPDATE knowledge_bases SET updated_at = ?2 WHERE id = ?1", params![kb, now]).map_err(err)?;
+    // 放进了别的库：从暂存箱里拿出来（家挪过去）
+    if let Some(inbox) = inbox_id(c)?
+        && inbox != kb
+    {
+        rehome_from(c, inbox, Some(material))?;
+        c.execute("DELETE FROM kb_members WHERE kb_id = ?1 AND material_id = ?2", params![inbox, material]).map_err(err)?;
+    }
     Ok(())
 }
 
@@ -344,8 +351,31 @@ pub fn candidates(c: &Connection) -> Result<Vec<Material>, String> {
 // ---------- 1.1.0 的升级（migration 0011 之后，启动时做） ----------
 
 const MIGRATED: &str = "kb.v11";
-/// 解析好的书迁过来时放进的库
-pub const SHELF: &str = "书架";
+/// 解析好的书迁过来时放进的库：暂存箱（1.1.0 第 3 期叫「书架」，验收时改名，`decisions/0041`）。
+/// 放进别的知识库的材料自动从这里拿出来（`join`），留在这里的就是还没归好的
+pub const INBOX: &str = "暂存箱";
+const INBOX_KEY: &str = "kb.inbox";
+const INBOX_NOTE: &str = "解析好的书先放在这里；放进别的知识库，就从暂存箱里拿出来";
+const OLD_SHELF: (&str, &str) = ("书架", "解析好的书（1.1.0 从概念研究迁过来）");
+
+/// 暂存箱是哪一个库（删掉了就没有）
+pub fn inbox_id(c: &Connection) -> Result<Option<i64>, String> {
+    let Some(uid) = setting(c, INBOX_KEY)? else { return Ok(None) };
+    c.query_row("SELECT id FROM knowledge_bases WHERE uid = ?1", [uid], |r| r.get(0)).optional().map_err(err)
+}
+
+/// 1.1.0 升级时建的「书架」改叫「暂存箱」（站主自己建的同名库不动）
+fn rename_shelf(c: &Connection) -> Result<(), String> {
+    if setting(c, INBOX_KEY)?.is_some() {
+        return Ok(());
+    }
+    let old: Option<String> = c.query_row("SELECT uid FROM knowledge_bases WHERE name = ?1 AND note = ?2 ORDER BY id LIMIT 1", params![OLD_SHELF.0, OLD_SHELF.1], |r| r.get(0)).optional().map_err(err)?;
+    if let Some(uid) = old {
+        c.execute("UPDATE knowledge_bases SET name = ?2, note = ?3 WHERE uid = ?1", params![uid, INBOX, INBOX_NOTE]).map_err(err)?;
+        c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)", params![INBOX_KEY, uid]).map_err(err)?;
+    }
+    Ok(())
+}
 
 fn setting(c: &Connection, key: &str) -> Result<Option<String>, String> {
     c.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional().map_err(err)
@@ -356,6 +386,7 @@ fn setting(c: &Connection, key: &str) -> Result<Option<String>, String> {
 pub fn upgrade(c: &Connection, now: &str) -> Result<usize, String> {
     c.execute("INSERT OR IGNORE INTO kb_members (kb_id, material_id, added_at) SELECT kb_id, id, created_at FROM kb_materials", []).map_err(err)?;
     let mut planted = 0;
+    rename_shelf(c)?;
     if setting(c, MIGRATED)?.is_none() {
         merge_duplicates(c)?;
         let books: Vec<Material> = candidates(c)?.into_iter().filter(|m| m.kind == "full").collect();
@@ -364,9 +395,13 @@ pub fn upgrade(c: &Connection, now: &str) -> Result<usize, String> {
             if by_source(c, kind, r)?.is_some() {
                 continue;
             }
-            let shelf = match kbs_list(c)?.into_iter().find(|k| k.name == SHELF) {
+            let shelf = match kbs_list(c)?.into_iter().find(|k| k.name == INBOX) {
                 Some(k) => k.uid,
-                None => kb_create(c, SHELF, "解析好的书（1.1.0 从概念研究迁过来）", now)?,
+                None => {
+                    let uid = kb_create(c, INBOX, INBOX_NOTE, now)?;
+                    c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)", params![INBOX_KEY, uid]).map_err(err)?;
+                    uid
+                }
             };
             material_add(c, &Material { kb: shelf, ..b }, now)?;
             planted += 1;

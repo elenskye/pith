@@ -213,7 +213,7 @@ PITH_LOCAL_MODELS=real PITH_ACCEPT_DIR=<副本> PITH_RUN=<研究 uid> PITH_TERM=
 ## 知识库检索（1.1.0 第 3 期，`decisions/0038`）
 
 - **存取**（`src-tauri/src/kb/tests.rs`，fresh）：一份材料进几个库、再种进同一个库只是照料、从家里拿掉家挪过去、删库只删只在这个库里的；正文切块（小标题、并短的、拆长的），改正文时同一位置的块 id 不变、按词索引跟着改，变短了多出来的连索引一起删；索引坏了对一遍就重建。
-- **1.1.0 的升级**：0011 以前同一来源在两个库里各一份 → 并成一份、进两个库、阶段取高的；已经种过的书不再种，没种的进「书架」；书的块和文本一段对一段（段落号、页码、章）；再启动一次什么都不多。升级测试（`transfer/tests.rs`）：v10 的冻结样本库（`fixtures/library-v10.json`，这一期加 migration 之前冻的）升到 v11，`exercise` 跑一遍升级、每份材料都在家里、面板读得出。
+- **1.1.0 的升级**：0011 以前同一来源在两个库里各一份 → 并成一份、进两个库、阶段取高的；已经种过的书不再种，没种的进「暂存箱」（1.1.0 验收前叫「书架」，`kb/tests.rs` 的 `the_old_shelf_becomes_an_inbox_that_empties_as_books_get_filed`：只改 1.1.0 建的那一个、放进别的库就拿出来）；书的块和文本一段对一段（段落号、页码、章）；再启动一次什么都不多。升级测试（`transfer/tests.rs`）：v10 的冻结样本库（`fixtures/library-v10.json`，这一期加 migration 之前冻的）升到 v11，`exercise` 跑一遍升级、每份材料都在家里、面板读得出。
 - **检索**（模拟的本机模型）：没向量时只按词并说明；补向量（书以前算过的直接拿来、建好的不重算）；英文问题按意思找到讲市场范围的那一段；中文问题从译本映射回原著、带着中译、同一组不重复；勾了空库找不到；本机模型关掉只按词；搜索词空着列出材料。
 - **读原文**：上下文不出这一章、整章的段数对、按章号读和按段落读一样、目录、面板读到那一段并带对照；太长的一章只给前一部分并说怎么接着读。
 - **引用编号**：`[P12]`、`【P34】`、`[P12, P56]`、`[P56][P99]` 按第一次出现编号；不认识的那一处原样留着；页边注带段落号、页码、中译、文献库条目；存进知识库的正文后面附出处。
@@ -233,7 +233,7 @@ PITH_LOCAL_MODELS=real PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.e
 
 ## 1.1.0 真实验收（第 5 期，`decisions/0040`）
 
-默认忽略；联网、花钱（上限 $20，这一次 $0.63）。和 App 走同一条路（网关的真模型、`ChatEnv`、本机检索、真联网），回答存进 `PITH_ACCEPT_DIR` 的对话，打包版设 `PITH_DATA_DIR` 指过去能看。第一次跑会解析两本书、迁进书架、补向量（约 6 分钟）；书的解析器版本变了会先「重新解析」。密钥文件每行 `名字=密钥`（`anthropic=…`、`openai=…`、`deepseek=…`、`google=…`）。轮次：`anthropic`、`followup`（接着 anthropic 那段对话问）、`openai`、`deepseek`、`google`、`google_lite`、`chapter`、`longchapter`（长章交给子代理）、`web`、`web_openai`、`web_deepseek`、`web_google`、`web_google_lite`。每一轮打印状态行、怎么结束的、花费和缓存、引用编号对上几个、回答。
+默认忽略；联网、花钱（上限 $20，这一次 $0.63）。和 App 走同一条路（网关的真模型、`ChatEnv`、本机检索、真联网），回答存进 `PITH_ACCEPT_DIR` 的对话，打包版设 `PITH_DATA_DIR` 指过去能看。第一次跑会解析两本书、迁进暂存箱、补向量（约 6 分钟）；书的解析器版本变了会先「重新解析」。密钥文件每行 `名字=密钥`（`anthropic=…`、`openai=…`、`deepseek=…`、`google=…`）。轮次：`anthropic`、`followup`（接着 anthropic 那段对话问）、`openai`、`deepseek`、`google`、`google_lite`、`chapter`、`longchapter`（长章交给子代理）、`web`、`web_openai`、`web_deepseek`、`web_google`、`web_google_lite`；Vertex 的 `vertex`、`vertex_lite`、`web_vertex` 要 `PITH_VERTEX_PROJECT=<项目 ID>`（区域 `PITH_VERTEX_LOCATION`，空着是 global），认证用 gcloud 的 ADC。每一轮的对话模型是清单 id（`chat/acceptance.rs` 的 `ROUNDS`），子代理用那一家最强的，思考照清单的默认。每一轮打印状态行、怎么结束的、花费和缓存、引用编号对上几个、回答。
 
 ```bash
 PITH_LOCAL_MODELS=real PITH_API_KEY_FILE=<密钥文件> PITH_ACCEPT_DIR=local/acceptance-1.1.0/data PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub PITH_ROUNDS=anthropic,openai,deepseek cargo test -p pith real_chat_acceptance -- --ignored --nocapture

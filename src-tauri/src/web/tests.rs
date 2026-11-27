@@ -46,7 +46,7 @@ fn a_fetched_page_is_kept_cut_into_numbered_blocks_and_can_be_saved() {
     assert_eq!((cites[0].kind.as_str(), cites[0].text.as_str()), ("网页", b.text.as_str()));
     assert!(cites[0].loc.starts_with("fixture.example.invalid") && cites[0].loc.contains("取于"));
     assert_eq!((cites[0].url.as_deref(), cites[0].web_page, cites[0].material.as_ref()), (Some(p.final_url.as_str()), Some(page), None));
-    let saved = state.with_db(|c| cite::with_sources(&format!("说法 [W{}]。", b.id), &cites).contains(&p.final_url).then_some(()).ok_or("出处里有网址".to_string())).unwrap();
+    let saved = state.with_db(|_c| cite::with_sources(&format!("说法 [W{}]。", b.id), &cites).contains(&p.final_url).then_some(()).ok_or("出处里有网址".to_string())).unwrap();
     let _ = saved;
     let kb = state.with_db(|c| crate::kb::store::kb_create(c, "随手存", "", "2026-11-26T10:00:00.000Z")).unwrap();
     let m = state.with_db(|c| crate::kb::store::save_web(c, page, &kb, None, "2026-11-26T10:00:00.000Z")).unwrap();
@@ -93,4 +93,29 @@ fn web_calls_are_booked_as_chat_web_on_the_conversation() {
     let rows = m.ledger.all().unwrap();
     assert_eq!((rows[0].purpose.as_str(), rows[0].conversation.as_deref()), ("chat_web", Some("conv-1")));
     assert_eq!(crate::gateway::commands::purpose_label("chat_web"), "联网");
+}
+
+/// 自带的搜索这次搜不了（Google 免费层不给 Google 搜索）：借别家的再搜，说一声
+#[test]
+fn a_refused_native_search_falls_back_and_says_so() {
+    struct Refused;
+    impl research_engine::ports::Search for Refused {
+        fn engine(&self) -> String {
+            "google_search".into()
+        }
+        fn search(&self, _: &str, _: usize, _: &AtomicBool) -> Result<research_engine::ports::SearchReply, research_engine::ports::PortError> {
+            Err(research_engine::ports::PortError::new(research_engine::ports::ErrorKind::Failed, "Gemini 调用太频繁或额度用完了"))
+        }
+    }
+    let (_dir, state, ..) = library_with_books("web-backup");
+    let none = |_: ApiKey| None;
+    let mut web = kit(&setup(&state.paths.root, false, Provider::Google, &none));
+    let mock = web.search.take().unwrap();
+    web.search = Some(Box::new(Refused));
+    web.engine = "Google 搜索".into();
+    let never = AtomicBool::new(false);
+    assert!(search(&web, "示例市", 3, &never).unwrap_err().contains("额度"), "没有可借的就照实报错");
+    web.backup = Some((mock, "Claude 网页搜索".into()));
+    let found = search(&web, "示例市", 3, &never).unwrap();
+    assert!(found.hits > 0 && found.text.contains("（Claude 网页搜索）") && found.text.contains("Google 搜索 这次搜不了"), "{}", found.text);
 }

@@ -1,6 +1,7 @@
 //! Anthropic Messages（流式 SSE），照 Peck 的 `convert/anthropic.rs` 改的。
 //!
-//! - 思考一直开着（Claude 5.5 一族关不掉），`thinking: adaptive`、显示摘要；深浅用 `output_config.effort`（Opus 5.5 默认 medium，这里每档写明）。
+//! - 思考：`thinking: adaptive`、显示摘要；深浅用 `output_config.effort`（设置里每个模型定的）。Opus、Fable 关不掉；
+//!   Haiku 5.5 能关（`disabled`）、Sonnet 5.5 能关（`between_tools`），关的时候不带 effort（`decisions/0041`）。
 //! - 缓存断点（`decisions/0036`）：系统提示里标了 `cache` 的块、最后一条站主消息、它前一条站主消息，最多 4 个；
 //!   顺序固定为 工具 → 系统 → 对话，对话只往后追加。
 //! - 工具开 `eager_input_streaming`（流式时参数边写边来）；参数读不成完整 JSON 的交给循环回一个出错的结果。
@@ -12,7 +13,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use super::catalog::ModelSpec;
+use super::catalog::{ModelSpec, Thinking};
 use super::{Delta, Message, Opaque, Origin, Part, Reply, Request, Role, Stop, Tokens, WireStream, parse_tool_input};
 
 pub const URL: &str = "https://api.anthropic.com/v1/messages";
@@ -68,9 +69,15 @@ pub fn encode(req: &Request, spec: &ModelSpec, origin: &Origin) -> Value {
             body["tool_choice"] = json!({ "type": "none" });
         }
     }
-    body["thinking"] = json!({ "type": "adaptive", "display": "summarized" });
-    if let Some(e) = &req.effort {
-        body["output_config"] = json!({ "effort": e });
+    match (&req.effort, spec.thinking, spec.off) {
+        // 能关的关掉：Haiku 5.5 写 disabled，Sonnet 5.5 写 between_tools（都不带别的字段、不带 effort，接口默认在 high 以下）
+        (None, Thinking::Switch, Some(off)) => body["thinking"] = json!({ "type": off }),
+        (effort, _, _) => {
+            body["thinking"] = json!({ "type": "adaptive", "display": "summarized" });
+            if let Some(e) = effort {
+                body["output_config"] = json!({ "effort": e });
+            }
+        }
     }
     if spec.fallback {
         body["fallbacks"] = json!("default");

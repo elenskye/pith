@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use serde_json::{Value, json};
 
-use super::catalog::{self, Tier};
+use super::catalog;
 use super::http::{Credential, HttpModel};
 use super::meter::{self, Meter, Use};
 use super::mock::{MockModel, Turn};
@@ -364,7 +364,60 @@ fn usage_summary_splits_by_provider_purpose_and_cache() {
 }
 
 #[test]
-fn tier_picks_cover_vertex_too() {
-    assert_eq!(catalog::tier(Provider::Vertex, Tier::Strong).model.api_model, "gemini-4-carbon");
+fn vertex_has_its_own_models() {
+    assert_eq!(catalog::strongest(Provider::Vertex).api_model, "gemini-4-carbon");
     assert!(HttpModel::new(spec("vertex/gemini-4-carbon"), Credential::Adc, None).is_err());
+}
+
+#[test]
+fn thinking_can_be_switched_off_where_the_model_allows() {
+    let mut req = request(&origin("anthropic/claude-sonnet-5-5"));
+    req.effort = None;
+    // Sonnet 5.5 关是 between_tools、Haiku 5.5 是 disabled，都不带 effort；Opus 关不掉，照 adaptive
+    let b = body("anthropic/claude-sonnet-5-5", &req);
+    assert_eq!((b["thinking"].clone(), b.get("output_config").is_none()), (json!({ "type": "between_tools" }), true));
+    assert_eq!(body("anthropic/claude-haiku-5-5", &req)["thinking"], json!({ "type": "disabled" }));
+    assert_eq!(body("anthropic/claude-opus-5-5", &req)["thinking"]["type"], "adaptive");
+    // OpenAI：能关的写 none，一直开着的不写深浅
+    assert_eq!(body("openai/gpt-6.1-terra", &req)["reasoning"], json!({ "effort": "none" }));
+    assert_eq!(body("openai/gpt-6.2-sol", &req)["reasoning"], json!({ "summary": "auto" }));
+    assert_eq!(body("deepseek/deepseek-flash", &req)["thinking"], json!({ "type": "disabled" }));
+    // 设置里定的深浅照发
+    req.effort = Some("xhigh".into());
+    assert_eq!(body("anthropic/claude-opus-5-5", &req)["output_config"]["effort"], "xhigh");
+}
+
+#[test]
+fn free_tier_calls_cost_nothing_and_skip_the_budget() {
+    let dir = temp_dir("gateway-free");
+    let mut meter = Meter::new(&dir, 0.000_001, Prices::default());
+    meter.free = vec![Provider::Google];
+    let id = "google/gemini-3.8-flash";
+    let s = sse(&[json!({ "candidates": [{ "content": { "parts": [{ "text": "好" }] }, "finishReason": "STOP" }], "usageMetadata": { "promptTokenCount": 500, "candidatesTokenCount": 20 } })]);
+    let (_s, m) = served(id, s);
+    let u = Use { purpose: "chat", conversation: None };
+    let (_, cost) = meter::send(&m, &meter, &u, &Request { messages: vec![Message::user("hi")], max_output_tokens: 100, ..Default::default() }, &mut |_| {}, &AtomicBool::new(false)).unwrap();
+    assert_eq!(cost, 0.0);
+    let c = &meter.ledger.all().unwrap()[0];
+    assert_eq!(c.cost_usd, 0.0);
+    assert!(c.note.as_deref().unwrap().starts_with("免费额度（按价目约 $"), "{:?}", c.note);
+}
+
+#[test]
+fn free_tier_daily_quota_is_not_retried_and_says_when_it_comes_back() {
+    let body = json!({ "error": { "code": 429, "message": "You exceeded your current quota", "details": [
+        { "@type": "type.googleapis.com/google.rpc.QuotaFailure", "violations": [{ "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests", "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaDimensions": { "model": "gemini-3.8-flash" }, "quotaValue": "20" }] },
+        { "@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "5460s" }
+    ] } })
+    .to_string();
+    let hits = Arc::new(AtomicUsize::new(0));
+    let h = hits.clone();
+    let server = FakeServer::start(move |_| {
+        h.fetch_add(1, Ordering::SeqCst);
+        Resp::json(429, &body)
+    });
+    let m = HttpModel::new(spec("google/gemini-3.8-flash"), Credential::Key("k".into()), None).unwrap().at(&format!("{}/x", server.base));
+    let e = run(&m, &request(&origin("google/gemini-3.8-flash"))).0.unwrap_err();
+    assert_eq!(hits.load(Ordering::SeqCst), 1, "一天的额度用完了不重试");
+    assert!(e.message.contains("免费层每天只能调 20 次") && e.message.contains("约 1 小时 31 分钟后恢复"), "{}", e.message);
 }

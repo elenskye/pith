@@ -46,6 +46,7 @@ pub fn encode(req: &Request, spec: &ModelSpec, origin: &Origin) -> Value {
         (_, Some(e)) => body["reasoning"] = json!({ "summary": "auto", "effort": e }),
         (Thinking::Switch, None) => body["reasoning"] = json!({ "effort": "none" }),
         (Thinking::Always, None) => body["reasoning"] = json!({ "summary": "auto" }),
+        (Thinking::Never, None) => {}
     }
     body
 }

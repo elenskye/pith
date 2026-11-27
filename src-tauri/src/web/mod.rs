@@ -25,7 +25,7 @@ use rusqlite::Connection;
 use crate::agent::secret::ApiKey;
 use crate::agent::usage::Prices;
 use crate::gateway::Provider;
-use crate::gateway::catalog::{self, Tier};
+use crate::gateway::catalog;
 use crate::research::anthropic::{Anthropic, ClaudeFetch, ClaudeSearch};
 use crate::research::download::{Downloader, WithFallback};
 use crate::research::meter::Meter;
@@ -44,6 +44,8 @@ pub struct Web {
     pub engine: String,
     /// 没用这一家自带的搜索时说一句
     pub note: Option<String>,
+    /// 自带的搜索这次搜不了（Google 免费层不给 Google 搜索、限流）时借用的：搜索、给站主看的名字
+    pub backup: Option<(Box<dyn Search>, String)>,
     pub fetch: WithFallback,
 }
 
@@ -81,17 +83,17 @@ fn native(p: Provider, s: &Setup, meter: &Arc<Meter>) -> Option<Box<dyn Search>>
     match p {
         Provider::Anthropic => {
             let key = (s.key)(ApiKey::Anthropic)?;
-            Some(Box::new(ClaudeSearch { model: Anthropic::new(None, key, catalog::tier(p, Tier::Cheap).model.api_model, meter.clone()) }))
+            Some(Box::new(ClaudeSearch { model: Anthropic::new(None, key, catalog::helper(p).api_model, meter.clone()) }))
         }
         Provider::Openai => {
             let key = (s.key)(ApiKey::Openai)?;
-            Some(Box::new(crate::concept::responses::OpenAiSearch { model: crate::concept::responses::Responses::new(None, key, catalog::tier(p, Tier::Balanced).model.api_model, "low", meter.clone()) }))
+            Some(Box::new(crate::concept::responses::OpenAiSearch { model: crate::concept::responses::Responses::new(None, key, catalog::helper(p).api_model, "low", meter.clone()) }))
         }
         Provider::Google => {
             let key = (s.key)(ApiKey::Google)?;
-            Some(Box::new(gemini::GeminiSearch::with_key(key, catalog::tier(p, Tier::Cheap).model.api_model, meter.clone())))
+            Some(Box::new(gemini::GeminiSearch::with_key(key, catalog::helper(p).api_model, meter.clone())))
         }
-        Provider::Vertex => s.vertex.as_ref().map(|v| Box::new(gemini::GeminiSearch::vertex(v, catalog::tier(p, Tier::Cheap).model.api_model, meter.clone())) as Box<dyn Search>),
+        Provider::Vertex => s.vertex.as_ref().map(|v| Box::new(gemini::GeminiSearch::vertex(v, catalog::helper(p).api_model, meter.clone())) as Box<dyn Search>),
         Provider::Deepseek => None,
     }
 }
@@ -104,6 +106,7 @@ pub fn kit(s: &Setup) -> Web {
             search: Some(Box::new(research_engine::fixture::MockSearch::new(1))),
             engine: label("mock").into(),
             note: None,
+            backup: None,
             fetch: WithFallback { inner: Downloader::mock(s.root, 1).into_snapshots(snaps), claude: None },
         };
     }
@@ -131,8 +134,20 @@ pub fn kit(s: &Setup) -> Web {
         }
     }
     let engine = search.as_ref().map(|x| label(&x.engine()).to_string()).unwrap_or_default();
+    // 自带的搜索这次搜不了时借谁的：Tavily，再不行别家自带的（1.1.0 验收：Google 免费层不给 Google 搜索）
+    let backup = if note.is_none() && search.is_some() {
+        (s.key)(ApiKey::Tavily)
+            .map(|k| Box::new(Tavily::new(None, k, Depth::Basic, meter.clone())) as Box<dyn Search>)
+            .or_else(|| [Provider::Anthropic, Provider::Openai, Provider::Google, Provider::Vertex].into_iter().filter(|p| *p != s.provider && !(matches!(s.provider, Provider::Google | Provider::Vertex) && matches!(p, Provider::Google | Provider::Vertex))).find_map(|p| native(p, s, &meter)))
+            .map(|x| {
+                let name = label(&x.engine()).to_string();
+                (x, name)
+            })
+    } else {
+        None
+    };
     let claude = (s.key)(ApiKey::Anthropic).map(|k| ClaudeFetch { model: Anthropic::new(None, k, crate::research::anthropic::FETCH_MODEL, meter.clone()) });
-    Web { search, engine, note, fetch: WithFallback { inner: Downloader::real(s.root).into_snapshots(snaps), claude } }
+    Web { search, engine, note, backup, fetch: WithFallback { inner: Downloader::real(s.root).into_snapshots(snaps), claude } }
 }
 
 /// 搜索结果写成给模型看的文字
@@ -150,9 +165,20 @@ pub fn search(web: &Web, query: &str, limit: usize, cancel: &AtomicBool) -> Resu
     let Some(engine) = &web.search else {
         return Err("联网搜索用不了：这一家没有自带的搜索，也没有填 Tavily 或别家的密钥。到「设置 › 模型与费用」填一把。".into());
     };
-    let reply = engine.search(q, limit.clamp(1, 10), cancel).map_err(|e| e.message)?;
-    let mut out = format!("网上搜「{q}」的 {} 条（{}）：\n", reply.hits.len(), web.engine);
-    if let Some(n) = &web.note {
+    let n = limit.clamp(1, 10);
+    let (reply, used, note) = match engine.search(q, n, cancel) {
+        Ok(r) => (r, web.engine.clone(), web.note.clone()),
+        Err(e) => match &web.backup {
+            // 自带的搜不了：借别家的再搜一次，说一声
+            Some((b, name)) if !cancel.load(std::sync::atomic::Ordering::SeqCst) => {
+                let r = b.search(q, n, cancel).map_err(|e2| format!("{}；改用 {name} 也没搜成：{}", e.message, e2.message))?;
+                (r, name.clone(), Some(format!("{} 这次搜不了（{}），改用 {name}", web.engine, crate::gateway::short(&e.message, 60))))
+            }
+            _ => return Err(e.message),
+        },
+    };
+    let mut out = format!("网上搜「{q}」的 {} 条（{used}）：\n", reply.hits.len());
+    if let Some(n) = &note {
         out.push_str(&format!("（{n}）\n"));
     }
     for (i, h) in reply.hits.iter().enumerate() {

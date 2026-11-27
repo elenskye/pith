@@ -1,15 +1,17 @@
-// 设置 › 模型与费用（1.1.0 照 R1 重画，decisions/0036）：本月花了多少（大圈、每天的细柱、各家、缓存命中、月上限）、
-// 默认模型（一家 + 一档）、各家的密钥（Vertex AI 填项目和区域、看 gcloud 登录了没有）、最近的几笔。
-// 大留白、大字、少按钮：填过的密钥只露「换」「清掉」两个字。
+// 设置 › 模型与费用（1.1.0 照 R1 重画，decisions/0036；验收时改，decisions/0041）：本月花了多少（大圈、每天的细柱、各家、缓存命中、月上限）、
+// 默认模型（对话用的、子代理用的，两层的选框）、各家（密钥、模型清单、每个模型想不想想多深、刷新、免费额度；
+// Vertex AI 填项目和区域、看 gcloud 登录了没有）、最近的几笔。
+// 大留白、大字、少按钮：填过的密钥只露「换」「清掉」；每个模型只露「自定义」，点开的改动立刻存。
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApiKeyWhich, type ModelKeyView, type ModelProviderView, type ModelStatus, type UsageCall } from "@/shared/ipc";
+import { api, type ApiKeyWhich, type ModelChoice, type ModelKeyView, type ModelProviderView, type ModelStatus, type ModelView, type UsageCall } from "@/shared/ipc";
+import { EFFORT, ModelPicker, effortLabel, findModel, price, thinkLabel } from "@/chat/ModelPicker";
 import { useUi } from "@/shared/ui";
 import { money } from "@/research/labels";
 import { UsageRing, DayBars } from "@/chat/Usage";
 
 const PLACE: Record<string, string> = { keychain: "存在钥匙串", memory: "只在这次运行里", file: "来自密钥文件" };
-const PURPOSE: Record<string, string> = { chat: "对话", chat_subagent: "子代理", extract: "排版", plan: "排版" };
+const PURPOSE: Record<string, string> = { chat: "对话", chat_subagent: "子代理", chat_web: "联网", model_probe: "刷新模型清单", extract: "排版", plan: "排版" };
 const purpose = (p: string) => PURPOSE[p] ?? (p.startsWith("research") ? "事实调查" : p.startsWith("concept") ? "概念研究" : p);
 
 export function ModelSettings() {
@@ -30,14 +32,11 @@ export function ModelSettings() {
       {s.mock && <p className="mdl-mock">开发版、测试用模拟模型：不联网、不花钱。下面的密钥只在换成真接口（正式版，或 PITH_REAL_MODEL=1）时用到。</p>}
       {usage.data && <Spend s={s} onBudget={() => void Promise.all([status.refetch(), usage.refetch()])} />}
       <p className="set-h3">默认模型</p>
-      <Default s={s} onStatus={put} />
-      <p className="set-h3">各家的密钥</p>
-      {s.providers
-        .filter((p) => p.key)
-        .map((p) => (
-          <KeyRow key={p.id} which={p.key!} label={p.label} has={p.ready} place={p.keyPlace ?? "memory"} note={tierLine(p)} onStatus={put} />
-        ))}
-      <Vertex s={s} onStatus={put} />
+      <Defaults s={s} onStatus={put} />
+      <p className="set-h3">各家</p>
+      {s.providers.map((p) => (
+        <ProviderBlock key={p.id} s={s} p={p} onStatus={put} />
+      ))}
       <p className="set-h3">别的密钥</p>
       {s.otherKeys.map((k) => (
         <KeyRow key={k.which} which={k.which} label={k.label} has={k.has} place={k.place} note={k.note} onStatus={put} />
@@ -56,7 +55,6 @@ export function ModelSettings() {
   );
 }
 
-const tierLine = (p: ModelProviderView) => p.tiers.map((t) => t.modelLabel).filter((v, i, a) => a.indexOf(v) === i).join(" · ");
 
 function Spend({ s, onBudget }: { s: ModelStatus; onBudget: () => void }) {
   const { notify } = useUi();
@@ -136,42 +134,175 @@ function Spend({ s, onBudget }: { s: ModelStatus; onBudget: () => void }) {
   );
 }
 
-function Default({ s, onStatus }: { s: ModelStatus; onStatus: (s: ModelStatus) => void }) {
+function useSet(onStatus: (s: ModelStatus) => void) {
   const { notify } = useUi();
-  const set = async (prefs: ModelStatus["prefs"]) => {
+  return async (f: () => Promise<ModelStatus>, ok?: string) => {
     try {
-      onStatus(await api.modelPrefsSet(prefs));
+      onStatus(await f());
+      if (ok) notify(ok);
     } catch (e) {
       notify(String(e), "error");
     }
   };
-  const p = s.providers.find((x) => x.id === s.prefs.provider) ?? s.providers[0];
-  const t = p.tiers.find((x) => x.tier === s.prefs.tier) ?? p.tiers[1];
+}
+
+/** 对话用哪个模型、子代理用哪个（默认：对话那一家最强的） */
+function Defaults({ s, onStatus }: { s: ModelStatus; onStatus: (s: ModelStatus) => void }) {
+  const run = useSet(onStatus);
+  const main = findModel(s, s.prefs.model);
+  const sub = findModel(s, s.prefs.subagentUsed);
+  const subSet = s.prefs.subagent && findModel(s, s.prefs.subagent)?.p.id === main?.p.id ? s.prefs.subagent : null;
+  const setMain = (model: string | null) => {
+    if (!model) return;
+    const same = findModel(s, model)?.p.id === main?.p.id;
+    void run(() => api.modelPrefsSet({ model, subagent: same ? subSet : null }));
+  };
+  const setSub = (subagent: string | null) => void run(() => api.modelPrefsSet({ model: s.prefs.model, subagent }));
   return (
-    <div className="mdl-default">
-      <div className="mdl-providers">
-        {s.providers.map((x) => (
-          <button key={x.id} className={`mdl-provider ${x.id === p.id ? "is-on" : ""} ${x.ready ? "is-ready" : ""}`} onClick={() => void set({ provider: x.id, tier: s.prefs.tier })} disabled={!x.ready && !s.mock}>
-            <b>{x.label}</b>
-            <span>{x.ready ? "能用" : x.id === "vertex" ? "要登录" : "没填密钥"}</span>
-          </button>
-        ))}
+    <div className="mdl-defaults">
+      <div className="mdl-def">
+        <span className="mdl-def-k">对话</span>
+        <ModelPicker status={s} value={s.prefs.model} onPick={setMain} />
+        {main && <Brief m={main.m} />}
       </div>
-      <div className="seg mdl-seg">
-        {p.tiers.map((x) => (
-          <button key={x.tier} className={x.tier === t.tier ? "is-on" : ""} onClick={() => void set({ provider: p.id, tier: x.tier })}>
-            {x.label}
-          </button>
-        ))}
+      <div className="mdl-def">
+        <span className="mdl-def-k">读整章、写长东西</span>
+        <ModelPicker status={s} value={subSet} onPick={setSub} only={main?.p.id} auto={{ label: `自动：${sub?.m.label ?? "这一家最强的"}`, hint: "跟着对话那一家，用它最强的" }} />
+        {sub && <Brief m={sub.m} />}
       </div>
-      <p className="mdl-pick">
-        <b>{t.modelLabel}</b>
-        {t.effort && <span>想得{t.effort === "low" ? "浅" : t.effort === "high" ? "深" : "适中"}</span>}
-        <span className="num">
-          每百万 token 输入 ${t.input} · 输出 ${t.output} · 缓存读 ${t.cacheRead}
+      <p className="mdl-hint">对话从头到尾用一个模型（中途换，缓存会白付）；读整章、写长东西交给子代理。每个模型想不想、想多深，在下面各家的清单里定，对话、子代理和别处都照它。</p>
+    </div>
+  );
+}
+
+function Brief({ m }: { m: ModelView }) {
+  return (
+    <span className="mdl-brief">
+      <span>{thinkLabel(m)}</span>
+      <span className="num">{m.priced ? `每百万 token 输入 $${m.input} · 输出 $${m.output} · 缓存读 $${m.cacheRead}` : "价格表里没有，按最贵的估"}</span>
+    </span>
+  );
+}
+
+const when = (iso: string | null) => (iso ? `${Number(iso.slice(5, 7))} 月 ${Number(iso.slice(8, 10))} 日` : "");
+
+/** 一家：密钥（Vertex 是项目和登录）、免费额度、模型清单、刷新 */
+function ProviderBlock({ s, p, onStatus }: { s: ModelStatus; p: ModelProviderView; onStatus: (s: ModelStatus) => void }) {
+  const run = useSet(onStatus);
+  const [refreshing, setRefreshing] = useState(false);
+  const [more, setMore] = useState(false);
+  const usable = p.ready || s.mock;
+  const own = p.models.filter((m) => !m.found);
+  const found = p.models.filter((m) => m.found);
+  const refresh = async () => {
+    setRefreshing(true);
+    await run(() => api.modelRefresh(p.id));
+    setRefreshing(false);
+  };
+  return (
+    <section className={`mdl-prov ${usable ? "" : "is-off"}`}>
+      {p.key ? (
+        <KeyRow which={p.key} label={p.label} has={p.ready} place={p.keyPlace ?? "memory"} note={usable ? "" : own.map((m) => m.label).join(" · ")} onStatus={onStatus} />
+      ) : (
+        <Vertex s={s} onStatus={onStatus} />
+      )}
+      {(usable || p.refreshNote) && (
+        <div className="mdl-prov-bar">
+          <span>
+            {p.models.length} 个模型
+            {p.refreshedAt ? ` · ${when(p.refreshedAt)}刷新过` : " · Pith 自带的清单"}
+          </span>
+          {!s.mock && (p.ready || p.id === "vertex") && (
+            <button className="pith-link" onClick={() => void refresh()} disabled={refreshing}>
+              {refreshing ? "正在问…" : "刷新"}
+            </button>
+          )}
+          {p.free !== null && (
+            <label className="mdl-free">
+              <input type="checkbox" className="pith-check" checked={p.free} onChange={(e) => void run(() => api.modelFreeSet(p.id, e.target.checked))} />
+              用免费额度
+              <em>账本记 0、不占月上限</em>
+            </label>
+          )}
+        </div>
+      )}
+      {p.refreshNote && <p className="mdl-note selectable">上次刷新没成：{p.refreshNote}</p>}
+      {usable && (
+        <div className="mdl-models">
+          {own.map((m) => (
+            <ModelRow key={m.id} m={m} onStatus={onStatus} />
+          ))}
+          {found.length > 0 && (
+            <button className="mdl-more" onClick={() => setMore(!more)} aria-expanded={more}>
+              {more ? "收起" : `还有 ${found.length} 个`}
+              <em>刷新时从接口拿到的</em>
+            </button>
+          )}
+          {more && found.map((m) => <ModelRow key={m.id} m={m} onStatus={onStatus} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const CAP: Record<ModelView["thinking"], string> = { always: "一直想", switch: "能关", never: "不想" };
+
+/** 一个模型：名字、想不想想多深、价；「自定义」点开改，改了立刻存 */
+function ModelRow({ m, onStatus }: { m: ModelView; onStatus: (s: ModelStatus) => void }) {
+  const run = useSet(onStatus);
+  const [open, setOpen] = useState(false);
+  const set = (choice: ModelChoice | null) => void run(() => api.modelThinkingSet(m.id, choice));
+  const levels = m.efforts.length;
+  return (
+    <div className={`mdl-model ${open ? "is-open" : ""}`}>
+      <div className="mdl-model-row">
+        <b>{m.label}</b>
+        <span className="mdl-cap">
+          {CAP[m.thinking]}
+          {levels > 0 && ` · ${levels} 档`}
+          {m.source !== "builtin" && <em>{m.source === "api" ? "接口报的" : "推断的"}</em>}
         </span>
-      </p>
-      <p className="mdl-hint">对话都用这一档；读整章、写长东西时交给强一档的子代理，主对话不换模型（换来换去缓存会白付）。</p>
+        <span className={`mdl-now ${m.custom ? "is-custom" : ""}`}>{thinkLabel(m)}</span>
+        <span className="mdl-price num">{price(m)}</span>
+        {m.thinking !== "never" ? (
+          <button className="pith-link" onClick={() => setOpen(!open)} aria-expanded={open}>
+            {open ? "收起" : "自定义"}
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
+      {open && (
+        <div className="mdl-custom">
+          {m.thinking === "switch" && (
+            <div className="seg">
+              <button className={m.choice.on ? "is-on" : ""} onClick={() => set({ on: true, effort: m.choice.effort ?? m.defaultChoice.effort })}>
+                想
+              </button>
+              <button className={!m.choice.on ? "is-on" : ""} onClick={() => set({ on: false, effort: m.choice.effort })}>
+                不想
+              </button>
+            </div>
+          )}
+          {levels > 0 && (
+            <div className={`seg ${m.choice.on ? "" : "is-dim"}`} aria-label="想多深">
+              {m.efforts.map((e) => (
+                <button key={e} className={m.choice.on && m.choice.effort === e ? "is-on" : ""} onClick={() => set({ on: true, effort: e })} title={e}>
+                  {EFFORT[e] ?? e}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="mdl-custom-def">
+            默认：{m.defaultChoice.on ? `想 · ${effortLabel(m.defaultChoice.effort)}` : "不想"}
+            {m.custom && (
+              <button className="pith-link" onClick={() => set(null)}>
+                恢复默认
+              </button>
+            )}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 //! - 跑的时候界面每 0.2 秒问一次 `chat_live`：状态行到哪一格、正文写到哪了；点停是 `chat_stop`。
 //! - 给模型看的对话由存下的消息拼出来：站主那一条用当时发出去的样子（`sent`），Pith 那一条用存下的 `transcript`，
 //!   原样重放、只往后追加，缓存才命中。演示的回答（1.0.x 的 `mock: true`）不放进去。
-//! - 模型：设置里的一家 + 一档；子代理用同一家高一档。开发版、测试用模拟模型（`harness::brain`）。
+//! - 模型：设置里选的对话模型和子代理模型，思考照设置里每个模型定的（`decisions/0041`）。开发版、测试用模拟模型（`harness::brain`）。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager};
 
 use super::store::{self, Conversation, Role};
 use crate::AppState;
-use crate::gateway::catalog::{self, Pick, Tier};
+use crate::gateway::catalog::Pick;
 use crate::gateway::http::{Credential, HttpModel};
 use crate::gateway::meter::Meter;
 use crate::gateway::mock::MockModel;
@@ -313,12 +313,10 @@ fn build(app: &AppHandle, state: &AppState, pick: Pick) -> Result<Box<dyn Model>
     Ok(Box::new(HttpModel::new(pick.model, credential, Some(&vertex)).map_err(|e| e.message)?))
 }
 
-/// 这一回用哪一档：角色写了清单里的模型（`anthropic/claude-opus-5-5`）就用它，不然用设置里的一家 + 一档
+/// 这一回用哪个模型：角色写了清单里的模型（`anthropic/claude-opus-5-5`）就用它，不然用设置里选的；思考照设置
 fn picks(state: &AppState, role: &Role) -> (Pick, Pick) {
-    let prefs = crate::gateway::commands::prefs(state);
-    let main = catalog::model(role.model.trim()).map(|m| Pick { model: m, effort: catalog::tier(m.provider, Tier::Balanced).effort, tier: Tier::Balanced }).unwrap_or_else(|| catalog::tier(prefs.provider, prefs.tier));
-    let strong = catalog::tier(main.model.provider, main.tier.up());
-    (main, strong)
+    let m = role.model.trim();
+    crate::gateway::commands::picks(state, (!m.is_empty()).then_some(m))
 }
 
 pub fn ready(app: &AppHandle, state: &AppState, p: Provider) -> bool {
@@ -370,7 +368,8 @@ fn answer(app: &AppHandle, conv_uid: &str, view: &Arc<Mutex<LiveView>>, cancel: 
     }
     let model = build(app, &state, main)?;
     let strong_model = build(app, &state, strong)?;
-    let meter = Meter::new(&state.paths.root, crate::agent::budget(&state), crate::research::commands::settings(&state).prices);
+    let mut meter = Meter::new(&state.paths.root, crate::agent::budget(&state), crate::research::commands::settings(&state).prices);
+    meter.free = crate::gateway::commands::free(&state);
     let provider = main.model.provider;
     let env = ChatEnv {
         state: &state,

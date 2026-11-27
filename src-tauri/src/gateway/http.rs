@@ -147,6 +147,13 @@ fn read_error_body(resp: &mut ureq::http::Response<ureq::Body>) -> Value {
     serde_json::from_str(&text).unwrap_or(Value::Null)
 }
 
+/// Google 的错误里带的「多久以后再试」（秒）
+pub fn retry_delay(v: &Value) -> Option<u64> {
+    let details = v.pointer("/error/details").or_else(|| v.pointer("/0/error/details"))?.as_array()?;
+    let d = details.iter().find(|d| d["@type"].as_str().is_some_and(|t| t.ends_with("RetryInfo")))?;
+    d["retryDelay"].as_str()?.trim_end_matches('s').parse::<f64>().ok().map(|x| x.ceil() as u64)
+}
+
 /// 中途断了、停了：按估计算已经花掉的（输入按估计，输出按收到的字数，往高里算）
 fn spent(input_estimate: u64, chars: usize) -> Tokens {
     Tokens { input: input_estimate, output: chars as u64 * 3 / 2 + 200, ..Default::default() }
@@ -191,7 +198,9 @@ impl Model for HttpModel {
             if status == 401 && matches!(self.credential, Credential::Adc) {
                 vertex::token().forget();
             }
-            if retryable(status) && attempt < self.waits.len() {
+            // 要等很久的（Google 免费额度一天的上限用完了）不重试，直接说清楚
+            let long_wait = retry_delay(&v).is_some_and(|d| d > 90);
+            if retryable(status) && attempt < self.waits.len() && !long_wait {
                 let w = self.waits[attempt];
                 wait(after.map(|a| a.min(60)).filter(|_| w > 0).unwrap_or(w), cancel)?;
                 attempt += 1;

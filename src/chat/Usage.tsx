@@ -1,8 +1,9 @@
-// 输入框下面一行（1.1.0，decisions/0036）：左边是用哪个模型（点开换一档、换一家），右边是本月花了多少的小圈（点开看明细）。
+// 输入框下面一行（1.1.0，decisions/0036）：左边是用哪个模型（点开两层：先选一家、再选模型，decisions/0041），右边是本月花了多少的小圈（点开看明细）。
 // 花钱只看月上限（decisions/0030）：不逐次确认，这里一直看得见。
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ModelStatus, type UsageSummary } from "@/shared/ipc";
+import { api, type UsageSummary } from "@/shared/ipc";
+import { ModelPicker } from "@/chat/ModelPicker";
 import { usePresence } from "@/shared/controls";
 import { useNav } from "@/app/nav";
 import { money } from "@/research/labels";
@@ -52,25 +53,17 @@ export function UsageLine({ conversation, below }: { conversation?: string | nul
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["modelStatus"], queryFn: api.modelStatus, staleTime: 30_000 });
   const usage = useQuery({ queryKey: ["usage", conversation ?? null], queryFn: () => api.usageSummary(conversation), staleTime: 5_000 });
-  const [open, setOpen] = useState<"model" | "usage" | null>(null);
-  // 退场时还要知道是哪一个在退
-  const [shown, setShown] = useState<"model" | "usage">("usage");
-  const toggle = (k: "model" | "usage") => {
-    setShown(k);
-    setOpen(open === k ? null : k);
-  };
+  const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  useClickAway(!!open, wrap, () => setOpen(null));
-  const pop = usePresence(!!open);
+  useClickAway(open, wrap, () => setOpen(false));
+  const pop = usePresence(open);
   const s = status.data;
   const u = usage.data;
   if (!s || !u) return <div className="use-line" />;
-  const provider = s.providers.find((p) => p.id === s.prefs.provider);
-  const tier = provider?.tiers.find((t) => t.tier === s.prefs.tier);
-  const pick = async (prefs: ModelStatus["prefs"]) => {
+  const pick = async (model: string | null) => {
+    if (!model) return;
     try {
-      qc.setQueryData(["modelStatus"], await api.modelPrefsSet(prefs));
-      setOpen(null);
+      qc.setQueryData(["modelStatus"], await api.modelPrefsSet({ model, subagent: s.prefs.subagent }));
     } catch (e) {
       nav.say(String(e));
     }
@@ -78,45 +71,22 @@ export function UsageLine({ conversation, below }: { conversation?: string | nul
 
   return (
     <div className={`use-line ${below ? "is-below" : ""}`} ref={wrap}>
-      <button className={`use-model ${open === "model" ? "is-open" : ""}`} onClick={() => toggle("model")}>
-        <span>{tier?.modelLabel ?? "选一个模型"}</span>
-        <em>{tier?.label}</em>
-        {s.mock && <em className="is-mock">模拟</em>}
-      </button>
-      <button className={`use-spend ${open === "usage" ? "is-open" : ""}`} onClick={() => toggle("usage")} aria-label="本月用量">
+      <ModelPicker
+        status={s}
+        value={s.prefs.model}
+        onPick={(id) => void pick(id)}
+        variant="line"
+        footer={
+          <button className="pith-link" onClick={() => nav.openSettings("keys")}>
+            每个模型想多深：设置 › 模型与费用 →
+          </button>
+        }
+      />
+      <button className={`use-spend ${open ? "is-open" : ""}`} onClick={() => setOpen(!open)} aria-label="本月用量">
         <UsageRing spent={u.spentUsd} budget={u.budgetUsd} />
         <span className="num">{money(u.spentUsd)}</span>
       </button>
-      {pop.mounted && shown === "model" && (
-        <div className={`use-pop is-model ${pop.leaving ? "is-leaving" : ""}`}>
-          <p>默认模型 · 难的活交给强一档的子代理</p>
-          {provider && (
-            <div className="use-tiers">
-              {provider.tiers.map((t) => (
-                <button key={t.tier} className={t.tier === s.prefs.tier ? "is-on" : ""} onClick={() => void pick({ provider: provider.id, tier: t.tier })}>
-                  <b>{t.label}</b>
-                  <span>{t.modelLabel}</span>
-                  <em className="num">
-                    ${t.input} / ${t.output}
-                  </em>
-                </button>
-              ))}
-            </div>
-          )}
-          <p className="use-sub">换一家</p>
-          <div className="use-providers">
-            {s.providers.map((p) => (
-              <button key={p.id} className={p.id === s.prefs.provider ? "is-on" : ""} disabled={!p.ready && !s.mock} onClick={() => void pick({ provider: p.id, tier: s.prefs.tier })} title={p.ready || s.mock ? undefined : "还没填密钥"}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <button className="pith-link use-go" onClick={() => (setOpen(null), nav.openSettings("keys"))}>
-            设置 › 模型与费用 →
-          </button>
-        </div>
-      )}
-      {pop.mounted && shown === "usage" && <UsagePop u={u} leaving={pop.leaving} onMore={() => (setOpen(null), nav.openSettings("keys"))} />}
+      {pop.mounted && <UsagePop u={u} leaving={pop.leaving} onMore={() => (setOpen(false), nav.openSettings("keys"))} />}
     </div>
   );
 }

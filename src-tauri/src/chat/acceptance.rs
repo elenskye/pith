@@ -1,13 +1,13 @@
 //! 1.1.0 第 5 期的真实验收（默认忽略；联网、花钱，上限 $20，`decisions/0034`）。
 //!
-//! 和 App 走同一条路：真模型（网关）、真的本机检索（两本真《国富论》在知识库的「书架」里）、真的联网，
+//! 和 App 走同一条路：真模型（网关）、真的本机检索（两本真《国富论》在知识库的「暂存箱」里）、真的联网，
 //! 工具环境是 App 用的 `ChatEnv`，回答照 App 的样子存进对话。数据目录用 `PITH_ACCEPT_DIR`（一个测试目录，不是正式的），
 //! 打包版设 `PITH_DATA_DIR` 指过去就能在 App 里看这些对话。
 //!
 //! ```bash
 //! PITH_LOCAL_MODELS=real PITH_API_KEY_FILE=<名字=密钥 的文件> PITH_ACCEPT_DIR=local/acceptance-1.1.0/data \
 //! PITH_BOOK_EN=local/wealth-of-nations/en-penguin-skinner.epub PITH_BOOK_ZH=local/wealth-of-nations/zh-yang-jingnian-2011.epub \
-//! PITH_ROUNDS=anthropic,openai,deepseek,google,chapter,web,followup cargo test -p pith real_chat_acceptance -- --ignored --nocapture
+//! PITH_ROUNDS=anthropic,openai,deepseek,google,chapter,web,followup [PITH_VERTEX_PROJECT=<项目 ID>] cargo test -p pith real_chat_acceptance -- --ignored --nocapture
 //! ```
 //! 每一轮打印：模型、怎么结束的、状态行、花了多少（含缓存命中）、引用编号对上了几个、回答。整个目录的账本超过 $20 就不发（网关的月上限）。
 
@@ -19,10 +19,10 @@ use super::run::{self, ChatEnv};
 use super::store;
 use crate::AppState;
 use crate::agent::secret::ApiKey;
-use crate::gateway::catalog::{self, Tier};
+use crate::gateway::catalog;
 use crate::gateway::http::{Credential, HttpModel};
 use crate::gateway::meter::Meter;
-use crate::gateway::{Model, Provider};
+use crate::gateway::Model;
 use crate::harness::{self, Ctx, Event, Limits, prompt, tools::Toolbox};
 use crate::kb::cite;
 
@@ -34,7 +34,7 @@ fn path_of(var: &str) -> PathBuf {
     if p.is_absolute() { p } else { std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(p) }
 }
 
-/// 两本书在不在；不在就解析、迁进书架、补向量
+/// 两本书在不在；不在就解析、迁进暂存箱、补向量
 fn shelve(state: &AppState) -> String {
     let have = state.with_db(|c| crate::concept::store::texts_list(c)).unwrap();
     if have.is_empty() {
@@ -70,33 +70,35 @@ fn shelve(state: &AppState) -> String {
     if n > 0 {
         println!("用向量重新对齐：{n} 对");
     }
-    state.with_db(|c| crate::kb::store::kbs_list(c)).unwrap().into_iter().find(|k| k.name == crate::kb::store::SHELF).expect("书架").uid
+    state.with_db(|c| crate::kb::store::kbs_list(c)).unwrap().into_iter().find(|k| k.name == crate::kb::store::INBOX).expect("暂存箱").uid
 }
 
 struct Round {
     name: &'static str,
-    provider: Provider,
-    /// 用哪一档（默认均衡，和 App 一样）
-    tier: Tier,
+    /// 对话用的模型（清单 id；子代理用这一家最强的，思考照清单的默认）
+    model: &'static str,
     question: &'static str,
     /// 接着哪一轮的对话问
     after: Option<&'static str>,
 }
 
 const ROUNDS: &[Round] = &[
-    Round { name: "anthropic", provider: Provider::Anthropic, tier: Tier::Balanced, question: "斯密为什么说分工受市场范围的限制？请用书里的原话说明，每个说法标出处。", after: None },
-    Round { name: "followup", provider: Provider::Anthropic, tier: Tier::Balanced, question: "那他为什么特别强调水运？", after: Some("anthropic") },
-    Round { name: "openai", provider: Provider::Openai, tier: Tier::Balanced, question: "斯密的别针工厂例子是怎么讲的？他说分工提高效率有哪三个原因？引原文。", after: None },
-    Round { name: "deepseek", provider: Provider::Deepseek, tier: Tier::Balanced, question: "「看不见的手」在《国富论》里出现在哪里？原话怎么说，上下文在讲什么？", after: None },
-    Round { name: "google", provider: Provider::Google, tier: Tier::Balanced, question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
-    Round { name: "chapter", provider: Provider::Anthropic, tier: Tier::Balanced, question: "把第一篇第三章整章读一遍，告诉我这一章的论证是怎么一步步展开的，每一步标出处。", after: None },
-    Round { name: "web", provider: Provider::Anthropic, tier: Tier::Balanced, question: "《国富论》第一版是哪一年、在哪里出版的？上网查一下，给出处。再说说它和书里斯密自己讲市场范围的那段有没有关系（不用勉强联系）。", after: None },
-    Round { name: "longchapter", provider: Provider::Anthropic, tier: Tier::Balanced, question: "把第四篇第二章整章读一遍，概括斯密反对限制进口的论证是怎么展开的，每一步标出处。", after: None },
-    Round { name: "web_openai", provider: Provider::Openai, tier: Tier::Balanced, question: "亚当·斯密是哪一年去世的、葬在哪里？上网查一下，给出处。", after: None },
-    Round { name: "web_google", provider: Provider::Google, tier: Tier::Balanced, question: "格拉斯哥大学现在有没有以亚当·斯密命名的学院或商学院？上网查一下，给出处。", after: None },
-    Round { name: "google_lite", provider: Provider::Google, tier: Tier::Cheap, question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
-    Round { name: "web_google_lite", provider: Provider::Google, tier: Tier::Cheap, question: "格拉斯哥大学现在有没有以亚当·斯密命名的学院或商学院？上网查一下，给出处。", after: None },
-    Round { name: "web_deepseek", provider: Provider::Deepseek, tier: Tier::Balanced, question: "斯密的《道德情操论》第一版是哪一年出版的？上网查一下，给出处。", after: None },
+    Round { name: "anthropic", model: "anthropic/claude-sonnet-5-5", question: "斯密为什么说分工受市场范围的限制？请用书里的原话说明，每个说法标出处。", after: None },
+    Round { name: "followup", model: "anthropic/claude-sonnet-5-5", question: "那他为什么特别强调水运？", after: Some("anthropic") },
+    Round { name: "openai", model: "openai/gpt-6.2-sol", question: "斯密的别针工厂例子是怎么讲的？他说分工提高效率有哪三个原因？引原文。", after: None },
+    Round { name: "deepseek", model: "deepseek/deepseek-flash", question: "「看不见的手」在《国富论》里出现在哪里？原话怎么说，上下文在讲什么？", after: None },
+    Round { name: "google", model: "google/gemini-3.8-flash", question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
+    Round { name: "chapter", model: "anthropic/claude-sonnet-5-5", question: "把第一篇第三章整章读一遍，告诉我这一章的论证是怎么一步步展开的，每一步标出处。", after: None },
+    Round { name: "web", model: "anthropic/claude-sonnet-5-5", question: "《国富论》第一版是哪一年、在哪里出版的？上网查一下，给出处。再说说它和书里斯密自己讲市场范围的那段有没有关系（不用勉强联系）。", after: None },
+    Round { name: "longchapter", model: "anthropic/claude-sonnet-5-5", question: "把第四篇第二章整章读一遍，概括斯密反对限制进口的论证是怎么展开的，每一步标出处。", after: None },
+    Round { name: "web_openai", model: "openai/gpt-6.2-sol", question: "亚当·斯密是哪一年去世的、葬在哪里？上网查一下，给出处。", after: None },
+    Round { name: "web_google", model: "google/gemini-3.8-flash", question: "格拉斯哥大学现在有没有以亚当·斯密命名的学院或商学院？上网查一下，给出处。", after: None },
+    Round { name: "google_lite", model: "google/gemini-3.5-flash-lite", question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
+    Round { name: "web_google_lite", model: "google/gemini-3.5-flash-lite", question: "格拉斯哥大学现在有没有以亚当·斯密命名的学院或商学院？上网查一下，给出处。", after: None },
+    Round { name: "vertex", model: "vertex/gemini-3.8-flash", question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
+    Round { name: "vertex_lite", model: "vertex/gemini-3.5-flash-lite", question: "斯密怎么区分生产性劳动和非生产性劳动？举书里的例子，标出处。", after: None },
+    Round { name: "web_vertex", model: "vertex/gemini-3.5-flash-lite", question: "格拉斯哥大学现在有没有以亚当·斯密命名的学院或商学院？上网查一下，给出处。", after: None },
+    Round { name: "web_deepseek", model: "deepseek/deepseek-flash", question: "斯密的《道德情操论》第一版是哪一年出版的？上网查一下，给出处。", after: None },
 ];
 
 #[test]
@@ -112,13 +114,20 @@ fn real_chat_acceptance() {
     let shelf = shelve(&state);
     let wanted: Vec<String> = std::env::var("PITH_ROUNDS").unwrap_or_else(|_| "anthropic".into()).split(',').map(|s| s.trim().to_string()).collect();
     let prices = crate::research::commands::settings(&state).prices;
+    // Vertex 的几轮：PITH_VERTEX_PROJECT（区域 PITH_VERTEX_LOCATION，空着是 global），认证用 gcloud 的 ADC
+    let vertex = std::env::var("PITH_VERTEX_PROJECT").ok().filter(|p| !p.is_empty()).map(|project| crate::gateway::vertex::VertexConfig { project, location: std::env::var("PITH_VERTEX_LOCATION").unwrap_or_default() });
     let mut convs: Vec<(&str, String)> = Vec::new();
     let mut total = 0.0;
     for r in ROUNDS.iter().filter(|r| wanted.iter().any(|w| w == r.name)) {
-        let (main, strong) = (catalog::tier(r.provider, r.tier), catalog::tier(r.provider, r.tier.up()));
-        let k = key(crate::gateway::keys::key_of(r.provider).unwrap()).unwrap_or_else(|| panic!("密钥文件里没有 {} 的", r.provider.label()));
-        let model = HttpModel::new(main.model, Credential::Key(k.clone()), None).unwrap();
-        let strong_model = HttpModel::new(strong.model, Credential::Key(k), None).unwrap();
+        let main = catalog::default_pick(r.model);
+        let provider = main.model.provider;
+        let strong = catalog::strongest(provider).settle(None);
+        let credential = || match crate::gateway::keys::key_of(provider) {
+            Some(which) => Credential::Key(key(which).unwrap_or_else(|| panic!("密钥文件里没有 {} 的", provider.label()))),
+            None => Credential::Adc,
+        };
+        let model = HttpModel::new(main.model, credential(), vertex.as_ref()).unwrap();
+        let strong_model = HttpModel::new(strong.model, credential(), vertex.as_ref()).unwrap();
         // 接着问：这一次跑过的那一轮，或者以前跑过、标题是那一轮问题的最近一段对话
         let earlier = r.after.and_then(|a| {
             convs.iter().find(|(n, _)| *n == a).map(|(_, u)| u.clone()).or_else(|| {
@@ -141,7 +150,6 @@ fn real_chat_acceptance() {
             .unwrap();
         let meter = Meter::new(&root, BUDGET, prices.clone());
         let cancel = AtomicBool::new(false);
-        let provider = r.provider;
         let env = ChatEnv {
             state: &state,
             kbs: conv.kbs.clone(),
@@ -149,7 +157,7 @@ fn real_chat_acceptance() {
             cancel: &cancel,
             backfill: Box::new(|| {}),
             make_web: Box::new(|| {
-                crate::web::kit(&crate::web::Setup { root: &root, real: true, provider, key: &key, vertex: None, budget_usd: BUDGET, prices: prices.clone(), conversation: Some(&uid) })
+                crate::web::kit(&crate::web::Setup { root: &root, real: true, provider, key: &key, vertex: vertex.clone(), budget_usd: BUDGET, prices: prices.clone(), conversation: Some(&uid) })
             }),
             web: std::sync::OnceLock::new(),
         };

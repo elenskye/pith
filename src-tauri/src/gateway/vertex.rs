@@ -71,10 +71,45 @@ fn adc_path() -> Option<PathBuf> {
     Some(PathBuf::from(home).join(".config/gcloud/application_default_credentials.json"))
 }
 
-/// 从「应用程序」打开的 App 的 PATH 很短，gcloud 常装在这几处
+/// 站主终端里的 PATH：从「应用程序」打开的 App 只有很短的 PATH，看不到 `.zshrc` 里加的目录（gcloud 常装在那种地方）。
+/// 问一次登录的交互 shell（10 秒内没回就算了），记住；换令牌时也把它交给 gcloud（它要找 python）。
+pub fn shell_path() -> Option<&'static str> {
+    static P: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    P.get_or_init(|| {
+        let shell = std::env::var("SHELL").ok().filter(|s| s.starts_with('/')).unwrap_or_else(|| "/bin/zsh".into());
+        let mut child = std::process::Command::new(shell)
+            .args(["-ilc", "printf '\n__PITH_PATH__%s__END__\n' \"$PATH\""])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .ok()?;
+        let started = Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) if started.elapsed() > Duration::from_secs(10) => {
+                    let _ = child.kill();
+                    return None;
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(30)),
+                Err(_) => return None,
+            }
+        }
+        let out = String::from_utf8_lossy(&child.wait_with_output().ok()?.stdout).to_string();
+        let path = out.split("__PITH_PATH__").nth(1)?.split("__END__").next()?.trim().to_string();
+        (!path.is_empty()).then_some(path)
+    })
+    .as_deref()
+}
+
+/// gcloud 在哪：App 自己的 PATH、终端里的 PATH、常装的几处
 pub fn find_gcloud() -> Option<PathBuf> {
     let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
     let mut candidates: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).map(|d| d.join("gcloud")).collect()).unwrap_or_default();
+    if let Some(p) = shell_path() {
+        candidates.extend(std::env::split_paths(p).map(|d| d.join("gcloud")));
+    }
     candidates.extend(
         [
             "/opt/homebrew/bin/gcloud",
@@ -131,7 +166,11 @@ fn fetch() -> Result<String, GateError> {
         return Err(GateError::new(ErrorKind::Auth, format!("还没有 gcloud 的应用默认凭据。{LOGIN_HINT}")));
     }
     let gcloud = find_gcloud().ok_or_else(|| GateError::new(ErrorKind::Auth, "找不到 gcloud。装好 Google Cloud CLI（brew install --cask google-cloud-sdk）以后再试。"))?;
-    let mut child = std::process::Command::new(gcloud)
+    let mut cmd = std::process::Command::new(gcloud);
+    if let Some(p) = shell_path() {
+        cmd.env("PATH", p);
+    }
+    let mut child = cmd
         .args(["auth", "application-default", "print-access-token"])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())

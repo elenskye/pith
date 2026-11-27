@@ -273,16 +273,32 @@ impl WireStream for GeminiStream {
     }
 }
 
+/// 免费层的额度用完了：哪个模型、一天几次、多久以后恢复
+fn free_tier(body: &Value) -> Option<String> {
+    let details = body.pointer("/error/details").or_else(|| body.pointer("/0/error/details"))?.as_array()?;
+    let q = details.iter().find(|d| d["@type"].as_str().is_some_and(|t| t.ends_with("QuotaFailure")))?;
+    let v = q.pointer("/violations/0")?;
+    let id = v["quotaId"].as_str().unwrap_or("");
+    if !(id.contains("FreeTier") || v["quotaMetric"].as_str().is_some_and(|m| m.contains("free_tier"))) {
+        return None;
+    }
+    let model = v.pointer("/quotaDimensions/model").and_then(Value::as_str).unwrap_or("这个模型");
+    let n = v["quotaValue"].as_str().unwrap_or("?");
+    let per = if id.contains("PerDay") { "每天" } else if id.contains("PerMinute") { "每分钟" } else { "每段时间" };
+    let wait = super::http::retry_delay(body).map(|s| if s >= 3600 { format!("约 {} 小时 {} 分钟后恢复", s / 3600, s % 3600 / 60) } else if s >= 60 { format!("约 {} 分钟后恢复", s.div_ceil(60)) } else { format!("{s} 秒后恢复") }).unwrap_or_else(|| "过一阵恢复".into());
+    Some(format!("Google 的免费额度用完了：{model} 在免费层{per}只能调 {n} 次（问一句要调好几次），{wait}。可以先换别的模型；项目开了计费就没有这个限制。"))
+}
+
 pub fn error_message(status: u16, body: &Value, vertex: bool) -> String {
     let who = if vertex { "Vertex AI" } else { "Gemini" };
     let detail = body.pointer("/error/message").or_else(|| body.pointer("/0/error/message")).and_then(Value::as_str).map(|m| format!("（{}）", super::short(m, 200))).unwrap_or_default();
     match status {
         401 if vertex => "Vertex AI 拒绝了认证：在终端跑一次 gcloud auth application-default login，再看项目有没有开 Vertex AI 和计费。".into(),
-        403 if vertex => format!("这个项目没有权限调用这个模型{detail}：在 Google Cloud 控制台给项目开 Vertex AI API。"),
+        403 if vertex => format!("这个项目调不了 Vertex AI{detail}。多半是还没打开 Vertex AI API（Google 现在叫 Agent Platform API）：在终端跑 gcloud services enable aiplatform.googleapis.com --project 你的项目 ID，或在 Google Cloud 控制台打开；一般还要项目开了计费。"),
         400 if detail.contains("API key") => "Google 的 API Key 不对或已失效。到「设置 › 模型与费用」重新填写。".into(),
         401 | 403 => format!("{who} 的认证不对{detail}。到「设置 › 模型与费用」检查。"),
         404 => format!("找不到这个模型{detail}。"),
-        429 => format!("{who} 调用太频繁或额度用完了{detail}。等一会儿再试。"),
+        429 => free_tier(body).unwrap_or_else(|| format!("{who} 调用太频繁或额度用完了{detail}。等一会儿再试。")),
         s if s >= 500 => format!("{who} 的服务出错（{s}）。等一会儿再试。"),
         _ => format!("请求没有被接受{detail}。"),
     }
