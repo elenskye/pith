@@ -2,65 +2,68 @@
 
 > 规则：每轮开发结束必须更新本文件（`CLAUDE.md` 规则 1）。只写当前状态，历史看 git。
 
-## 现在：1.1.0 做完（2026-11-26），正式版装好了
+## 现在：1.1.0 验收（2026-11-27），正式版重装成验收后的 1.1.0
 
-你说第 4、5 期一起做：两个提交。第 5 期真书真模型验收花了 **$0.63**（上限 $20），找出并修了六处问题；正式版 1.1.0 已经装进「应用程序」（没有打开它，`~/Pith` 没碰）。
+你验收 1.1.0 时提的六条，都在 `decisions/0041`：
 
-### 第 5 期：真实验收和正式版（`decisions/0040`）
+1. **模型设置**（不分便宜 / 均衡 / 强）：
+   - 设置 › 模型与费用「默认模型」两行：**对话**、**读整章写长东西**（子代理，默认「自动：这一家最强的」）。都是两层的选框（左边一家、右边它的模型），弹出层贴着按钮、放不下往上翻、收在窗口里、名字换行不截断。
+   - 「各家」每家一份模型清单。每个模型写着「一直想 / 能关 · 几档」、现在的设置（「想 · 中」）、价；「自定义」点开改想不想、想多深（立刻存，「恢复默认」回去）。对话、子代理、联网借的模型都照它。
+   - 每家「刷新」问接口现在有哪些模型（不花钱）。Anthropic 的接口直接报思考能力；OpenAI 用一个必被拒收的请求读出每个模型认的档位（拒收不计费）；DeepSeek、Google 按同系列推断。新的放在「还有 N 个」里，标「接口报的 / 推断的」，没价的按最贵的估。核下来 **Haiku 5.5、Sonnet 5.5 的思考其实能关**，以前当成关不掉。自带清单加了 Fable 5.2、GPT-6.1 Terra、Gemini 4 Argon。
+   - 输入框下面只换模型（两层选框），旁边显示「想 · 中」；你原来存的「一家 + 一档」自动换成那一档的模型。
+2. **Google 免费额度**：429 是免费层的上限——**Gemini 3.8 Flash 每天 20 次**（每个模型分开算，问一句要调好几次）。现在不再白白重试，直接说「免费额度用完了，约 X 小时后恢复」。免费层**不给 Google 搜索**，联网加了备用：自带的搜不了就借 Claude 网页搜索（或 Tavily）再搜。设置里 Google、Vertex 有「用免费额度」，勾上账本记 0、不占月上限。
+3. **Vertex**：你登录过了，但项目 `gen-lang-client-0389669195` **还没打开 Vertex AI API**（403 SERVICE_DISABLED），一个请求都发不出去，那一轮没跑成。另外修了：gcloud 装在 `.zshrc` 加的目录里，正式版看不到（「没找到 gcloud」），现在会读终端的 PATH。
+4. **书架 → 暂存箱**：是的，它就是暂存的地方（1.1.0 升级时把还没种进任何库的书放进去，只为了能检索）。改名「暂存箱」，而且**放进别的知识库的书会自动从暂存箱里拿出来**，留下的就是还没归好的。你自己建的同名库不会被改。
+5. **重排**：有，是本机的 Qwen3-Reranker-0.6B（`~/Documents/LLM`，127.0.0.1:8082，用到才启动）。检索先按向量和按词各捞一批，再用它排序；它起不来就只按向量相似度排并说一声。不用云端重排、不花钱。
 
-- **怎么验的**：`chat/acceptance.rs`（忽略的测试），和 App 走同一条路：网关的真模型、App 的工具环境、本机检索、真联网，回答存进测试目录 `local/acceptance-1.1.0/data` 的对话里。两本真《国富论》迁进书架、本机补 8112 块向量。
-- **结果**（详表在 `0040`）：Anthropic、OpenAI、DeepSeek 问书都答得好，引用编号一共 93 个、库里全对得上；短章 `kb_read` 直接读完，长章（IV.ii）交给 Opus 子代理读完整章；联网三家都通（Claude 搜索、OpenAI 搜索、DeepSeek 借 Claude 的），取回原页、引用网页。**Google 没跑成**：Gemini 3.8 Flash 先 503「high demand」，后 429「exceeded your current quota」——账号那边的额度；便宜一档 3.5 Flash Lite 的工具调用和回放真的跑通了。Vertex 没跑（要你登录 gcloud、给项目 ID）。
-- **修了的六处**：
-  1. 回答丢了：DeepSeek 把整篇回答和交付卡写在同一轮，以前被当成过程话清掉（`harness::answer_text`）。
-  2. 英文版第四、五篇的页码全是 570：Penguin 第二卷的 EPUB 没有页码标记，解析器一直往下带；现在离上一个标记约两页以外就不写页码（解析器 `concept-text-3`）。**你的正式数据要重新解析一次英文版**（验收清单 1.1.0-5）。
-  3. Google 的新密钥（`AQ.` 开头，你的就是）设置里填不进：两种都认了。
-  4. 中译本的段落页边注写「译文」，不再写「原文」。
-  5. 模型常用的写法：单个换行隔开的小标题 / 列表 / 段落、`>` 引文、`[文字](网址)`、引用范围 `[P12–P15]`。
-  6. 写到一半断了却提示「没有产生费用」。
-- **正式版**：`pnpm app:install` 装好 1.1.0（固定证书签名）。第一次打开会先备份、把数据库升到 v12、书迁进书架。
+### 正式版里验了什么（computer use，2026-11-27 14:53）
 
-改的文件（第 5 期）：新 `src-tauri/src/chat/acceptance.rs`、`src/chat/markdown.ts`（+ 测试）、`docs/decisions/0040`；改 `harness/{mod,tools,tests}.rs`、`kb/{cite,retrieve}.rs`、`agent/secret.rs`、`concept-engine/src/text.rs`（+ `tests/text.rs`）、`chat/Reply.tsx`、`styles/app.css`；文档 `architecture.md`、`testing.md`、`ROADMAP.md`、决策索引。
+`pnpm app:install` 重装了 1.1.0（会先退出正在开的 Pith）。在正式版里点过：
 
-测试：`pnpm check` 全过（Rust 主库 337 个、前端 23 个、concept-engine 全部）；真实验收命令在 `docs/testing.md`「1.1.0 真实验收」；两本真书的解析测试（忽略的）重跑过，第一至三篇页码不变。
+- 输入框下面：「DeepSeek V4.1 Flash 想 · 深」——你原来的「DeepSeek · 均衡」自动换成了对的模型；点开两层选框正常（短的清单弹出层也短、贴着按钮往上翻）。
+- 设置 › 模型与费用：默认模型两行、各家清单都在；Vertex 那行「找到了 gcloud · 登录过了」（以前是没找到）；Vertex「刷新」把没开 API 的原因和命令写出来了。**替你勾了 Google 的「用免费额度」**（你说那把 Key 是免费额度；不对就取消勾）。
+- 知识库：「书架」已经改名「暂存箱」（3 份）。
+- **Anthropic「刷新」报 401「invalid x-api-key」**：同样的请求用你密钥文件夹里那把是 200，所以是**钥匙串里存的 Anthropic 密钥不对了**（多半是旧的）。
+- OpenAI「刷新」时 macOS 弹出钥匙串的询问（新装的 Pith 第一次读这把密钥），要你输登录密码、点「始终允许」——那个窗口我看不到也不该点，就停在那里。DeepSeek、真问一句的测试都要读钥匙串，所以没往下走。
+
+### 改的文件
+
+- 新：`src-tauri/src/gateway/discover.rs`（刷新清单、读接口的能力）、`src/chat/ModelPicker.tsx`（两层选框）、`docs/decisions/0041-models-per-model-thinking.md`
+- Rust：`gateway/{catalog,commands,anthropic,openai,gemini,http,meter,vertex,mod,tests}.rs`、`chat/{run,acceptance}.rs`、`web/{mod,tests}.rs`（备用搜索）、`kb/{store,tests}.rs`（暂存箱）、`lib.rs`（三个新命令）
+- 前端：`settings/ModelSettings.tsx`、`chat/Usage.tsx`、`shared/ipc.ts`、`dev/mockModel.ts`、`styles/app.css`（拿掉三档的样式）
+- 文档：`ROADMAP.md`（验收清单）、`architecture.md`、`testing.md`、`requirements.md`、`decisions/0036`（状态）、决策索引
+
+### 测试
+
+- `pnpm check` 全过（Rust 主库 350 个，新增：清单和思考设置、刷新的解析、关思考的写法、免费额度记 0、免费层一天的额度不重试、备用搜索、暂存箱）。
+- `?mock` 里走过：两层选框（窄窗口里收在窗口内、长清单在框里滚）、设置页自定义（改成「不想」、恢复默认）。
+- 补跑真实验收（`local/acceptance-1.1.0/rounds-6…8-*.log`）：Google 问书 5/5 编号对上；Google 联网第一次被免费层拒（这就是加备用搜索的原因），加了以后借 Claude 搜索、2/2 对上。一共 $0.007（Google 那部分实际免费）。另外刷新清单时探测 OpenAI 的档位，都是被拒收的请求，不计费。
 
 提交：
-- `v1.1.0: add web search, page fetch, web citations`（第 4 期）
-- `v1.1.0: real acceptance fixes, install`（第 5 期）
-
-## 第 4 期（2026-11-26）
-
-### 第 4 期：联网（`decisions/0039`）
-
-- **冻结 v11 样本库**（`fixtures/library-v11.json`，带知识库的块），**migration 0012**：`web_pages`、`web_blocks`。
-- **工具**（插件「联网」）：`web_search`（搜，返回标题、网站、网址、摘要）、`web_fetch`（取回一页，存快照，每段一个编号 `[W12]`，太长的接着读）。子代理也能用。
-- **搜索跟着这一回的模型**：Anthropic → Claude 网页搜索（Haiku 搜一次）；OpenAI → Responses 网页搜索；Google、Vertex → Gemini 的 Google 搜索（新写的 `web/gemini.rs`）；DeepSeek → Tavily；用不了就用 Tavily，再不行借别家有密钥的，并说一声。密钥第一次用到联网工具时才读。
-- **取回**：v0.3 的本机下载器（不下本机和内网），失败了有 Anthropic 密钥就用 Claude 网页抓取。快照在 `数据目录/web/`。
-- **引用**：`[W12]` 和 `[P123]` 一起编号；网页的页边注：标题、网站、取回的日子、那一段；「打开网页」「存进知识库」（存成网页快照材料，块就是那一页的块，能检索、能引用；存过的变「知识库里」）。
-- **账本**：用途 `chat_web`（用量明细里叫「联网」），带着对话。
-- 开发版、`?mock`：模拟搜索和合成网页；模拟脑子遇到「网上、最新、联网、查一下、新闻」先搜、取回、引用。
-
-改的文件：新 `src-tauri/migrations/0012_web.sql`、`src-tauri/src/web/*`、`fixtures/library-v11.json`、`docs/decisions/0039-web.md`；改 `kb/{cite,passages,retrieve,store,commands}.rs`、`chat/{run,tests}.rs`（工具环境改成不碰 Tauri 的 `ChatEnv`，真实验收也用它）、`harness/{tools,prompt,brain,tests}.rs`、`research/{meter,download}.rs`、`gateway/commands.rs`、`db.rs`、`transfer.rs`、`lib.rs`；前端 `ipc.ts`、`chat/Reply.tsx`、`dev/{mockChat,mockModel}.ts`；文档。
-
-测试：`pnpm check` 全过（Rust 主库 336 个，新增联网 5 个、工具 1 个）。`?mock` 里走过：问一句要上网的 → 状态行「在网上搜」「取回了」→ 页边注 → 存进知识库 → 变「知识库里」。真联网在第 5 期。
-
-提交：`v1.1.0: add web search, page fetch, web citations`
+- `v1.1.0: per-model thinking settings, model picker, inbox, free tier`
+- `v1.1.0: acceptance notes`（这份 HANDOFF）
 
 ## 等你
 
-1. **推送**：Pith `main`（第 3、4、5 期）。
-2. **正式版里点一遍**：`ROADMAP.md`「用户验收清单」里 1.1.0-1 到 1.1.0-5，最要紧的三件：第一次打开（升级、书架）、**英文版《国富论》重新解析一次**（修页码）、设置 › 知识库与检索「建索引」。
-3. **Google**：到 aistudio.google.com 看这把 Key 的项目开没开计费、额度多少（验收那天 3.8 Flash 一直 503 / 429）。
-4. **Vertex AI**（想用的话）：终端里 `gcloud auth application-default login`，设置里填项目 ID；告诉我项目 ID，我可以补跑 Vertex 那一轮（几分钱）。
-5. 两件我自己定的，不要就说：书迁进新建的「书架」；有向量时对齐默认用相似度。
+1. **钥匙串**：屏幕上那个钥匙串询问输登录密码、点「始终允许」（每把密钥第一次会问一次）。
+2. **Anthropic 密钥**：设置 › 模型与费用 › Anthropic「换」，粘你现在用的那把，再点「刷新」应该就不报 401 了。
+3. **Vertex**：要用的话，先给项目打开 Vertex AI API（会改你的 Google Cloud 项目，所以我没动）：
+   ```bash
+   gcloud services enable aiplatform.googleapis.com --project gen-lang-client-0389669195
+   ```
+   Vertex 一般还要项目开了计费。打开以后告诉我，我补跑 Vertex 那一轮（`PITH_VERTEX_PROJECT=… PITH_ROUNDS=vertex_lite,web_vertex`，几分钱）。
+4. **推送**：Pith `main`（第 3、4、5 期和这次验收的两个提交）。
+5. 正式版里点一遍 `ROADMAP.md`「用户验收清单」里 1.1.0-验收 那几行；英文版《国富论》重新解析一次（1.1.0-5，修页码）还没做的话也做一下。
 
 ## 已知的、没做的
 
-- Gemini 的 Google 搜索（grounding）只有单元测试，没在真接口上跑成（额度）；Tavily 没有密钥，没真跑。
-- 网页快照在知识库面板里还没有专门的阅读样子；没存进知识库的快照不清理。
-- 输入框下面的模型名改的是默认，还不能每段对话各选各的。
+- 回答里的 `###`、`####` 小标题、`---` 分隔线，轻量 Markdown 还没认（Gemini 爱写）。
+- Google 的「用免费额度」只管对话；Gemini 的 Google 搜索在免费层本来就搜不了，会借别家的。
+- 输入框下面换的是默认模型，还不能每段对话各选各的。
+- 两层选框是在 Pith 里用方案 `pith` 现有的变量和动效拼的，还没进 Atelier 的 Design System（待批）。
 - 子代理只有「读」一种、不能再派；后台任务、组队、插件库在后面的版本。
 - 1.0.5 那些照旧：卡片滑的时候宽度一下变；洇开的圈里是静的；文献库表格没虚拟滚动；技能页、导入页、设置旧块的样子没重画。
 
 ## 下一轮
 
-1.1.0 做完了。下一版是 **1.2.0 PDF 交给 engine-pdf**（`0034`）：开工前先问开发程度；那一版开工前还要问你一件——PDF 的标注写进文件、另存一份，还是照现在留在库里；engine-pdf 的 tag 要先推到 GitHub。
+先把上面「等你」1–3 做了（尤其 Vertex 要不要开）。之后 1.1.0 就算验收完；下一版是 **1.2.0 PDF 交给 engine-pdf**（`0034`）：开工前先问开发程度；还要问你一件——PDF 的标注写进文件、另存一份，还是照现在留在库里；engine-pdf 的 tag 要先推到 GitHub。
